@@ -70,7 +70,8 @@ impl Application for Game {
             Message::SolvePuzzle => {
                 let field = self.field.as_ref().expect("No puzzle available!");
                 let tents = field.tent_coordinates();
-                solve_puzzle(&tents, &field.row_counts, &field.column_counts)
+                //field.to_dimacs()
+                unimplemented!()
             },
         };
         Command::none()

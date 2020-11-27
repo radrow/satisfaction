@@ -1,8 +1,15 @@
-use std::collections::{HashSet};
+use std::collections::{HashSet, HashMap};
 use std::io;
 use std::path::Path;
 use std::fs;
 
+use crate::formula::*;
+
+
+type TentPlace = (usize, usize);
+
+type CoordSet = HashMap<usize, Vec<TentPlace>>;
+type NeiSet = HashMap<TentPlace, Vec<TentPlace>>;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum CellType {
@@ -10,6 +17,11 @@ pub enum CellType {
     Tent,
     Tree,
     Meadow,
+}
+
+
+pub fn mk_var_name((x, y) : TentPlace) -> String {
+    return String::from("v_") + &x.to_string() + "_" + &y.to_string();
 }
 
 pub struct Field {
@@ -54,9 +66,9 @@ impl Field {
             cells
         })
     }
-    
-    pub fn tent_coordinates(&self) -> HashSet<(usize, usize)> {
-        let mut tent_coordinates: HashSet<(usize, usize)> = HashSet::new();
+
+    pub fn tent_coordinates(&self) -> HashSet<TentPlace> {
+        let mut tent_coordinates: HashSet<TentPlace> = HashSet::new();
         let width = self.cells.len();
         let height = self.cells[0].len();
         for (x, row) in self.cells.iter().enumerate() {
@@ -84,12 +96,119 @@ impl Field {
         }
         tent_coordinates
     }
-}
 
-pub fn solve_puzzle(
-    tents: &HashSet<(usize, usize)>,
-    row_counts: &Vec<usize>,
-    column_counts: &Vec<usize>,
-) {
-    unimplemented!();
+    pub fn to_dimacs(&self) -> String {
+        self.to_formula().to_cnf().to_dimacs()
+    }
+
+    pub fn to_formula(&self) -> Formula {
+        let tents = &self.tent_coordinates();
+
+        let col_set: CoordSet = Field::make_coord_set_by(
+            &|x : &TentPlace| -> usize {x.1}, tents
+        );
+        let row_set: CoordSet = Field::make_coord_set_by(
+            &|x : &TentPlace| -> usize {x.0}, tents
+        );
+        let nei_set: NeiSet = Field::make_nei_set(tents);
+
+        let col_constraints : Formula =
+            Field::make_count_constraints(&self.column_counts, &col_set);
+        let row_constraints : Formula =
+            Field::make_count_constraints(&self.row_counts, &row_set);
+        let nei_constraints : Formula =
+            Field::make_nei_constraints(&nei_set);
+
+        col_constraints.and(row_constraints).and(nei_constraints)
+    }
+
+
+    fn make_coord_set_by (
+        by : &dyn Fn(&TentPlace) -> usize,
+        tents : &HashSet<TentPlace>,
+    ) -> CoordSet {
+        let mut out : CoordSet = HashMap::new();
+
+        for tent in tents {
+            out.entry(by(tent))
+                .and_modify(|v| v.push(*tent))
+                .or_insert(vec![*tent]);
+        }
+
+        out
+    }
+
+    fn make_nei_set(tents : &HashSet<TentPlace>) -> NeiSet {
+        let mut out : NeiSet = HashMap::new();
+
+        for tent in tents {
+            let mut neighbours = vec![];
+
+            let mut candidates = vec![];
+            if tent.0 > 0 {
+                candidates.push((tent.0 - 1, tent.1))
+            }
+            if tent.1 > 0 {
+                candidates.push((tent.0, tent.1 - 1))
+            }
+            candidates.push((tent.0 + 1, tent.1));
+            candidates.push((tent.0, tent.1 + 1));
+
+            if tent.0 > 0 && tent.1 > 0 {
+                candidates.push((tent.0 - 1, tent.1 - 1))
+            }
+            if tent.0 > 0 {
+                candidates.push((tent.0 - 1, tent.1 + 1))
+            }
+            if tent.1 > 0 {
+                candidates.push((tent.0 + 1, tent.1 - 1))
+            }
+            candidates.push((tent.0 + 1, tent.1 + 1));
+
+            for candidate in candidates {
+                if tents.contains(&candidate) {
+                    neighbours.push(candidate)
+                }
+            }
+
+            out.insert(*tent, neighbours);
+        }
+
+        out
+    }
+
+    fn make_count_constraints(counts : &Vec<usize>, coords : &CoordSet) -> Formula {
+        let mut clauses = Formula::Const(true);
+        for (coord, tents) in coords {
+            clauses = clauses.and(Field::make_count_constraints_for_coord(counts[*coord], tents))
+        }
+        clauses
+    }
+
+    fn make_count_constraints_for_coord(counts : usize, tents : &Vec<TentPlace>) -> Formula {
+        fn go(counts : usize, index : usize, tents : &Vec<TentPlace>) -> Formula {
+            if index >= tents.len() {
+                Formula::Const(true)
+            } else if counts == 0 {
+                Formula::Var(mk_var_name(tents[counts])).not().and(go(counts, index + 1, tents))
+            } else {
+                let var1 = Formula::Var(mk_var_name(tents[counts]));
+                let var2 = Formula::Var(mk_var_name(tents[counts]));
+                (var1.and(go(counts - 1, index + 1, tents)))
+                    .or(var2.not().and(go(counts, index + 1, tents)))
+            }
+        }
+        go(counts, 0, tents)
+    }
+
+    fn make_nei_constraints(neigh : &NeiSet) -> Formula {
+        let mut out = Formula::Const(true);
+        for (t, ns) in neigh {
+            for n in ns {
+                out = out.and(Formula::Var(mk_var_name(*t)).not().iff(Formula::Var(mk_var_name(*n))))
+            }
+        }
+        out
+    }
+
 }
