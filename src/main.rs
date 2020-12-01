@@ -1,5 +1,5 @@
-mod game;
 mod field;
+mod game;
 
 use game::Game;
 

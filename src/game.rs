@@ -1,8 +1,8 @@
 extern crate iced;
 
 use iced::{button, executor};
-use iced::Length;
-use iced::{Button, Column, Element, Row, Application, Settings, Space, Svg, Text, Command, Subscription};
+use iced::{Length, HorizontalAlignment, VerticalAlignment};
+use iced::{Button, Column, Element, Row, Application, Settings, Space, Svg, Text, Command, Subscription, Align};
 use iced_native::{
     window::Event,
 };
@@ -14,9 +14,12 @@ use std::path::PathBuf;
 pub struct Game {
     field: Field,
 
+    width: Length,
+    height: Length,
+
     svgs: HashMap<CellType, Svg>,
-    width: u16,
-    height: u16,
+    vertical_spacing: u16,
+    horizontal_spacing: u16,
 }
 
 #[derive(Debug, Clone)]
@@ -24,6 +27,51 @@ pub enum Message {
     FileDropped(PathBuf),
     SolvePuzzle,
 }
+
+impl Game {
+    fn draw_cell(&self, cell: &CellType) -> Element<Message> {
+        match self.svgs.get(cell) {
+            Some(svg) => svg.clone()
+                            .width(self.width)
+                            .height(self.height)
+                            .into(),
+            None => Space::new(self.width, self.height).into(),
+        }
+    }
+
+    fn draw_number(&self, number: usize) -> Element<Message> {
+        Text::new(number.to_string())
+            .width(self.width)
+            .height(self.height)
+            .horizontal_alignment(HorizontalAlignment::Center)
+            .vertical_alignment(VerticalAlignment::Center)
+            .into()
+    }
+
+    fn draw_field(&self) -> Element<Message> {
+        Column::with_children(
+            self.field.cells.iter()
+                .zip(self.field.row_counts.iter())
+                .map(|(rows, row_count)| {
+                    Row::with_children(
+                        rows.iter()
+                            .map(|cell| self.draw_cell(cell))
+                            .collect()
+                    ).spacing(self.vertical_spacing)
+                        .push(self.draw_number(*row_count))
+                        .into()
+                }).collect()
+        ).push(
+            Row::with_children(
+                self.field.column_counts.iter()
+                    .map(|number| self.draw_number(*number))
+                    .collect()
+            )
+        ).spacing(self.horizontal_spacing)
+            .into()
+    }
+}
+
 
 impl Application for Game {
     type Executor = executor::Default;
@@ -43,15 +91,20 @@ impl Application for Game {
         };
 
         let mut svgs = HashMap::new();
-        let _ = svgs.insert(CellType::Meadow, Svg::from_path("images/meadow.svg"));
-        let _ = svgs.insert(CellType::Tent, Svg::from_path("images/tent.svg"));
-        let _ = svgs.insert(CellType::Tree, Svg::from_path("images/tree.svg"));
+        svgs.insert(CellType::Meadow, Svg::from_path("images/meadow.svg"));
+        svgs.insert(CellType::Tent, Svg::from_path("images/tent.svg"));
+        svgs.insert(CellType::Tree, Svg::from_path("images/tree.svg"));
+
 
         let game = Game {
             field,
+
+            width: Length::Units(30),
+            height: Length::Units(30),
+            vertical_spacing: 2,
+            horizontal_spacing: 2,
+
             svgs,
-            width: 30,
-            height: 30,
         };
         (game, Command::none())
     }
@@ -68,36 +121,9 @@ impl Application for Game {
         Command::none()
     }
 
-    fn view(&mut self) -> Element<Self::Message> {
-        let mut grid = Column::new();
-        for (i, row) in self.field.cells.iter().enumerate() {
-            let mut columns = Row::new();
-            for (j, column) in row.iter().enumerate() {
-                columns = columns.push({
-                    let element: Element<Self::Message> = if let Some(svg) = self.svgs.get(column) {
-                        svg.clone()
-                            .width(Length::Units(self.width))
-                            .height(Length::Units(self.height))
-                            .into()
-                    } else {
-                        Space::new(Length::Units(self.width), Length::Units(self.height)).into()
-                    };
 
-                    element
-                }).spacing(2)
-            }
-            grid = grid.push(columns.push(Text::new(self.field.column_counts[i].to_string())))
-                .spacing(2)
-        }
-        grid.push({
-            let elements = self.field.row_counts.iter().map(|number|
-                Text::new(number.to_string())
-                    .width(Length::Units(self.width))
-                    .height(Length::Units(self.height))
-                    .into()
-            ).collect();
-            Row::with_children(elements)
-        }).into()
+    fn view(&mut self) -> Element<Self::Message> {
+        self.draw_field()
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {

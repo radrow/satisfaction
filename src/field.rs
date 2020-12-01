@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
 use std::io;
+use std::path::Path;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum CellType {
@@ -22,6 +22,10 @@ impl Field {
     }
 }
 
-pub fn solve_puzzle(tents: &HashSet<(usize, usize)>, row_counts: &Vec<usize>, column_counts: &Vec<usize>) {
+pub fn solve_puzzle(
+    tents: &HashSet<(usize, usize)>,
+    row_counts: &Vec<usize>,
+    column_counts: &Vec<usize>,
+) {
     unimplemented!();
 }
