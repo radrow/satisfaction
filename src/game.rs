@@ -69,7 +69,7 @@ impl LayoutSettings {
                     field.column_counts.iter()
                         .map(|number| self.draw_number(*number))
                         .collect()
-                )
+                ).spacing(self.horizontal_spacing)
             ).spacing(self.horizontal_spacing)
                 .into()
         } else {
@@ -102,16 +102,11 @@ impl Application for Game {
             vec![CellType::Tree, CellType::Unknown],
         ];
 
-        let field = Field {
-            cells: cells,
-            row_counts: vec![2, 1],
-            column_counts: vec![0,1],
-        };
-
         let mut svgs = HashMap::new();
         svgs.insert(CellType::Meadow, Svg::from_path("images/meadow.svg"));
         svgs.insert(CellType::Tent, Svg::from_path("images/tent.svg"));
         svgs.insert(CellType::Tree, Svg::from_path("images/tree.svg"));
+
 
         let settings = LayoutSettings {
             rect_size: Length::Units(20),
@@ -121,7 +116,7 @@ impl Application for Game {
         };
 
         let game = Game {
-            field: Some(field),
+            field: None,
             settings,
             exception: None,
             solve_button: button::State::new()
@@ -139,7 +134,11 @@ impl Application for Game {
                 // TODO: Handle exception appropriately
                 self.field = Field::from_file(&path).ok();
             },
-            Message::SolvePuzzle => println!("Solving puzzle ..."),
+            Message::SolvePuzzle => {
+                let field = self.field.as_ref().expect("No puzzle available!");
+                let tents = field.tent_coordinates();
+                solve_puzzle(&tents, &field.row_counts, &field.column_counts)
+            },
         };
         Command::none()
     }
@@ -148,12 +147,11 @@ impl Application for Game {
     fn view(&mut self) -> Element<Self::Message> {
         Row::new()
         .align_items(Align::Center)
-        .push(self.settings.draw_field(&self.field))
         .push(Text::new("Drag and drop tent puzzle, please!"))
         .push(Button::new(&mut self.solve_button, Text::new("Solve Puzzle!"))
             .on_press(Message::SolvePuzzle)
         )
-
+        .push(self.settings.draw_field(&self.field))
         .into()
     }
 
