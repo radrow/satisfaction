@@ -1,8 +1,8 @@
 extern crate iced;
 
 use iced::{button, executor};
-use iced::{Length, HorizontalAlignment, VerticalAlignment};
-use iced::{Button, Column, Element, Row, Application, Settings, Space, Svg, Text, Command, Subscription, Align};
+use iced::{Length, HorizontalAlignment, VerticalAlignment, Align};
+use iced::{Button, Column, Element, Row, Application, Settings, Space, Svg, Text, Command, Subscription};
 use iced_native::{
     window::Event,
 };
@@ -11,15 +11,71 @@ use crate::field::*;
 use std::collections::{HashMap};
 use std::path::PathBuf;
 
+
+enum Exception {
+    FileNotFound(PathBuf),
+    IllFormatedFile(PathBuf),
+}
+
 pub struct Game {
-    field: Field,
+    field: Option<Field>,
+    settings: LayoutSettings,
+    exception: Option<Exception>,
+    solve_button: button::State,
+}
 
-    width: Length,
-    height: Length,
-
-    svgs: HashMap<CellType, Svg>,
+struct LayoutSettings {
+    rect_size: Length,
     vertical_spacing: u16,
     horizontal_spacing: u16,
+    svgs: HashMap<CellType, Svg>,
+}
+
+impl LayoutSettings {
+    fn draw_cell(&self, cell: &CellType) -> Element<Message> {
+        match self.svgs.get(cell) {
+            Some(svg) => svg.clone()
+                            .width(self.rect_size)
+                            .height(self.rect_size)
+                            .into(),
+            None => Space::new(self.rect_size, self.rect_size).into(),
+        }
+    }
+    fn draw_number(&self, number: usize) -> Element<Message> {
+        Text::new(number.to_string())
+            .width(self.rect_size)
+            .height(self.rect_size)
+            .horizontal_alignment(HorizontalAlignment::Center)
+            .vertical_alignment(VerticalAlignment::Center)
+            .into()
+    }
+
+    fn draw_field(&self, field: &Option<Field>) -> Element<Message> {
+        if let Some(field) = field {
+            Column::with_children(
+                field.cells.iter()
+                    .zip(field.row_counts.iter())
+                    .map(|(rows, row_count)| {
+                        Row::with_children(
+                            rows.iter()
+                                .map(|cell| self.draw_cell(cell))
+                                .collect()
+                        ).spacing(self.vertical_spacing)
+                            .push(self.draw_number(*row_count))
+                            .into()
+                    }).collect()
+            ).push(
+                Row::with_children(
+                    field.column_counts.iter()
+                        .map(|number| self.draw_number(*number))
+                        .collect()
+                )
+            ).spacing(self.horizontal_spacing)
+                .into()
+        } else {
+            Space::new(self.rect_size, self.rect_size).into()
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -29,47 +85,9 @@ pub enum Message {
 }
 
 impl Game {
-    fn draw_cell(&self, cell: &CellType) -> Element<Message> {
-        match self.svgs.get(cell) {
-            Some(svg) => svg.clone()
-                            .width(self.width)
-                            .height(self.height)
-                            .into(),
-            None => Space::new(self.width, self.height).into(),
-        }
-    }
-
-    fn draw_number(&self, number: usize) -> Element<Message> {
-        Text::new(number.to_string())
-            .width(self.width)
-            .height(self.height)
-            .horizontal_alignment(HorizontalAlignment::Center)
-            .vertical_alignment(VerticalAlignment::Center)
-            .into()
-    }
-
-    fn draw_field(&self) -> Element<Message> {
-        Column::with_children(
-            self.field.cells.iter()
-                .zip(self.field.row_counts.iter())
-                .map(|(rows, row_count)| {
-                    Row::with_children(
-                        rows.iter()
-                            .map(|cell| self.draw_cell(cell))
-                            .collect()
-                    ).spacing(self.vertical_spacing)
-                        .push(self.draw_number(*row_count))
-                        .into()
-                }).collect()
-        ).push(
-            Row::with_children(
-                self.field.column_counts.iter()
-                    .map(|number| self.draw_number(*number))
-                    .collect()
-            )
-        ).spacing(self.horizontal_spacing)
-            .into()
-    }
+    
+    
+    //fn draw_control(self, )
 }
 
 
@@ -95,16 +113,18 @@ impl Application for Game {
         svgs.insert(CellType::Tent, Svg::from_path("images/tent.svg"));
         svgs.insert(CellType::Tree, Svg::from_path("images/tree.svg"));
 
-
-        let game = Game {
-            field,
-
-            width: Length::Units(30),
-            height: Length::Units(30),
+        let settings = LayoutSettings {
+            rect_size: Length::Units(20),
             vertical_spacing: 2,
             horizontal_spacing: 2,
-
             svgs,
+        };
+
+        let game = Game {
+            field: Some(field),
+            settings,
+            exception: None,
+            solve_button: button::State::new()
         };
         (game, Command::none())
     }
@@ -115,7 +135,10 @@ impl Application for Game {
 
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match message {
-            Message::FileDropped(path) => println!("{:?}", path),
+            Message::FileDropped(path) => {
+                // TODO: Handle exception appropriately
+                self.field = Field::from_file(&path).ok();
+            },
             Message::SolvePuzzle => println!("Solving puzzle ..."),
         };
         Command::none()
@@ -123,7 +146,15 @@ impl Application for Game {
 
 
     fn view(&mut self) -> Element<Self::Message> {
-        self.draw_field()
+        Row::new()
+        .align_items(Align::Center)
+        .push(self.settings.draw_field(&self.field))
+        .push(Text::new("Drag and drop tent puzzle, please!"))
+        .push(Button::new(&mut self.solve_button, Text::new("Solve Puzzle!"))
+            .on_press(Message::SolvePuzzle)
+        )
+
+        .into()
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
