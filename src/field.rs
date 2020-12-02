@@ -1,6 +1,6 @@
-use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use std::collections::{HashSet};
 use std::io;
+use std::path::Path;
 use std::fs;
 
 
@@ -85,6 +85,10 @@ impl Field {
     }
 }
 
-pub fn solve_puzzle(tents: &HashSet<(usize, usize)>, row_counts: &Vec<usize>, column_counts: &Vec<usize>) {
+pub fn solve_puzzle(
+    tents: &HashSet<(usize, usize)>,
+    row_counts: &Vec<usize>,
+    column_counts: &Vec<usize>,
+) {
     unimplemented!();
 }
