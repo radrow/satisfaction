@@ -20,7 +20,7 @@ pub struct Field {
 
 impl Field {
     pub fn from_file(path: &Path) -> io::Result<Field> {
-        let contents: String = fs::read_to_string(path).expect("something went wrong");
+        let contents: String = fs::read_to_string(path)?;
         let mut split = contents.split(|c| c == '\n' || c == ' ');
 
         let width: usize = split.next().unwrap().parse::<usize>().unwrap();
