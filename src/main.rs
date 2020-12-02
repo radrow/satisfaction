@@ -1,5 +1,8 @@
 mod field;
 mod game;
+mod field_widget;
+mod message;
+mod control_widget;
 
 use game::Game;
 
