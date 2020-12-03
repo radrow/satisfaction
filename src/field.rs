@@ -21,13 +21,14 @@ pub struct Field {
 impl Field {
     pub fn from_file(path: &Path) -> io::Result<Field> {
         let contents: String = fs::read_to_string(path)?;
-        let mut split = contents.split(|c| c == '\n' || c == ' ');
+        let mut split = contents.split(|c| c == '\n' || c == ' ' || c == '\r');
 
-        let width: usize = split.next().unwrap().parse::<usize>().unwrap();
         let height: usize = split.next().unwrap().parse::<usize>().unwrap();
+        let width: usize = split.next().unwrap().parse::<usize>().unwrap();
 
         let mut field: Vec<String> = Vec::new();
         let mut row_counts: Vec<usize> = Vec::new();
+        println!("height: {}", height);
         for _ in 0..height {
             field.push(split.next().unwrap().to_string());
             row_counts.push(split.next().unwrap().parse::<usize>().unwrap());
