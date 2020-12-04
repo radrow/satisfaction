@@ -3,12 +3,14 @@ use std::io;
 use std::path::Path;
 use std::fs;
 
+use cadical;
+
 use crate::formula::*;
 
 
 type TentPlace = (usize, usize);
 
-type CoordSet = HashMap<usize, Vec<TentPlace>>;
+type AxisSet = HashMap<usize, Vec<TentPlace>>;
 type NeiSet = HashMap<TentPlace, Vec<TentPlace>>;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -45,7 +47,13 @@ impl Field {
             field.push(split.next().unwrap().to_string());
             row_counts.push(split.next().unwrap().parse::<usize>().unwrap());
         }
-        let column_counts: Vec<usize> = split.map(|x| x.parse::<usize>().unwrap()).collect();
+
+        let column_counts: Vec<usize> = split.filter_map(
+            |x| match x.parse::<usize>() {
+                Err(_) => None,
+                Ok(x) => Some(x)
+            }
+        ).collect();
 
         let mut cells: Vec<Vec<CellType>> = Vec::new();
         for row in field {
@@ -101,13 +109,17 @@ impl Field {
         self.to_formula().to_cnf().to_dimacs()
     }
 
+    pub fn to_solver(&self) -> cadical::Solver {
+        self.to_formula().to_cnf().to_solver()
+    }
+
     pub fn to_formula(&self) -> Formula {
         let tents = &self.tent_coordinates();
 
-        let col_set: CoordSet = Field::make_coord_set_by(
+        let col_set: AxisSet = Field::make_coord_set_by(
             &|x : &TentPlace| -> usize {x.1}, tents
         );
-        let row_set: CoordSet = Field::make_coord_set_by(
+        let row_set: AxisSet = Field::make_coord_set_by(
             &|x : &TentPlace| -> usize {x.0}, tents
         );
         let nei_set: NeiSet = Field::make_nei_set(tents);
@@ -126,8 +138,8 @@ impl Field {
     fn make_coord_set_by (
         by : &dyn Fn(&TentPlace) -> usize,
         tents : &HashSet<TentPlace>,
-    ) -> CoordSet {
-        let mut out : CoordSet = HashMap::new();
+    ) -> AxisSet {
+        let mut out : AxisSet = HashMap::new();
 
         for tent in tents {
             out.entry(by(tent))
@@ -177,28 +189,32 @@ impl Field {
         out
     }
 
-    fn make_count_constraints(counts : &Vec<usize>, coords : &CoordSet) -> Formula {
+    fn make_count_constraints(counts : &Vec<usize>, axes : &AxisSet) -> Formula {
+        // The default option is true – if we have no constraints
         let mut clauses = Formula::Const(true);
-        for (coord, tents) in coords {
-            clauses = clauses.and(Field::make_count_constraints_for_coord(counts[*coord], tents))
+
+        // Conjunction of constranits per each axis
+        for (axis, tents) in axes {
+            let axis_count = counts[*axis];
+            clauses = clauses.and(Field::make_count_constraints_for_axis(axis_count, tents))
         }
         clauses
     }
 
-    fn make_count_constraints_for_coord(counts : usize, tents : &Vec<TentPlace>) -> Formula {
-        fn go(counts : usize, index : usize, tents : &Vec<TentPlace>) -> Formula {
+    fn make_count_constraints_for_axis(axis_count : usize, tents : &Vec<TentPlace>) -> Formula {
+        fn go(count : usize, index : usize, tents : &Vec<TentPlace>) -> Formula {
             if index >= tents.len() {
                 Formula::Const(true)
-            } else if counts == 0 {
-                Formula::Var(mk_var_name(tents[counts])).not().and(go(counts, index + 1, tents))
+            } else if count == 0 {
+                Formula::Var(mk_var_name(tents[index])).not().and(go(count, index + 1, tents))
             } else {
-                let var1 = Formula::Var(mk_var_name(tents[counts]));
-                let var2 = Formula::Var(mk_var_name(tents[counts]));
-                (var1.and(go(counts - 1, index + 1, tents)))
-                    .or(var2.not().and(go(counts, index + 1, tents)))
+                let var1 = Formula::Var(mk_var_name(tents[index]));
+                let var2 = Formula::Var(mk_var_name(tents[index]));
+                (var1.and(go(count - 1, index + 1, tents)))
+                    .or(var2.not().and(go(count, index + 1, tents)))
             }
         }
-        go(counts, 0, tents)
+        go(axis_count, 0, tents)
     }
 
     fn make_nei_constraints(neigh : &NeiSet) -> Formula {

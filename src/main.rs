@@ -3,7 +3,6 @@ mod game;
 mod field_widget;
 mod message;
 mod control_widget;
-mod game_file_parser;
 mod cnf;
 mod formula;
 

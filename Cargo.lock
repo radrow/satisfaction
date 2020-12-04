@@ -166,6 +166,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08c48aae112d48ed9f069b33538ea9e3e90aa263cfa3d1c24309612b1f7472de"
 
 [[package]]
+name = "cadical"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "509aed9f025452ea0105d2cf7635776a9a4977500424085fcf8f44d79bbf0ff5"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "calloop"
 version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2105,6 +2114,7 @@ dependencies = [
 name = "sat-2020-project-01"
 version = "0.1.0"
 dependencies = [
+ "cadical",
  "iced",
  "iced_native",
 ]

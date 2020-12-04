@@ -15,7 +15,7 @@ use crate::{
 };
 
 use std::collections::{HashMap};
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 
 enum Exception {
     FileNotFound(PathBuf),
@@ -69,8 +69,19 @@ impl Application for Game {
             },
             Message::SolvePuzzle => {
                 let field = self.field.as_ref().expect("No puzzle available!");
-                let tents = field.tent_coordinates();
-                //field.to_dimacs()
+                let mut solver = field.to_solver();
+                match solver.solve() {
+                    None => panic!(":(((("),
+                    Some(satisfiable) => {
+                        solver.write_dimacs(Path::new("/tmp/xd"));
+                        if satisfiable {
+                            println!("Success!")
+                        }
+                        else {
+                            panic!("no solution")
+                        }
+                    }
+                }
                 unimplemented!()
             },
         };

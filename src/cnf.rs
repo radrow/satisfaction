@@ -1,6 +1,8 @@
 use std::fmt;
 use std::collections::HashMap;
 
+use cadical;
+
 #[derive (Clone)]  // :(
 pub struct CNF {
     pub clauses : Vec<CNFClause>
@@ -67,6 +69,20 @@ impl CNF {
             out.extend("0\n".chars())
         }
         out
+    }
+
+    pub fn to_solver(&self) -> cadical::Solver {
+        let var_map = self.create_variable_mapping();
+        let mut sat: cadical::Solver = Default::default();
+
+        for clause in &self.clauses {
+            sat.add_clause(clause.vars.iter().map(|var| match var {
+                CNFVar::Pos(s) => *var_map.get(s).unwrap(),
+                CNFVar::Neg(s) => -*var_map.get(s).unwrap(),
+            }));
+        }
+
+        sat
     }
 }
 
