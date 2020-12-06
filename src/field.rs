@@ -28,12 +28,16 @@ impl Field {
 
         let mut field: Vec<String> = Vec::new();
         let mut row_counts: Vec<usize> = Vec::new();
-        println!("height: {}", height);
+
+
         for _ in 0..height {
             field.push(split.next().unwrap().to_string());
             row_counts.push(split.next().unwrap().parse::<usize>().unwrap());
         }
-        let column_counts: Vec<usize> = split.map(|x| x.parse::<usize>().unwrap()).collect();
+        let column_counts: Vec<usize> = split.map(|x| {
+            println!("{} ", x);
+            x.parse::<usize>().unwrap()
+        }).collect();
 
         let mut cells: Vec<Vec<CellType>> = Vec::new();
         for row in field {
