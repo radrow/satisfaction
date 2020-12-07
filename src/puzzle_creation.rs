@@ -1,12 +1,27 @@
 use crate::field::*;
 use rand::prelude::*;
 
-pub fn create_random_puzzle(hight: usize, width: usize, trees: usize) -> Field {
+const TOO_LARGE_FIELD: usize = 400;
+
+pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String> {
+    let mut trees = (hight * width) / 5;
+    if hight * width >= TOO_LARGE_FIELD {
+        trees = hight * width / 6;
+    }
+
     fn create_empty_field(hight: usize, width: usize) -> Field {
         Field {
             cells: vec![vec![CellType::Meadow; width]; hight],
             row_counts: vec![0; hight],
             column_counts: vec![0; width]
+        }
+    }
+
+    fn reset_field(field: &mut Field) {
+        for x in 0..field.cells.len() {
+            for y in 0..field.cells[0].len() {
+                field.cells[x][y] = CellType::Meadow;
+            }
         }
     }
 
@@ -31,20 +46,36 @@ pub fn create_random_puzzle(hight: usize, width: usize, trees: usize) -> Field {
         println!(" ");
     }
 
-    fn place_trees(mut tree_count: usize, field: &mut Field) {
+    fn place_tents(tree_count: usize, field: &mut Field) -> bool {
         let mut rng: ThreadRng = rand::thread_rng();
         let hight = field.cells.len();
         let width = field.cells[0].len();
 
-        while tree_count > 0 {
+        let mut curr_tree_count = tree_count;
+        let mut loop_count = 0;
+        let mut max_retries = 1000;
+        let mut fields_count = field.cells[0].len() * field.cells.len() * 20;
+
+        while curr_tree_count > 0 {
+            if loop_count >= fields_count {
+                curr_tree_count = tree_count;
+                fields_count = 0;
+                reset_field(field);
+                max_retries -= 1;
+            }
+            if max_retries <= 0 {
+                return false;
+            }
             let tree_pos: usize = rng.gen_range(0, hight * width - 1);
             let col: usize = tree_pos % width;
             let row: usize = tree_pos / width;
-            if field.cells[row][col] != CellType::Tree {
-                field.cells[row][col] = CellType::Tree;
-                tree_count -= 1;
+            if field.cells[row][col] != CellType::Tent && !has_tent_neighbours(row, col, &field) {
+                field.cells[row][col] = CellType::Tent;
+                curr_tree_count -= 1;
             }
+            loop_count += 1;
         }
+        return true;
     }
 
     fn get_neighbour_coords(col: usize, row: usize, field: &Field, checked_datatype: CellType) -> Vec<(usize, usize)> {
@@ -86,7 +117,7 @@ pub fn create_random_puzzle(hight: usize, width: usize, trees: usize) -> Field {
         coords
     }
 
-    fn has_tent_neighbours(row: usize, col: usize, field: &mut Field) -> bool {
+    fn has_tent_neighbours(row: usize, col: usize, field: &Field) -> bool {
         let coords: Vec<(usize, usize)> = get_neighbour_coords(col, row, field, CellType::Tent);
         let mut has_nighbour = false;
 
@@ -103,29 +134,27 @@ pub fn create_random_puzzle(hight: usize, width: usize, trees: usize) -> Field {
         has_nighbour
     }
 
-    fn set_a_tent(row: usize, col: usize, field: &mut Field) -> bool {
+    fn set_a_tree(row: usize, col: usize, field: &mut Field) -> bool {
         let coords = get_neighbour_coords(col, row, field, CellType::Tree);
         
         let mut can_set = false;
         for c in &coords {
-            if !has_tent_neighbours(c.0, c.1, field) {
-                if field.cells[c.0][c.1] == CellType::Meadow {
-                    field.cells[c.0][c.1] = CellType::Tent;
-                    can_set = true;
-                    break;
-                }
+            if field.cells[c.0][c.1] == CellType::Meadow {
+                field.cells[c.0][c.1] = CellType::Tree;
+                can_set = true;
+                break;
             }
         }
         can_set
     }
 
-    fn create_possible_tent_pos(mut field: &mut Field) -> bool {
+    fn place_trees(mut field: &mut Field) -> bool {
         let mut is_possible = true;
         
         for y in 0..field.cells.len() {
             for x in 0..field.cells[0].len() {
-                if field.cells[y][x] == CellType::Tree {
-                    if !set_a_tent(y, x, &mut field) {
+                if field.cells[y][x] == CellType::Tent {
+                    if !set_a_tree(y, x, &mut field) {
                         is_possible = false;
                     } 
                 }
@@ -138,17 +167,22 @@ pub fn create_random_puzzle(hight: usize, width: usize, trees: usize) -> Field {
     fn fill_col_row_count(field: &mut Field) {
         for (y, row) in field.cells.iter().enumerate() {
             let mut row_count = 0;
-            let mut col_count = 0;
             for (x, cell) in row.iter().enumerate() {
                 if cell == &CellType::Tent {
                     row_count += 1;
                 }
-                if field.cells[x][y] == CellType::Tent {
+           }
+            field.row_counts[y] = row_count;
+        }
+
+        for x1 in 0..field.cells[0].len() {
+            let mut col_count = 0;
+            for y1 in 0..field.cells.len() {
+                if field.cells[y1][x1] == CellType::Tent {
                     col_count += 1;
                 }
             }
-            field.column_counts[y] = col_count;
-            field.row_counts[y] = row_count;
+            field.column_counts[x1] = col_count;
         }
     }
 
@@ -164,13 +198,108 @@ pub fn create_random_puzzle(hight: usize, width: usize, trees: usize) -> Field {
 
     let mut can_create = false;
     let mut field: Field = create_empty_field(hight, width);
+    let mut loop_count = 0;
 
     while can_create == false {
+        if loop_count >= 10000 {
+            return Err("couldnt find a puzzle in 10000 iterations".to_string());
+        }
         field = create_empty_field(hight, width);
-        place_trees(trees, &mut field);
-        can_create = create_possible_tent_pos(&mut field);
+        let tents_worked = place_tents(trees, &mut field);
+        if !tents_worked {
+            return Err("couldnt find a puzzle in time".to_string());
+        }
+        can_create = place_trees(&mut field);
+        loop_count += 1;
     }
     fill_col_row_count(&mut field);
     remove_tents(&mut field);
-    field
+    print_field(&field);
+    Ok(field)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn calc5x5() {
+        match create_random_puzzle(5, 5) {
+            Ok(_) => assert!(true),
+            Err(_) => assert!(false),
+        }
+    }
+
+    #[test]
+    fn calc10x10() {
+        match create_random_puzzle(10, 10) {
+            Ok(_) => assert!(true),
+            Err(_) => assert!(false),
+        }
+    }
+
+    #[test]
+    fn calc15x15() {
+        match create_random_puzzle(15, 15) {
+            Ok(_) => assert!(true),
+            Err(_) => assert!(false),
+        }
+    }
+
+    #[test]
+    fn calc20x20() {
+        match create_random_puzzle(20, 20) {
+            Ok(_) => assert!(true),
+            Err(_) => assert!(false),
+        }
+    }
+
+    #[test]
+    fn calc25x25() {
+        match create_random_puzzle(25, 25) {
+            Ok(_) => assert!(true),
+            Err(_) => assert!(false),
+        }
+    }
+
+    #[test]
+    fn calc30x30() {
+        match create_random_puzzle(30, 30) {
+            Ok(_) => assert!(true),
+            Err(_) => assert!(false),
+        }
+    }
+
+
+    #[test]
+    fn calc10x5() {
+        match create_random_puzzle(10, 5) {
+            Ok(_) => assert!(true),
+            Err(_) => assert!(false),
+        }
+    }
+
+    #[test]
+    fn calc15x5() {
+        match create_random_puzzle(15, 5) {
+            Ok(_) => assert!(true),
+            Err(_) => assert!(false),
+        }
+    }
+
+    #[test]
+    fn calc5x10() {
+        match create_random_puzzle(5, 10) {
+            Ok(_) => assert!(true),
+            Err(_) => assert!(false),
+        }
+    }
+
+    #[test]
+    fn calc5x15() {
+        match create_random_puzzle(5, 15) {
+            Ok(_) => assert!(true),
+            Err(_) => assert!(false),
+        }
+    }
 }
