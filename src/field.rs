@@ -38,7 +38,7 @@ impl Field {
         let mut split = contents.split(|c| c == '\n' || c == ' ' || c == '\r');
 
         let height: usize = split.next().unwrap().parse::<usize>().unwrap();
-        let width: usize = split.next().unwrap().parse::<usize>().unwrap();
+        let _width: usize = split.next().unwrap().parse::<usize>().unwrap();
 
         let mut field: Vec<String> = Vec::new();
         let mut row_counts: Vec<usize> = Vec::new();
@@ -157,21 +157,8 @@ impl Field {
             let mut neighbours = vec![];
 
             let mut candidates = vec![];
-            if tent.0 > 0 {
-                candidates.push((tent.0 - 1, tent.1))
-            }
-            if tent.1 > 0 {
-                candidates.push((tent.0, tent.1 - 1))
-            }
             candidates.push((tent.0 + 1, tent.1));
             candidates.push((tent.0, tent.1 + 1));
-
-            if tent.0 > 0 && tent.1 > 0 {
-                candidates.push((tent.0 - 1, tent.1 - 1))
-            }
-            if tent.0 > 0 {
-                candidates.push((tent.0 - 1, tent.1 + 1))
-            }
             if tent.1 > 0 {
                 candidates.push((tent.0 + 1, tent.1 - 1))
             }
@@ -221,10 +208,11 @@ impl Field {
         let mut out = Formula::Const(true);
         for (t, ns) in neigh {
             for n in ns {
-                out = out.and(Formula::Var(mk_var_name(*t)).not().iff(Formula::Var(mk_var_name(*n))))
+                out = out.and(
+                    Formula::Var(mk_var_name(*t)).not()
+                        .iff(Formula::Var(mk_var_name(*n))))
             }
         }
         out
     }
-
 }

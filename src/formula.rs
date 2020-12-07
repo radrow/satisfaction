@@ -14,11 +14,16 @@ pub enum Formula {
 
 impl Formula {
     pub fn not(self) -> Formula {
-        Formula::Not(Box::new(self))
+        match &self {
+            Formula::Const(true) => Formula::Const(false),
+            Formula::Const(false) => Formula::Const(true),
+            _ => Formula::Not(Box::new(self))
+        }
     }
 
     pub fn or(self, other : Formula) -> Formula {
         match (&self, &other) {
+            (Formula::Var(v1), Formula::Var(v2)) if v1 == v2 => self,
             (Formula::Const(true), _) => Formula::Const(true),
             (_, Formula::Const(true)) => Formula::Const(true),
             (Formula::Const(false), Formula::Const(false)) => Formula::Const(false),
@@ -28,6 +33,7 @@ impl Formula {
 
     pub fn and(self, other : Formula) -> Formula {
         match (&self, &other) {
+            (Formula::Var(v1), Formula::Var(v2)) if v1 == v2 => self,
             (Formula::Const(false), _) => Formula::Const(false),
             (_, Formula::Const(false)) => Formula::Const(false),
             (Formula::Const(true), Formula::Const(true)) => Formula::Const(true),
@@ -37,6 +43,7 @@ impl Formula {
 
     pub fn imp(self, other : Formula) -> Formula {
         match (&self, &other) {
+            (Formula::Var(v1), Formula::Var(v2)) if v1 == v2 => Formula::Const(true),
             (Formula::Const(false), _) => Formula::Const(true),
             (_, Formula::Const(true)) => Formula::Const(true),
             (Formula::Const(true), Formula::Const(false)) => Formula::Const(false),
@@ -46,6 +53,7 @@ impl Formula {
 
     pub fn iff(self, other : Formula) -> Formula {
         match (&self, &other) {
+            (Formula::Var(v1), Formula::Var(v2)) if v1 == v2 => Formula::Const(true),
             (Formula::Const(true), Formula::Const(false)) => Formula::Const(false),
             (Formula::Const(false), Formula::Const(true)) => Formula::Const(false),
             (Formula::Const(true), Formula::Const(true)) => Formula::Const(true),
@@ -76,7 +84,7 @@ impl Formula {
                     Formula::Const(true) => CNF{clauses: vec![CNFClause{vars: vec![]}]},
                     Formula::Const(false) => CNF{clauses: vec![]},
                     Formula::Var(v) =>
-                        CNF{clauses: vec![CNFClause{vars: vec![CNFVar::Neg(String::from(v.clone()))]}]},
+                        CNF{clauses: vec![CNFClause{vars: vec![CNFVar::Pos(String::from(v.clone()))]}]},
                     Formula::And(l, r) =>
                         l.clone().not().or(r.clone().not()).to_cnf(),
                     Formula::Or(l, r) =>
@@ -85,12 +93,16 @@ impl Formula {
                     Formula::Imp(l, r) =>
                         l.clone().and(r.clone().not()).to_cnf(),
                     Formula::Iff(l, r) =>
-                        (l.clone().not().and(*r.clone())).or(r.clone().not().and(*l.clone())).to_cnf()
+                        (l.clone().not().and(*r.clone()))
+                        .or(r.clone().not().and(*l.clone()))
+                        .to_cnf()
                 },
             Formula::Imp(l, r) =>
                 l.clone().not().or(*r.clone()).to_cnf(),
             Formula::Iff(l, r) =>
-                (l.clone().and(*r.clone()).or(l.clone().not())).and(r.clone().not()).to_cnf()
+                (l.clone().and(*r.clone()))
+                .or(l.clone().not().and(r.clone().not()))
+                .to_cnf()
         }
     }
 

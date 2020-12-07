@@ -29,8 +29,8 @@ impl CNF {
         }
     }
 
-    pub fn create_variable_mapping(&self) -> HashMap<String, i32> {
-        let mut var_map : HashMap<String, i32> = HashMap::new();
+    pub fn create_variable_mapping(&self) -> HashMap<&str, i32> {
+        let mut var_map : HashMap<&str, i32> = HashMap::new();
         let mut count : i32 = 0;
 
         for clause in &self.clauses {
@@ -39,8 +39,11 @@ impl CNF {
                     CNFVar::Pos(s) => s,
                     CNFVar::Neg(s) => s
                 };
-                var_map.entry(name.clone())
-                    .or_insert({count += 1; count});
+
+                if !var_map.contains_key(name.as_str()) {
+                    count += 1;
+                    var_map.insert(name.as_str(), count);
+                }
             }
         }
         var_map
@@ -59,8 +62,10 @@ impl CNF {
         for clause in &self.clauses {
             for var in &clause.vars {
                 let var: i32 = match var {
-                    CNFVar::Pos(s) => *var_map.get(s).unwrap(),
-                    CNFVar::Neg(s) => -*var_map.get(s).unwrap(),
+                    CNFVar::Pos(s) =>
+                        *var_map.get(s.as_str()).unwrap(),
+                    CNFVar::Neg(s) =>
+                        -*var_map.get(s.as_str()).unwrap(),
                 };
 
                 out.extend(var.to_string().chars());
@@ -77,8 +82,8 @@ impl CNF {
 
         for clause in &self.clauses {
             sat.add_clause(clause.vars.iter().map(|var| match var {
-                CNFVar::Pos(s) => *var_map.get(s).unwrap(),
-                CNFVar::Neg(s) => -*var_map.get(s).unwrap(),
+                CNFVar::Pos(s) => *var_map.get(s.as_str()).unwrap(),
+                CNFVar::Neg(s) => -*var_map.get(s.as_str()).unwrap(),
             }));
         }
 
