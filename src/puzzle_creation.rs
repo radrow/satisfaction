@@ -1,9 +1,7 @@
 use crate::field::*;
 use rand::prelude::*;
 
-pub fn create_random_puzzle(hight: usize, width: usize) -> Field {
-    let trees = 12;
-
+pub fn create_random_puzzle(hight: usize, width: usize, trees: usize) -> Field {
     fn create_empty_field(hight: usize, width: usize) -> Field {
         Field {
             cells: vec![vec![CellType::Meadow; width]; hight],

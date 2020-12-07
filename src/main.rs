@@ -10,10 +10,6 @@ use game::Game;
 
 use iced::{Application, Settings};
 
-//fn main() -> iced::Result {
-//    Game::run(Settings::default())
-//}
-
-fn main() {
-    let mut field = create_random_puzzle(8, 8);
+fn main() -> iced::Result {
+    Game::run(Settings::default())
 }
