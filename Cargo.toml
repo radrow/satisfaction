@@ -12,3 +12,4 @@ edition = "2018"
 [dependencies]
 iced = { version="0.2.0", features = ["svg"] }
 iced_native = "0.3.0"
+cadical = "0.1.13"
