@@ -17,17 +17,10 @@ use crate::{
 use std::collections::{HashMap};
 use std::path::PathBuf;
 
-enum Exception {
-    FileNotFound(PathBuf),
-    IllFormatedFile(PathBuf),
-}
-
-
 pub struct Game {
     field: Option<Field>,
     field_widget: FieldWidget,
     control_widget: ControlWidget,
-    exception: Option<Exception>,
 }
 
 
@@ -51,8 +44,6 @@ impl Application for Game {
             field: None,
             field_widget,
             control_widget,
-            exception: None,
-
         };
         (game, Command::none())
     }
@@ -68,10 +59,21 @@ impl Application for Game {
                 self.field = Field::from_file(&path).ok();
             },
             Message::SolvePuzzle => {
-                let field = self.field.as_ref().expect("No puzzle available!");
-                let tents = field.tent_coordinates();
-                solve_puzzle(&tents, &field.row_counts, &field.column_counts)
+                if let Some(field) = &self.field {
+                    let tents = field.tent_coordinates();
+                    solve_puzzle(&tents, &field.row_counts, &field.column_counts)
+                } else {
+                    self.control_widget.add_to_log(
+                        "No field available! Drag and drop a tent file or create a custom or random one."
+                    );
+                };
             },
+            Message::GridSizeInputChanged(event) => {
+                self.control_widget.field_creation_widget.update(event);
+            },
+            _ => {
+                unimplemented!();
+            }
         };
         Command::none()
     }
@@ -79,7 +81,7 @@ impl Application for Game {
 
     fn view(&mut self) -> Element<Self::Message> {
         Row::new()
-        .align_items(Align::Center)
+        .align_items(Align::Start)
         .push(self.control_widget.draw())
         .push(self.field_widget.draw_field(&self.field))
         .into()

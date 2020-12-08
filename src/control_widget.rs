@@ -1,13 +1,20 @@
 use crate::message::*;
+use crate::random_creation_widget::RandomCreationWidget;
 use iced::button::State;
 use iced::{Length, HorizontalAlignment, VerticalAlignment, Element, Button, Text, Column};
 
 pub struct ControlWidget {
     width: Length,
     height: Length,
-    solve_button: State,
     text_size: u16,
-    pub log: Option<String>,
+
+    pub field_creation_widget: RandomCreationWidget,
+
+    create_custom_field_button: State,
+    create_random_field_button: State,
+    solve_puzzle_button: State,
+
+    log: Option<String>,
 }
 
 impl ControlWidget {
@@ -15,7 +22,11 @@ impl ControlWidget {
         ControlWidget {
             width: Length::Units(width),
             height: Length::Units(height),
-            solve_button: State::new(),
+            field_creation_widget: RandomCreationWidget::new(10, 10, 5),
+
+            create_custom_field_button: State::new(),
+            create_random_field_button: State::new(),
+            solve_puzzle_button: State::new(),
             text_size,
             log: Some("Drag and drop a tent file!".to_string())
         }
@@ -25,8 +36,13 @@ impl ControlWidget {
         let mut control = Column::new()
             .width(self.width)
             .push(
-                Button::new(&mut self.solve_button, Text::new("Solve Puzzle!"))
-                .on_press(Message::SolvePuzzle)
+                ControlWidget::button(
+                    &mut self.solve_puzzle_button,
+                    "Solve Puzzle",
+                    Message::SolvePuzzle
+                )
+            ).push(
+                self.field_creation_widget.widget()
             );
         if let Some(message) = &self.log {
             control = control.push(
@@ -35,5 +51,19 @@ impl ControlWidget {
             );
         };
         control.into()
+    }
+    
+    fn button<'a>(state: &'a mut State, text: &str, message: Message) -> Button<'a, Message> {
+        Button::new(state, 
+            Text::new(text)
+            .horizontal_alignment(HorizontalAlignment::Center)
+            .width(Length::Fill)
+        )
+        .width(Length::Fill)
+        .on_press(message)
+    }
+
+    pub fn add_to_log<S: Into<String>>(&mut self, message: S) {
+        self.log.replace(message.into());
     }
 }

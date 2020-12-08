@@ -19,6 +19,20 @@ pub struct Field {
 }
 
 impl Field {
+    pub fn create_empty(width: usize, height: usize) -> Field {
+        let prototype = vec![CellType::Meadow;width];
+        let cells = vec![prototype; height];
+
+        let column_counts = vec![0, width];
+        let row_counts = vec![0; height];
+
+        Field {
+            cells,
+            row_counts,
+            column_counts,
+        }
+    }
+
     pub fn from_file(path: &Path) -> io::Result<Field> {
         let contents: String = fs::read_to_string(path)?;
         let mut split = contents.split(|c| c == '\n' || c == ' ' || c == '\r');

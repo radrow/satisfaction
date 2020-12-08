@@ -3,6 +3,7 @@ mod game;
 mod field_widget;
 mod message;
 mod control_widget;
+mod random_creation_widget;
 
 use game::Game;
 
