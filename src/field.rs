@@ -42,7 +42,8 @@ impl Field {
 
         let mut field: Vec<String> = Vec::new();
         let mut row_counts: Vec<usize> = Vec::new();
-        println!("height: {}", height);
+
+
         for _ in 0..height {
             field.push(split.next().unwrap().to_string());
             row_counts.push(split.next().unwrap().parse::<usize>().unwrap());
