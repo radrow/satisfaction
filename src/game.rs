@@ -68,21 +68,11 @@ impl Application for Game {
                 self.field = Field::from_file(&path).ok();
             },
             Message::SolvePuzzle => {
-                let field = self.field.as_ref().expect("No puzzle available!");
-                let mut solver = field.to_solver();
-                match solver.solve() {
-                    None => panic!(":(((("),
-                    Some(satisfiable) => {
-                        solver.write_dimacs(Path::new("/tmp/xd"));
-                        if satisfiable {
-                            println!("Success!")
-                        }
-                        else {
-                            panic!("no solution")
-                        }
-                    }
-                }
-                unimplemented!()
+                let field : &mut Field = match &mut self.field {
+                    None => panic!("no puzzle man"),
+                    Some(f) => f
+                };
+                field.solve();
             },
         };
         Command::none()

@@ -9,11 +9,13 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
         trees = hight * width / 6;
     }
 
-    fn create_empty_field(hight: usize, width: usize) -> Field {
+    fn create_empty_field(height: usize, width: usize) -> Field {
         Field {
-            cells: vec![vec![CellType::Meadow; width]; hight],
-            row_counts: vec![0; hight],
-            column_counts: vec![0; width]
+            cells: vec![vec![CellType::Meadow; width]; height],
+            row_counts: vec![0; height],
+            column_counts: vec![0; width],
+            width: width,
+            height: height
         }
     }
 
@@ -89,7 +91,7 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
         }
         let col: isize = col as isize;
         let row: isize = row as isize;
-        
+
         if col - 1 >= 0 {
             coords.push((row as usize, (col - 1) as usize));
             if row - 1 >= 0 && for_tent_check {

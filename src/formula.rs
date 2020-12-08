@@ -64,7 +64,7 @@ impl Formula {
 
     pub fn to_cnf(&self) -> CNF {
         match self {
-             Formula::Const(true) => CNF{clauses: vec![]},
+            Formula::Const(true) => CNF{clauses: vec![]},
             Formula::Const(false) => CNF{clauses: vec![CNFClause{vars: vec![]}]},
             Formula::Var(v) =>
                 CNF{clauses: vec![CNFClause{vars: vec![CNFVar::Pos(String::from(v.clone()))]}]},
@@ -84,7 +84,7 @@ impl Formula {
                     Formula::Const(true) => CNF{clauses: vec![CNFClause{vars: vec![]}]},
                     Formula::Const(false) => CNF{clauses: vec![]},
                     Formula::Var(v) =>
-                        CNF{clauses: vec![CNFClause{vars: vec![CNFVar::Pos(String::from(v.clone()))]}]},
+                        CNF{clauses: vec![CNFClause{vars: vec![CNFVar::Neg(String::from(v.clone()))]}]},
                     Formula::And(l, r) =>
                         l.clone().not().or(r.clone().not()).to_cnf(),
                     Formula::Or(l, r) =>
@@ -115,7 +115,7 @@ impl fmt::Display for Formula {
             Formula::Const(false) => write!(f, "0"),
             Formula::Var(v) => write!(f, "{}", v),
             Formula::Not(l) => write!(f, "~{}", l),
-            Formula::Or(l, r) => write!(f, "{} \\/ {}", l, r),
+            Formula::Or(l, r) => write!(f, "({}) \\/ ({})", l, r),
             Formula::And(l, r) => write!(f, "({}) /\\ ({})", l, r),
             Formula::Imp(l, r) => write!(f, "{} => {}", l, r),
             Formula::Iff(l, r) => write!(f, "({}) <=> ({})", l, r),

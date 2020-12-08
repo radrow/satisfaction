@@ -30,6 +30,8 @@ pub struct Field {
     pub cells: Vec<Vec<CellType>>,
     pub row_counts: Vec<usize>,
     pub column_counts: Vec<usize>,
+    pub height : usize,
+    pub width : usize,
 }
 
 impl Field {
@@ -38,7 +40,7 @@ impl Field {
         let mut split = contents.split(|c| c == '\n' || c == ' ' || c == '\r');
 
         let height: usize = split.next().unwrap().parse::<usize>().unwrap();
-        let _width: usize = split.next().unwrap().parse::<usize>().unwrap();
+        let width: usize = split.next().unwrap().parse::<usize>().unwrap();
 
         let mut field: Vec<String> = Vec::new();
         let mut row_counts: Vec<usize> = Vec::new();
@@ -72,7 +74,9 @@ impl Field {
         Ok(Field {
             row_counts,
             column_counts,
-            cells
+            cells,
+            height: height,
+            width: width
         })
     }
 
@@ -125,14 +129,51 @@ impl Field {
         );
         let nei_set: NeiSet = Field::make_nei_set(tents);
 
+        println!("\nCOLS:");
         let col_constraints : Formula =
             Field::make_count_constraints(&self.column_counts, &col_set);
+        println!("\nROWS:");
         let row_constraints : Formula =
             Field::make_count_constraints(&self.row_counts, &row_set);
         let nei_constraints : Formula =
             Field::make_nei_constraints(&nei_set);
 
+        println!("\nNEIS: {} \n", nei_constraints);
+
         col_constraints.and(row_constraints).and(nei_constraints)
+    }
+
+    pub fn solve(&mut self) {
+        let formula = self.to_formula();
+        let cnf = formula.to_cnf();
+
+        println!("\nCNF: {}\n", cnf);
+        let var_map = cnf.create_variable_mapping();
+        let mut solver = cnf.to_solver();
+        match solver.solve() {
+            None => panic!(":(((("),
+            Some(satisfiable) => {
+                solver.write_dimacs(Path::new("/tmp/xd"));
+                if satisfiable {
+                    for y in 0..self.height {
+                        for x in 0..self.width {
+                            match
+                                var_map.get(mk_var_name((y, x)).as_str())
+                                .and_then(|var_name| solver.value(*var_name)) {
+                                    None => (),
+                                    Some(true) => self.cells[y][x] = {
+                                        CellType::Tent
+                                    },
+                                    Some(false) => self.cells[y][x] = CellType::Meadow
+                                }
+                        }
+                    }
+                }
+                else {
+                    panic!("no solution")
+                }
+            }
+        }
     }
 
 
@@ -184,7 +225,9 @@ impl Field {
         // Conjunction of constranits per each axis
         for (axis, tents) in axes {
             let axis_count = counts[*axis];
-            clauses = clauses.and(Field::make_count_constraints_for_axis(axis_count, tents))
+            let for_axis = Field::make_count_constraints_for_axis(axis_count, tents);
+            println!("{}: {}", axis, for_axis);
+            clauses = clauses.and(for_axis)
         }
         clauses
     }
@@ -192,7 +235,7 @@ impl Field {
     fn make_count_constraints_for_axis(axis_count : usize, tents : &Vec<TentPlace>) -> Formula {
         fn go(count : usize, index : usize, tents : &Vec<TentPlace>) -> Formula {
             if index >= tents.len() {
-                Formula::Const(true)
+                Formula::Const(count == 0)
             } else if count == 0 {
                 Formula::Var(mk_var_name(tents[index])).not().and(go(count, index + 1, tents))
             } else {
@@ -211,7 +254,7 @@ impl Field {
             for n in ns {
                 out = out.and(
                     Formula::Var(mk_var_name(*t)).not()
-                        .iff(Formula::Var(mk_var_name(*n))))
+                        .or(Formula::Var(mk_var_name(*n)).not()))
             }
         }
         out
