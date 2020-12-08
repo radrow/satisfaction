@@ -3,6 +3,8 @@ mod game;
 mod field_widget;
 mod message;
 mod control_widget;
+mod cnf;
+mod formula;
 
 use game::Game;
 
