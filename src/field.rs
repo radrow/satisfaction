@@ -165,8 +165,9 @@ impl Field {
         let var_map = cnf.create_variable_mapping();
         let mut solver = cnf.to_solver();
         match solver.solve() {
-            None => panic!(":(((("),
+            None => panic!("failed :(((("),
             Some(satisfiable) => {
+                println!("Solved.");
                 if satisfiable {
                     for y in 0..self.height {
                         for x in 0..self.width {
