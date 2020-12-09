@@ -2,6 +2,8 @@ use std::{collections::{HashSet, HashMap}, env::var};
 use std::io;
 use std::path::Path;
 use std::fs;
+use std::process::{Command, Stdio};
+use std::io::Write;
 
 use cadical;
 use num_integer::binomial;
@@ -129,7 +131,7 @@ impl Field {
         tent_coordinates
     }
 
-    pub fn to_formula(&self) -> String {
+    pub fn to_formula(&self) -> (String, HashMap<usize,TentPlace>) {
         let tents = &self.tent_coordinates();
         let tent_mapping = tents.iter()
             .cloned()
@@ -154,17 +156,48 @@ impl Field {
         total.push_str(&Field::make_count_constraints(&self.row_counts, &row_set));
         total.push_str(&Field::make_nei_constraints(&nei_set));
 
-        total
+        (total, tent_mapping)
     }
 
     pub fn solve(&mut self) {
-        //println!("Generating formula...");
-        //let formula = self.to_formula();
-        //println!("Done. Generating CNF...");
-        //let cnf = formula.to_cnf();
+        println!("Generating CNF...");
         println!("Done. Solving...");
-        let formular = self.to_formula();
-        fs::write("test.cnf", &formular).unwrap();
+
+        let (formular, mapping) = self.to_formula();
+        let mut process = Command::new("cadical")
+            .arg("-f")
+            .arg("-q")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let stdin = process.stdin.as_mut().unwrap();
+        stdin.write_all(formular.as_bytes()).unwrap();
+        let output = process.wait_with_output().unwrap();
+        let vec: Vec<TentPlace> = String::from_utf8(output.stdout)
+            .unwrap()
+            .lines()
+            .skip(1)
+            .map(|line| {
+                line.split_ascii_whitespace()
+                    .into_iter()
+                    .skip(1)
+                    .map(|number| {
+                        number.parse::<isize>().unwrap()
+                    })
+                    .filter(
+                        |number| { *number > 0 }
+                    ).map(|id| {
+                        *mapping.get(&(id as usize)).unwrap()
+                    })
+            }).flatten()
+                .collect();
+        
+        for (x,y) in vec.into_iter() {
+            self.cells[x][y] = CellType::Tent;
+        }
+
+
 
         /*let var_map = cnf.create_variable_mapping();
         let mut solver = cnf.to_solver();
