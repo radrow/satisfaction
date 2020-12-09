@@ -1,4 +1,4 @@
-use crate::message::*;
+use crate::{message::*, puzzle_creation};
 use crate::random_creation_widget::RandomCreationWidget;
 use iced::button::State;
 use iced::{Length, HorizontalAlignment, VerticalAlignment, Element, Button, Text, Column};
@@ -32,18 +32,20 @@ impl ControlWidget {
         }
     }
 
-    pub fn draw(&mut self) -> Element<Message> {
+    pub fn view(&mut self, solvable: bool) -> Element<Message> {
         let mut control = Column::new()
             .width(self.width)
             .push(
+                self.field_creation_widget.view()
+            );
+        if solvable {
+            control = control.push(
                 ControlWidget::button(
                     &mut self.solve_puzzle_button,
                     "Solve Puzzle",
                     Message::SolvePuzzle
-                )
-            ).push(
-                self.field_creation_widget.view()
-            );
+                ));
+        }
         if let Some(message) = &self.log {
             control = control.push(
                 Text::new(message)

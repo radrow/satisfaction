@@ -81,7 +81,7 @@ impl Application for Game {
     fn view(&mut self) -> Element<Self::Message> {
         Row::new()
         .align_items(Align::Start)
-        .push(self.control_widget.draw())
+        .push(self.control_widget.view(!self.puzzle_solved && self.field.is_some()))
         .push(Container::new(
             match &mut self.field {
                 None => Element::from(
