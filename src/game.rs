@@ -7,15 +7,10 @@ use iced_native::{
     window::Event,
 };
 
-use crate::{
-    field::*,
-    field_widget::*,
-    message::*,
-    control_widget::*,
-};
+use crate::{control_widget::*, field::*, field_widget::*, message::*, puzzle_creation};
 
 use std::collections::{HashMap};
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 
 pub struct Game {
     field: Option<Field>,
@@ -59,6 +54,13 @@ impl Application for Game {
                 self.field = Field::from_file(&path).ok();
             },
             Message::SolvePuzzle => {
+                let field : &mut Field = match &mut self.field {
+                    None => panic!("no puzzle man"),
+                    Some(f) => f
+                };
+                field.solve();
+            },
+                /**
                 if let Some(field) = &self.field {
                     let tents = field.tent_coordinates();
                     solve_puzzle(&tents, &field.row_counts, &field.column_counts)
@@ -67,9 +69,13 @@ impl Application for Game {
                         "No field available! Drag and drop a tent file or create a custom or random one."
                     );
                 };
-            },
+            },**/
             Message::GridSizeInputChanged(event) => {
                 self.control_widget.field_creation_widget.update(event);
+            },
+            Message::CreateRandomPuzzle{width , height, num_tent: _} => {
+                let field = puzzle_creation::create_random_puzzle(height, width).unwrap();
+                self.field = Some(field);
             },
             _ => {
                 unimplemented!();
