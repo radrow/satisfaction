@@ -2,7 +2,6 @@ use std::fmt;
 use crate::cnf::*;
 use std::collections::VecDeque;
 
-#[derive (Clone)]
 pub enum Formula {
     Const(bool),
     Var(String),
@@ -43,53 +42,57 @@ impl Formula {
     pub fn to_cnf(&self) -> CNF {
         let mut out_clauses : VecDeque<CNFClause> = VecDeque::new();
 
-        fn go(form : &Formula, mut clauses : &mut VecDeque<CNFClause>) {
+        fn go(form : &Formula, mut clauses : &mut VecDeque<CNFClause>, neg : bool) {
             match form {
-                Formula::Const(true) => (),
-                Formula::Const(false) => {
-                    clauses.push_back(CNFClause{vars: vec![]});
+                Formula::Const(b) => {
+                    if neg == *b {
+                        clauses.push_back(CNFClause{vars: vec![]});
+                    }
                 },
                 Formula::Var(v) => {
-                    clauses.push_back(CNFClause{vars: vec![CNFVar::Pos(String::from(v.clone()))]});
+                    if neg {
+                        clauses.push_back(CNFClause{vars: vec![CNFVar::Neg(String::from(v.clone()))]});
+                    } else {
+                        clauses.push_back(CNFClause{vars: vec![CNFVar::Pos(String::from(v.clone()))]});
+                    }
                 },
                 Formula::And(l, r) => {
-                    go(l, &mut clauses);
-                    go(r, &mut clauses);
+                    if neg {
+                        let mut clauses_l : VecDeque<CNFClause> = VecDeque::new();
+                        let mut clauses_r : VecDeque<CNFClause> = VecDeque::new();
+                        go(l, &mut clauses_l, true);
+                        go(r, &mut clauses_r, true);
+                        for cl in &clauses_l {
+                            for cr in &clauses_r {
+                                clauses.push_back(cl.cat(&cr))
+                            }
+                        }
+                    } else {
+                        go(l, &mut clauses, false);
+                        go(r, &mut clauses, false);
+                    }
                 },
                 Formula::Or(l, r) => {
-                    let mut clauses_l : VecDeque<CNFClause> = VecDeque::new();
-                    let mut clauses_r : VecDeque<CNFClause> = VecDeque::new();
-                    go(l, &mut clauses_l);
-                    go(r, &mut clauses_r);
-                    for cl in &clauses_l {
-                        for cr in &clauses_r {
-                            clauses.push_back(cl.cat(&cr))
+                    if neg {
+                        go(l, &mut clauses, true);
+                        go(r, &mut clauses, true);
+                    } else {
+                        let mut clauses_l : VecDeque<CNFClause> = VecDeque::new();
+                        let mut clauses_r : VecDeque<CNFClause> = VecDeque::new();
+                        go(l, &mut clauses_l, false);
+                        go(r, &mut clauses_r, false);
+                        for cl in &clauses_l {
+                            for cr in &clauses_r {
+                                clauses.push_back(cl.cat(&cr))
+                            }
                         }
                     }
                 },
-                Formula::Not(p) =>
-                    match &**p {
-                        Formula::Const(true) => {
-                            clauses.push_back(CNFClause{vars: vec![]});
-                        },
-                        Formula::Const(false) => (),
-                        Formula::Var(v) => {
-                            clauses.push_back(CNFClause{vars: vec![CNFVar::Neg(String::from(v.clone()))]});
-                        },
-                    Formula::And(l, r) => {
-                        go(&l.clone().not().or(r.clone().not()), &mut clauses);
-                    },
-                        Formula::Or(l, r) => {
-                            go(&l.clone().not().and(r.clone().not()), &mut clauses);
-                        },
-                        Formula::Not(q) => {
-                            go(q, &mut clauses);
-                        }
-                    },
-        }
+                Formula::Not(p) => go(p, &mut clauses, true),
+            }
         }
 
-        go(self, &mut out_clauses);
+        go(self, &mut out_clauses, false);
         CNF{clauses: out_clauses}
     }
 
