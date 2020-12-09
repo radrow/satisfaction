@@ -1,9 +1,12 @@
-use std::collections::{HashSet, HashMap};
+use std::{collections::{HashSet, HashMap}, env::var};
 use std::io;
 use std::path::Path;
 use std::fs;
 
 use cadical;
+use num_integer::binomial;
+use itertools::Itertools;
+use numtoa::NumToA;
 
 use crate::formula::*;
 
@@ -102,22 +105,22 @@ impl Field {
         let height = self.cells[0].len();
         for (x, row) in self.cells.iter().enumerate() {
             for (y, cell) in row.iter().enumerate() {
-                if cell == &CellType::Tree {
+                if *cell == CellType::Tree {
                     let left = x as isize - 1;
                     let right = x + 1;
                     let top = y as isize - 1;
                     let bottom = y + 1;
 
-                    if left >= 0 {
+                    if left >= 0 && self.cells[left as usize][y] != CellType::Tree {
                         tent_coordinates.insert((left as usize, y));
                     }
-                    if right < width {
+                    if right < width && self.cells[right][y] != CellType::Tree {
                         tent_coordinates.insert((right, y));
                     }
-                    if top >= 0 {
+                    if top >= 0 && self.cells[x][top as usize] != CellType::Tree {
                         tent_coordinates.insert((x, top as usize));
                     }
-                    if bottom < height {
+                    if bottom < height && self.cells[x][bottom] != CellType::Tree {
                         tent_coordinates.insert((x, bottom));
                     }
                 }
@@ -271,5 +274,24 @@ impl Field {
             }
         }
         out
+    }
+
+    pub fn axis_constraint(variables: &Vec<usize>, count: usize) -> String {
+        let mut lower_bound_clauses = variables.iter()
+            .map(|v| v.to_string())
+            .combinations(variables.len()-count+1)
+            .map(|v| {
+                v.join(" ")
+            }).join("\n");
+
+        let upper_bound_clauses = variables.iter()
+            .map(|v| format!("-{}",*v))
+            .combinations(count+1)
+            .map(|v| {
+                v.join(" ")
+            }).join("\n");
+        
+        lower_bound_clauses.push_str(&upper_bound_clauses);
+        lower_bound_clauses
     }
 }

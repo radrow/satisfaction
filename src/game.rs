@@ -32,7 +32,7 @@ impl Application for Game {
         svgs.insert(CellType::Tree, Svg::from_path("images/tree.svg"));
 
 
-        let field_widget = FieldWidget::new(20, 2, 2, svgs);
+        let field_widget = FieldWidget::new(15, 2, 2, svgs);
         let control_widget = ControlWidget::new(150, 10, 12);
 
         let game = Game {

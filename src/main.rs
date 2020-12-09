@@ -14,5 +14,8 @@ use game::Game;
 use iced::{Application, Settings};
 
 fn main() -> iced::Result {
+    let v = vec![1,2,3,4];
+    //field::Field::axis_constraint(&v, 2);
+    //Ok(())
     Game::run(Settings::default())
 }
