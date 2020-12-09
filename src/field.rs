@@ -13,8 +13,8 @@ use crate::formula::*;
 
 type TentPlace = (usize, usize);
 
-type AxisSet = HashMap<usize, Vec<TentPlace>>;
-type NeiSet = HashMap<TentPlace, Vec<TentPlace>>;
+type AxisSet = HashMap<usize, Vec<usize>>;
+type NeiSet = Vec<(usize, usize)>;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum CellType {
@@ -129,43 +129,44 @@ impl Field {
         tent_coordinates
     }
 
-    pub fn to_dimacs(&self) -> String {
-        self.to_formula().to_cnf().to_dimacs()
-    }
-
-    pub fn to_solver(&self) -> cadical::Solver {
-        self.to_formula().to_cnf().to_solver()
-    }
-
-    pub fn to_formula(&self) -> Formula {
+    pub fn to_formula(&self) -> String {
         let tents = &self.tent_coordinates();
+        let tent_mapping = tents.iter()
+            .cloned()
+            .enumerate()
+            .map(|(id, coord)| (id+1, coord))
+            .collect::<HashMap<usize,TentPlace>>();
+        let id_mapping = tent_mapping.iter()
+            .map(|(id, coord)| (*coord, *id))
+            .collect::<HashMap<TentPlace, usize>>();
+        eprintln!("{:?}", tent_mapping.len());
 
         let col_set: AxisSet = Field::make_coord_set_by(
-            &|x : &TentPlace| -> usize {x.1}, tents
+            &|x : &TentPlace| -> usize {x.1}, &tent_mapping
         );
         let row_set: AxisSet = Field::make_coord_set_by(
-            &|x : &TentPlace| -> usize {x.0}, tents
+            &|x : &TentPlace| -> usize {x.0}, &tent_mapping
         );
-        let nei_set: NeiSet = Field::make_nei_set(tents);
+        let nei_set: NeiSet = Field::make_nei_set(&tent_mapping, &id_mapping);
 
-        let col_constraints : Formula =
-            Field::make_count_constraints(&self.column_counts, &col_set);
-        let row_constraints : Formula =
-            Field::make_count_constraints(&self.row_counts, &row_set);
-        let nei_constraints : Formula =
-            Field::make_nei_constraints(&nei_set);
+        let mut total = "p cnf 1 1\n".to_string();
+        total.push_str(&Field::make_count_constraints(&self.column_counts, &col_set));
+        total.push_str(&Field::make_count_constraints(&self.row_counts, &row_set));
+        total.push_str(&Field::make_nei_constraints(&nei_set));
 
-        col_constraints.and(row_constraints).and(nei_constraints)
+        total
     }
 
     pub fn solve(&mut self) {
-        println!("Generating formula...");
-        let formula = self.to_formula();
-        println!("Done. Generating CNF...");
-        let cnf = formula.to_cnf();
+        //println!("Generating formula...");
+        //let formula = self.to_formula();
+        //println!("Done. Generating CNF...");
+        //let cnf = formula.to_cnf();
         println!("Done. Solving...");
+        let formular = self.to_formula();
+        fs::write("test.cnf", &formular).unwrap();
 
-        let var_map = cnf.create_variable_mapping();
+        /*let var_map = cnf.create_variable_mapping();
         let mut solver = cnf.to_solver();
         match solver.solve() {
             None => panic!("failed :(((("),
@@ -190,29 +191,29 @@ impl Field {
                     panic!("no solution")
                 }
             }
-        }
+        }*/
     }
 
 
     fn make_coord_set_by (
         by : &dyn Fn(&TentPlace) -> usize,
-        tents : &HashSet<TentPlace>,
+        tents : &HashMap<usize, TentPlace>,
     ) -> AxisSet {
         let mut out : AxisSet = HashMap::new();
 
-        for tent in tents {
-            out.entry(by(tent))
-                .and_modify(|v| v.push(*tent))
-                .or_insert(vec![*tent]);
+        for (id, coord) in tents {
+            out.entry(by(coord))
+                .and_modify(|v| v.push(*id))
+                .or_insert(vec![*id]);
         }
 
         out
     }
 
-    fn make_nei_set(tents : &HashSet<TentPlace>) -> NeiSet {
-        let mut out : NeiSet = HashMap::new();
+    fn make_nei_set(id_to_coord : &HashMap<usize, TentPlace>, coord_to_id: &HashMap<TentPlace, usize>) -> NeiSet {
+        let mut out : NeiSet = Vec::new();
 
-        for tent in tents {
+        for (id, tent) in id_to_coord {
             let mut neighbours = vec![];
 
             let mut candidates = vec![];
@@ -224,55 +225,40 @@ impl Field {
             candidates.push((tent.0 + 1, tent.1 + 1));
 
             for candidate in candidates {
-                if tents.contains(&candidate) {
-                    neighbours.push(candidate)
+
+                if coord_to_id.contains_key(&candidate) {
+                    neighbours.push((*id, coord_to_id[&candidate]));
                 }
             }
 
-            out.insert(*tent, neighbours);
+            out.extend(neighbours.into_iter());
         }
 
         out
     }
 
-    fn make_count_constraints(counts : &Vec<usize>, axes : &AxisSet) -> Formula {
-        // The default option is true – if we have no constraints
-        let mut clauses = Formula::Const(true);
+    fn make_count_constraints(counts : &Vec<usize>, axes : &AxisSet) -> String {
+        let mut clauses = String::new();
 
         // Conjunction of constranits per each axis
         for (axis, tents) in axes {
             let axis_count = counts[*axis];
-            let for_axis = Field::make_count_constraints_for_axis(axis_count, tents);
-            clauses = clauses.and(for_axis)
+            if axis_count == 0 {
+                continue;
+            }
+            let for_axis = Field::axis_constraint(tents, axis_count);
+            clauses.push_str(&for_axis);
         }
         clauses
     }
 
-    fn make_count_constraints_for_axis(axis_count : usize, tents : &Vec<TentPlace>) -> Formula {
-        fn go(count : usize, index : usize, tents : &Vec<TentPlace>) -> Formula {
-            if index >= tents.len() {
-                Formula::Const(count == 0)
-            } else if count == 0 {
-                Formula::Var(mk_var_name(tents[index])).not().and(go(count, index + 1, tents))
-            } else {
-                let var1 = Formula::Var(mk_var_name(tents[index]));
-                let var2 = Formula::Var(mk_var_name(tents[index]));
-                (var1.and(go(count - 1, index + 1, tents)))
-                    .or(var2.not().and(go(count, index + 1, tents)))
-            }
-        }
-        go(axis_count, 0, tents)
-    }
 
-    fn make_nei_constraints(neigh : &NeiSet) -> Formula {
-        let mut out = Formula::Const(true);
-        for (t, ns) in neigh {
-            for n in ns {
-                out = out.and(
-                    Formula::Var(mk_var_name(*t)).not()
-                        .or(Formula::Var(mk_var_name(*n)).not()))
-            }
-        }
+    fn make_nei_constraints(neigh : &NeiSet) -> String {
+        let mut out = neigh.iter()
+            .map(|(x,y)|{
+                format!("-{} -{}", x, y)
+            }).join(" 0 \n");
+        out.push_str(" 0");
         out
     }
 
@@ -282,14 +268,19 @@ impl Field {
             .combinations(variables.len()-count+1)
             .map(|v| {
                 v.join(" ")
-            }).join("\n");
+            }).join(" 0 \n");
+        lower_bound_clauses.push_str("  0 \n");
 
-        let upper_bound_clauses = variables.iter()
+        let mut upper_bound_clauses = variables.iter()
             .map(|v| format!("-{}",*v))
             .combinations(count+1)
             .map(|v| {
                 v.join(" ")
-            }).join("\n");
+            }).join(" 0 \n");
+        upper_bound_clauses.push_str(
+            if !upper_bound_clauses.is_empty() { " 0 \n" }
+            else { "\n" }
+        );
         
         lower_bound_clauses.push_str(&upper_bound_clauses);
         lower_bound_clauses
