@@ -2,7 +2,7 @@ extern crate iced;
 
 use iced::{executor};
 use iced::{Length, Align};
-use iced::{Button, Element, Row, Application, Svg, Text, Command, Subscription};
+use iced::{Button, Element, Row, Application, Svg, Text, Command, Subscription, HorizontalAlignment, VerticalAlignment, Container};
 use iced_native::{
     window::Event,
 };
@@ -13,9 +13,9 @@ use std::collections::{HashMap};
 use std::path::{PathBuf, Path};
 
 
-
 pub struct Game {
     field: Option<Field>,
+    puzzle_solved: bool,
     field_widget: FieldWidget,
     control_widget: ControlWidget,
 }
@@ -37,6 +37,7 @@ impl Application for Game {
 
         let game = Game {
             field: None,
+            puzzle_solved: false,
             field_widget,
             control_widget,
         };
@@ -51,31 +52,23 @@ impl Application for Game {
         match message {
             Message::FileDropped(path) => {
                 // TODO: Handle exception appropriately
-                self.field = Field::from_file(&path).ok();
+                let field = Field::from_file(&path)
+                    .unwrap();
+                self.field = Some(field);
+                self.puzzle_solved = false;
             },
             Message::SolvePuzzle => {
-                let field : &mut Field = match &mut self.field {
-                    None => panic!("no puzzle man"),
-                    Some(f) => f
-                };
+                let field = self.field.as_mut().unwrap();
                 field.solve();
+                self.puzzle_solved = true;
             },
-                /**
-                if let Some(field) = &self.field {
-                    let tents = field.tent_coordinates();
-                    solve_puzzle(&tents, &field.row_counts, &field.column_counts)
-                } else {
-                    self.control_widget.add_to_log(
-                        "No field available! Drag and drop a tent file or create a custom or random one."
-                    );
-                };
-            },**/
             Message::GridSizeInputChanged{width, height} => {
                 self.control_widget.field_creation_widget.update(width, height)
             },
             Message::CreateRandomPuzzle{width , height} => {
                 let field = puzzle_creation::create_random_puzzle(height, width).unwrap();
                 self.field = Some(field);
+                self.puzzle_solved = true;
             },
             _ => {
                 unimplemented!();
@@ -89,8 +82,20 @@ impl Application for Game {
         Row::new()
         .align_items(Align::Start)
         .push(self.control_widget.draw())
-        .push(self.field_widget.draw_field(&self.field))
-        .into()
+        .push(Container::new(
+            match &mut self.field {
+                None => Element::from(
+                    Text::new("Drag and drop a file!")
+                        .horizontal_alignment(HorizontalAlignment::Center)
+                        .vertical_alignment(VerticalAlignment::Center)
+                ),
+                Some(field) => self.field_widget.view(field).into(),
+            }).center_x()
+                .center_y()
+                .width(Length::Fill)
+                .height(Length::Fill)
+        ).padding(10)
+            .into()
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {

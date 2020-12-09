@@ -42,30 +42,26 @@ impl FieldWidget {
             .into()
     }
 
-    pub fn draw_field(&self, field: &Option<Field>) -> Element<Message> {
-        if let Some(field) = field {
-            Column::with_children(
-                field.cells.iter()
-                    .zip(field.row_counts.iter())
-                    .map(|(rows, row_count)| {
-                        Row::with_children(
-                            rows.iter()
-                                .map(|cell| self.draw_cell(cell))
-                                .collect()
-                        ).spacing(self.vertical_spacing)
-                            .push(self.draw_number(*row_count))
-                            .into()
-                    }).collect()
-            ).push(
-                Row::with_children(
-                    field.column_counts.iter()
-                        .map(|number| self.draw_number(*number))
-                        .collect()
-                ).spacing(self.horizontal_spacing)
+    pub fn view(&self, field: &Field) -> Element<Message> {
+        Column::with_children(
+            field.cells.iter()
+                .zip(field.row_counts.iter())
+                .map(|(rows, row_count)| {
+                    Row::with_children(
+                        rows.iter()
+                            .map(|cell| self.draw_cell(cell))
+                            .collect()
+                    ).spacing(self.vertical_spacing)
+                        .push(self.draw_number(*row_count))
+                        .into()
+                }).collect()
+        ).push(
+            Row::with_children(
+                field.column_counts.iter()
+                    .map(|number| self.draw_number(*number))
+                    .collect()
             ).spacing(self.horizontal_spacing)
-                .into()
-        } else {
-            Space::new(self.rect_size, self.rect_size).into()
-        }
+        ).spacing(self.horizontal_spacing)
+            .into()
     }
 }
