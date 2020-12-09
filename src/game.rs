@@ -12,13 +12,13 @@ use crate::{control_widget::*, field::*, field_widget::*, message::*, puzzle_cre
 use std::collections::{HashMap};
 use std::path::{PathBuf, Path};
 
+
+
 pub struct Game {
     field: Option<Field>,
     field_widget: FieldWidget,
     control_widget: ControlWidget,
 }
-
-
 
 impl Application for Game {
     type Executor = executor::Default;
@@ -70,10 +70,10 @@ impl Application for Game {
                     );
                 };
             },**/
-            Message::GridSizeInputChanged(event) => {
-                self.control_widget.field_creation_widget.update(event);
+            Message::GridSizeInputChanged{width, height} => {
+                self.control_widget.field_creation_widget.update(width, height)
             },
-            Message::CreateRandomPuzzle{width , height, num_tent: _} => {
+            Message::CreateRandomPuzzle{width , height} => {
                 let field = puzzle_creation::create_random_puzzle(height, width).unwrap();
                 self.field = Some(field);
             },

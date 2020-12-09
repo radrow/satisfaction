@@ -7,6 +7,7 @@ mod random_creation_widget;
 mod cnf;
 mod formula;
 mod puzzle_creation;
+mod number_input;
 
 use game::Game;
 

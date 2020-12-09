@@ -22,7 +22,7 @@ impl ControlWidget {
         ControlWidget {
             width: Length::Units(width),
             height: Length::Units(height),
-            field_creation_widget: RandomCreationWidget::new(10, 10, 5),
+            field_creation_widget: RandomCreationWidget::new(10, 10),
 
             create_custom_field_button: State::new(),
             create_random_field_button: State::new(),
@@ -42,7 +42,7 @@ impl ControlWidget {
                     Message::SolvePuzzle
                 )
             ).push(
-                self.field_creation_widget.widget()
+                self.field_creation_widget.view()
             );
         if let Some(message) = &self.log {
             control = control.push(
