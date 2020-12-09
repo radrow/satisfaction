@@ -145,31 +145,28 @@ impl Field {
         );
         let nei_set: NeiSet = Field::make_nei_set(tents);
 
-        println!("\nCOLS:");
         let col_constraints : Formula =
             Field::make_count_constraints(&self.column_counts, &col_set);
-        println!("\nROWS:");
         let row_constraints : Formula =
             Field::make_count_constraints(&self.row_counts, &row_set);
         let nei_constraints : Formula =
             Field::make_nei_constraints(&nei_set);
 
-        println!("\nNEIS: {} \n", nei_constraints);
-
         col_constraints.and(row_constraints).and(nei_constraints)
     }
 
     pub fn solve(&mut self) {
+        println!("Generating formula...");
         let formula = self.to_formula();
+        println!("Done. Generating CNF...");
         let cnf = formula.to_cnf();
+        println!("Done. Solving...");
 
-        println!("\nCNF: {}\n", cnf);
         let var_map = cnf.create_variable_mapping();
         let mut solver = cnf.to_solver();
         match solver.solve() {
             None => panic!(":(((("),
             Some(satisfiable) => {
-                solver.write_dimacs(Path::new("/tmp/xd"));
                 if satisfiable {
                     for y in 0..self.height {
                         for x in 0..self.width {
@@ -242,7 +239,6 @@ impl Field {
         for (axis, tents) in axes {
             let axis_count = counts[*axis];
             let for_axis = Field::make_count_constraints_for_axis(axis_count, tents);
-            println!("{}: {}", axis, for_axis);
             clauses = clauses.and(for_axis)
         }
         clauses

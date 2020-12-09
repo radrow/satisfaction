@@ -1,11 +1,11 @@
 use std::fmt;
 use std::collections::HashMap;
+use std::collections::VecDeque;
 
 use cadical;
 
-#[derive (Clone)]  // :(
 pub struct CNF {
-    pub clauses : Vec<CNFClause>
+    pub clauses : VecDeque<CNFClause>
 }
 
 #[derive (Clone)]
@@ -20,15 +20,6 @@ pub enum CNFVar {
 }
 
 impl CNF {
-    pub fn cat(&self, c : &CNF) -> CNF {
-        let mut clauses : Vec<CNFClause> = vec![];
-        clauses.extend(self.clauses.clone());
-        clauses.extend(c.clauses.clone());
-        CNF {
-            clauses: clauses
-        }
-    }
-
     pub fn create_variable_mapping(&self) -> HashMap<&str, i32> {
         let mut var_map : HashMap<&str, i32> = HashMap::new();
         let mut count : i32 = 0;
