@@ -55,7 +55,7 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
 
         let mut curr_tree_count = tree_count;
         let mut loop_count = 0;
-        let mut max_retries = 1000;
+        let mut max_retries = 10000;
         let mut fields_count = field.cells[0].len() * field.cells.len() * 20;
 
         while curr_tree_count > 0 {
@@ -203,15 +203,14 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
     let mut loop_count = 0;
 
     while can_create == false {
-        if loop_count >= 10000 {
+        if loop_count >= 100000 {
             return Err("couldnt find a puzzle in 10000 iterations".to_string());
         }
         field = create_empty_field(hight, width);
         let tents_worked = place_tents(trees, &mut field);
-        if !tents_worked {
-            return Err("couldnt find a puzzle in time".to_string());
+        if tents_worked {
+            can_create = place_trees(&mut field);
         }
-        can_create = place_trees(&mut field);
         loop_count += 1;
     }
     fill_col_row_count(&mut field);
