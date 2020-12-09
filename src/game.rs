@@ -68,7 +68,7 @@ impl Application for Game {
             Message::CreateRandomPuzzle{width , height} => {
                 let field = puzzle_creation::create_random_puzzle(height, width).unwrap();
                 self.field = Some(field);
-                self.puzzle_solved = true;
+                self.puzzle_solved = false;
             },
             _ => {
                 unimplemented!();
