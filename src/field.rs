@@ -2,10 +2,10 @@ use std::{collections::{HashMap}};
 use std::io;
 use std::path::Path;
 use std::fs;
-use std::process::{Command, Stdio};
-use std::io::Write;
 
 use itertools::Itertools;
+
+use crate::cnf::{CNF, CNFClause, CNFVar};
 
 type TentPlace = (usize, usize);
 type TreePlace = (usize, usize);
@@ -130,7 +130,7 @@ impl Field {
         tents_by_trees
     }
 
-    fn to_formula(&self) -> (String, HashMap<usize,TentPlace>, Vec<(Assignment, usize)>) {
+    pub fn to_formula(&self) -> (CNF, HashMap<TentPlace, usize>, Vec<(Assignment, usize)>) {
         let tents = self.tent_coordinates();
 
         // Id to coordinate
@@ -154,57 +154,48 @@ impl Field {
         );
         let neighbour_set: NeiSet = Field::make_neighbour_set(&tent_mapping, &id_mapping);
 
-        let mut total = "p cnf 1 1\n".to_string();
-        total.push_str(&Field::make_count_constraints(&self.column_counts, &col_set));
-        total.push_str(&Field::make_count_constraints(&self.row_counts, &row_set));
-        total.push_str(&Field::make_neighbour_constraints(&neighbour_set));
-        let (neistr, assg_mapping) =
-            &Field::make_correspondence_constraints(&self, &id_mapping);
-        total.push_str(neistr);
-        (total, tent_mapping, assg_mapping.clone().to_vec())
+        let mut total = CNF::new();
+        total.extend(Field::make_count_constraints(&self.column_counts, &col_set));
+        total.extend(Field::make_count_constraints(&self.row_counts, &row_set));
+        total.extend(Field::make_neighbour_constraints(&neighbour_set));
+        let (neistr, assg_mapping) = Field::make_correspondence_constraints(&self, &id_mapping);
+        total.extend(neistr);
+        (total, id_mapping, assg_mapping.clone().to_vec())
     }
 
     pub fn solve(&mut self) -> Vec<((usize, usize), (usize, usize))> {
-        let (formular, t_mapping, a_mapping) = self.to_formula();
-        let mut process = Command::new("cadical")
-            .arg("-f")
-            .arg("-q")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn()
-            .unwrap();
+        let (formula, t_mapping, a_mapping) = self.to_formula();
 
-        let stdin = process.stdin.as_mut().unwrap();
-        stdin.write_all(formular.as_bytes()).unwrap();
-        let output = process.wait_with_output().unwrap();
-        let output_string = String::from_utf8(output.stdout).unwrap();
+        let mut solver = formula.to_solver();
+        match solver.solve() {
+            None => panic!("was zur hölle"),
+            Some(satisfiable) => {
+                if satisfiable {
+                    println!("Success!");
+                    for y in 0..self.height {
+                        for x in 0..self.width {
+                            match
+                                t_mapping.get(&(y, x))
+                                .and_then(|var_name| solver.value(*var_name as i32)) {
+                                    None => (),
+                                    Some(true) => self.cells[y][x] = CellType::Tent,
+                                    Some(false) => self.cells[y][x] = CellType::Meadow
+                                }
+                        }
+                    }
 
-        let vec: Vec<TentPlace> = output_string.lines()
-            .skip(1)
-            .map(|line| {
-                line.split_ascii_whitespace()
-                    .into_iter()
-                    .skip(1)
-                    .map(|number| {
-                        number.parse::<isize>().unwrap()
-                    })
-                    .filter(
-                        |number| { *number > 0 && (*number as usize) <= t_mapping.len()}
-                    ).map(|id| {
-                        *t_mapping.get(&(id as usize)).unwrap()
-                    })
-            }).flatten()
-                .collect();
-
-        for (x,y) in vec.into_iter() {
-            self.cells[x][y] = CellType::Tent;
+                    a_mapping
+                        .iter()
+                        .filter(|(_, i)| *i > 0)
+                        .map(|(a, _)| (a.tent, a.tree))
+                        .collect()
+                }
+                else {
+                    println!("No solution");
+                    vec![]
+                }
+            }
         }
-
-        a_mapping
-            .iter()
-            .filter(|(_, i)| *i > 0)
-            .map(|(a, _)| (a.tent, a.tree))
-            .collect()
     }
 
 
@@ -249,8 +240,8 @@ impl Field {
         out
     }
 
-    fn make_count_constraints(counts : &Vec<usize>, axes : &AxisSet) -> String {
-        let mut clauses = String::new();
+    fn make_count_constraints(counts : &Vec<usize>, axes : &AxisSet) -> CNF {
+        let mut clauses = CNF::new();
 
         // Conjunction of constranits per each axis
         for (axis, tents) in axes {
@@ -259,24 +250,23 @@ impl Field {
                 continue;
             }
             let for_axis = Field::axis_constraint(tents, axis_count);
-            clauses.push_str(&for_axis);
+            clauses.extend(for_axis);
         }
         clauses
     }
 
 
-    fn make_neighbour_constraints(neigh : &NeiSet) -> String {
-        let mut out = neigh.iter()
+    fn make_neighbour_constraints(neigh : &NeiSet) -> CNF {
+        neigh
+            .iter()
             .map(|(x,y)|{
-                format!("-{} -{}", x, y) // Not both neighbours
-            }).join(" 0\n");
-        out.push_str(" 0\n");
-        out
+                CNFClause{vars: vec![CNFVar::Neg(*x as u32), CNFVar::Neg(*y as u32)]}
+            }).collect()
     }
 
     fn make_correspondence_constraints(
         &self,
-        id_mapping: &HashMap<TentPlace, usize>) -> (String, Vec<(Assignment, usize)>) {
+        id_mapping: &HashMap<TentPlace, usize>) -> (CNF, Vec<(Assignment, usize)>) {
 
         let mut oneof_packs : Vec<Vec<Assignment>> = vec![];
         let mut cond_oneof_packs : Vec<(TentPlace, Vec<Assignment>)> = vec![];
@@ -385,94 +375,97 @@ impl Field {
             assg_id_mapping : &HashMap<Assignment, usize>,
             pack : &Vec<Assignment>,
             cond : Option<TentPlace>
-        ) -> String {
+        ) -> CNF {
             let ids : Vec<&usize> = pack
                 .iter()
                 .map(|assg| assg_id_mapping
                      .get(assg)
                      .unwrap()
                      ).collect();
-            let any_of =
-                match cond {
-                    Some(x) => String::from("-") + &id_mapping.get(&x).unwrap().to_string()
-                        + " " + &ids.iter().map(|x| x.to_string()).join(" "),
-                    None => ids.iter().map(|x| x.to_string()).join(" ")
-                };
+            let mut any_of =
+                CNF::single(
+                    match cond {
+                        Some(x) => {
+                            let mut c = ids.iter().map(|i| CNFVar::Pos(**i as u32)).collect::<CNFClause>();
+                            c.push(CNFVar::Neg(*id_mapping.get(&x).unwrap() as u32));
+                            c
+                        },
+                        None => ids.iter().map(|i| CNFVar::Pos(**i as u32)).collect::<CNFClause>()
+                    }
+                );
 
             let no_two = {
-                let mut out = vec![];
+                let mut out = CNF::new();
                 for i in &ids {
                     for j in &ids {
                         if i < j {
                             out.push(
                                 match cond {
-                                    Some(x) => String::from("-") + &id_mapping.get(&x).unwrap().to_string()
-                                        + " -" + &i.to_string() + " -" + &j.to_string(),
-                                    None => String::from("-") + &i.to_string() + " -" + &j.to_string()
+                                    Some(x) => {
+                                        let mut c = CNFClause::new();
+                                        c.push(CNFVar::Neg(**i as u32));
+                                        c.push(CNFVar::Neg(**j as u32));
+                                        c.push(CNFVar::Neg(*id_mapping.get(&x).unwrap() as u32));
+                                        c
+                                    },
+                                    None => {
+                                        let mut c = CNFClause::new();
+                                        c.push(CNFVar::Neg(**i as u32));
+                                        c.push(CNFVar::Neg(**j as u32));
+                                        c
+                                    }
                                 });
                         }
                     }
                 }
-                out.join(" 0 \n")
+                out
             };
-            if pack.len() == 1 {
-                any_of
-            }
-            else {
-                vec![any_of, no_two].join(" 0 \n")
-            }
+            any_of.extend(no_two);
+            any_of
         }
 
         let pack_formula =
             oneof_packs
             .iter()
-            .map(|p| makeoneof(&id_mapping, &assg_id_mapping, p, None))
-            .join(" 0 \n");
+            .flat_map(|p| makeoneof(&id_mapping, &assg_id_mapping, p, None));
 
         let cond_pack_formula =
             cond_oneof_packs
             .iter()
-            .map(|(cond, p)| makeoneof(&id_mapping, &assg_id_mapping, p, Some(*cond)))
-            .join(" 0 \n");
+            .flat_map(|(cond, p)| makeoneof(&id_mapping, &assg_id_mapping, p, Some(*cond)));
 
         let tent_exists_formula =
             assignments
             .iter()
-            .map(|a| id_mapping.get(&a.tent).unwrap().to_string() + " -"
-                 + &assg_id_mapping.get(a).unwrap().to_string())
-            .join(" 0 \n");
+            .map(|a|
+                 CNFClause{
+                     vars: vec![
+                         CNFVar::Neg(*assg_id_mapping.get(a).unwrap() as u32),
+                         CNFVar::Pos(*id_mapping.get(&a.tent).unwrap() as u32)
+                     ]
+                 });
 
-        (vec![pack_formula,
-             cond_pack_formula,
-             tent_exists_formula
-        ].iter().join(" 0 \n") + " 0",
+        (pack_formula.chain(cond_pack_formula).chain(tent_exists_formula).collect(),
          assg_id_mapping
          .iter().map(|(a, i)| (*a, *i))
          .collect::<Vec<(Assignment, usize)>>()
         )
     }
 
-    pub fn axis_constraint(variables: &Vec<usize>, count: usize) -> String {
-        let mut lower_bound_clauses = variables.iter()
-            .map(|v| v.to_string())
-            .combinations(variables.len()-count+1)
-            .map(|v| {
-                v.join(" ")
-            }).join(" 0 \n");
-        lower_bound_clauses.push_str("  0 \n");
+    pub fn axis_constraint(variables: &Vec<usize>, count: usize) -> CNF {
+        let lower_bound_clauses =
+            variables.iter()
+            .map(|v| *v as u32)
+            .combinations(variables.len() - count + 1)
+            .map(|vs| vs.iter().map(|v| CNFVar::Pos(*v)).collect::<CNFClause>());
 
-        let mut upper_bound_clauses = variables.iter()
-            .map(|v| format!("-{}",*v))
+        let upper_bound_clauses =
+            variables.iter()
+            .map(|v| *v as u32)
             .combinations(count+1)
-            .map(|v| {
-                v.join(" ")
-            }).join(" 0 \n");
-        upper_bound_clauses.push_str(
-            if !upper_bound_clauses.is_empty() { " 0 \n" }
-            else { "\n" }
-        );
+            .map(|vs| vs.iter().map(|v| CNFVar::Neg(*v)).collect::<CNFClause>());
 
-        lower_bound_clauses.push_str(&upper_bound_clauses);
-        lower_bound_clauses
+        lower_bound_clauses.chain(upper_bound_clauses)
+            .collect::<CNF>()
     }
 }
