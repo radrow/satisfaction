@@ -130,7 +130,7 @@ impl Field {
         tents_by_trees
     }
 
-    pub fn to_formula(&self) -> (String, HashMap<usize,TentPlace>) {
+    pub fn to_formula(&self) -> (String, HashMap<usize,TentPlace>, Vec<(Assignment, usize)>) {
         let tents = self.tent_coordinates();
 
         // Id to coordinate
@@ -158,12 +158,14 @@ impl Field {
         total.push_str(&Field::make_count_constraints(&self.column_counts, &col_set));
         total.push_str(&Field::make_count_constraints(&self.row_counts, &row_set));
         total.push_str(&Field::make_neighbour_constraints(&neighbour_set));
-        // total.push_str(&Field::make_correspondence_constraints(&self, &id_mapping));
-        (total, tent_mapping)
+        let (neistr, assg_mapping) =
+            &Field::make_correspondence_constraints(&self, &id_mapping);
+        total.push_str(neistr);
+        (total, tent_mapping, assg_mapping.clone().to_vec())
     }
 
-    pub fn solve(&mut self) {
-        let (formular, mapping) = self.to_formula();
+    pub fn solve(&mut self) -> Vec<((usize, usize), (usize, usize))> {
+        let (formular, t_mapping, a_mapping) = self.to_formula();
         let mut process = Command::new("cadical")
             .arg("-f")
             .arg("-q")
@@ -187,9 +189,9 @@ impl Field {
                         number.parse::<isize>().unwrap()
                     })
                     .filter(
-                        |number| { *number > 0 && (*number as usize) < mapping.len()}
+                        |number| { *number > 0 && (*number as usize) <= t_mapping.len()}
                     ).map(|id| {
-                        *mapping.get(&(id as usize)).unwrap()
+                        *t_mapping.get(&(id as usize)).unwrap()
                     })
             }).flatten()
                 .collect();
@@ -197,6 +199,12 @@ impl Field {
         for (x,y) in vec.into_iter() {
             self.cells[x][y] = CellType::Tent;
         }
+
+        a_mapping
+            .iter()
+            .filter(|(_, i)| *i > 0)
+            .map(|(a, _)| (a.tent, a.tree))
+            .collect()
     }
 
 
@@ -268,7 +276,7 @@ impl Field {
 
     fn make_correspondence_constraints(
         &self,
-        id_mapping: &HashMap<TentPlace, usize>) -> String {
+        id_mapping: &HashMap<TentPlace, usize>) -> (String, Vec<(Assignment, usize)>) {
 
         let mut oneof_packs : Vec<Vec<Assignment>> = vec![];
         let mut cond_oneof_packs : Vec<(TentPlace, Vec<Assignment>)> = vec![];
@@ -436,10 +444,14 @@ impl Field {
 
         println!("FOR TREES : {}\n\nFOR TENTS : {}\n\nFOR EXISTENCE : {}\n\n", pack_formula, cond_pack_formula, tent_exists_formula);
 
-        vec![pack_formula,
+        (vec![pack_formula,
              cond_pack_formula,
              tent_exists_formula
-        ].iter().join(" 0 \n") + " 0"
+        ].iter().join(" 0 \n") + " 0",
+         assg_id_mapping
+         .iter().map(|(a, i)| (*a, *i))
+         .collect::<Vec<(Assignment, usize)>>()
+        )
     }
 
     pub fn axis_constraint(variables: &Vec<usize>, count: usize) -> String {

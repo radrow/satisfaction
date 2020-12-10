@@ -57,7 +57,7 @@ impl Application for Game {
             },
             Message::SolvePuzzle => {
                 let field = self.field.as_mut().unwrap();
-                field.solve();
+                self.field_widget.arrows = field.solve();
                 self.puzzle_solved = true;
             },
             Message::GridSizeInputChanged{width, height} => {

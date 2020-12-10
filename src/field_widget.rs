@@ -11,6 +11,7 @@ pub struct FieldWidget {
     vertical_spacing: u16,
     horizontal_spacing: u16,
     svgs: HashMap<CellType, Svg>,
+    pub arrows: Vec<((usize, usize), (usize, usize))>,
 }
 
 impl FieldWidget {
@@ -20,6 +21,7 @@ impl FieldWidget {
             vertical_spacing,
             horizontal_spacing,
             svgs,
+            arrows: vec![],
         }
     }
 
