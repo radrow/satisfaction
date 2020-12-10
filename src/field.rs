@@ -169,7 +169,6 @@ impl Field {
         stdin.write_all(formular.as_bytes()).unwrap();
         let output = process.wait_with_output().unwrap();
         let output_string = String::from_utf8(output.stdout).unwrap();
-        eprintln!("{}", output_string);
         let vec: Vec<TentPlace> = output_string.lines()
             .skip(1)
             .map(|line| {
