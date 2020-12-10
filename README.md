@@ -5,7 +5,7 @@ Rust was used as a programming language. If it is not already installed, [rustup
 Also the Iced framework might require Vulkan to be set up and Cadical to be available globaly from the commandline. 
 
 Libraries used:
-[Iced Native](https://crates.io/crates/iced_native),
+[Iced](https://crates.io/crates/iced),
 [Rand](https://crates.io/crates/rand),
 [Cadical](https://crates.io/crates/cadical),
 [Itertools](https://crates.io/crates/itertools)
