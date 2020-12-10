@@ -1,7 +1,5 @@
 use iced::{
     Text,
-    TextInput,
-    text_input,
     HorizontalAlignment,
     Length,
     button,

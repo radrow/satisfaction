@@ -2,7 +2,7 @@ extern crate iced;
 
 use iced::{executor};
 use iced::{Length, Align};
-use iced::{Button, Element, Row, Application, Svg, Text, Command, Subscription, HorizontalAlignment, VerticalAlignment, Container};
+use iced::{Element, Row, Application, Svg, Text, Command, Subscription, HorizontalAlignment, VerticalAlignment, Container};
 use iced_native::{
     window::Event,
 };
@@ -10,8 +10,6 @@ use iced_native::{
 use crate::{control_widget::*, field::*, field_widget::*, message::*, puzzle_creation};
 
 use std::collections::{HashMap};
-use std::path::{PathBuf, Path};
-
 
 pub struct Game {
     field: Option<Field>,
@@ -33,7 +31,7 @@ impl Application for Game {
 
 
         let field_widget = FieldWidget::new(15, 2, 2, svgs);
-        let control_widget = ControlWidget::new(150, 10, 12);
+        let control_widget = ControlWidget::new(180);
 
         let game = Game {
             field: None,
@@ -70,9 +68,6 @@ impl Application for Game {
                 self.field = Some(field);
                 self.puzzle_solved = false;
             },
-            _ => {
-                unimplemented!();
-            }
         };
         Command::none()
     }

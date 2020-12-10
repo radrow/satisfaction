@@ -4,7 +4,7 @@ use std::path::PathBuf;
 pub enum Message {
     FileDropped(PathBuf),
     
-    CreateCustomPuzzle(usize, usize),
+    //CreateCustomPuzzle(usize, usize),
     CreateRandomPuzzle{width: usize, height: usize},
     SolvePuzzle,
 

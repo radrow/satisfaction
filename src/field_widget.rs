@@ -1,6 +1,5 @@
-use iced::{button, executor};
-use iced::{Length, HorizontalAlignment, VerticalAlignment, Align};
-use iced::{Button, Column, Element, Row, Space, Svg, Text};
+use iced::{Length, HorizontalAlignment, VerticalAlignment};
+use iced::{Column, Element, Row, Space, Svg, Text};
 use std::collections::{HashMap};
 use crate::{
     field::*,

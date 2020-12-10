@@ -27,6 +27,7 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
         }
     }
 
+    #[allow(dead_code)]
     fn print_field(field: &Field) {
         for (y, row) in field.cells.iter().enumerate() {
             for cell in row {
@@ -169,7 +170,7 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
     fn fill_col_row_count(field: &mut Field) {
         for (y, row) in field.cells.iter().enumerate() {
             let mut row_count = 0;
-            for (x, cell) in row.iter().enumerate() {
+            for cell in row.iter() {
                 if cell == &CellType::Tent {
                     row_count += 1;
                 }

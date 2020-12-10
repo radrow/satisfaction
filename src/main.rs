@@ -12,6 +12,5 @@ use game::Game;
 use iced::{Application, Settings};
 
 fn main() -> iced::Result {
-    let v = vec![1,2,3,4];
     Game::run(Settings::default())
 }

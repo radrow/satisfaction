@@ -1,4 +1,4 @@
-use std::{collections::{HashSet, HashMap}};
+use std::{collections::{HashMap}};
 use std::io;
 use std::path::Path;
 use std::fs;
@@ -28,6 +28,7 @@ pub struct Field {
 }
 
 impl Field {
+    #[allow(dead_code)]
     pub fn create_empty(width: usize, height: usize) -> Field {
         let prototype = vec![CellType::Meadow;width];
         let cells = vec![prototype; height];
@@ -90,7 +91,6 @@ impl Field {
     }
 
     pub fn tent_coordinates(&self) -> Vec<Vec<TentPlace>> {
-        let mut tent_coordinates: HashSet<TentPlace> = HashSet::new();
         let width = self.cells.len();
         let height = self.cells[0].len();
         let mut tents_by_trees = Vec::new();
@@ -106,7 +106,6 @@ impl Field {
 
                     if left >= 0 && self.cells[left as usize][y] != CellType::Tree {
                         potential_tents.push((left as usize, y));
-                        tent_coordinates.insert((left as usize, y));
                     }
                     if right < width && self.cells[right][y] != CellType::Tree {
                         potential_tents.push((right, y));
@@ -130,6 +129,7 @@ impl Field {
         // Id to coordinate
         let tent_mapping = tents.iter()
             .flatten()
+            .unique()
             .enumerate()
             .map(|(id, coord)| (id+1, *coord))
             .collect::<HashMap<usize,TentPlace>>();
@@ -152,7 +152,6 @@ impl Field {
         total.push_str(&Field::make_count_constraints(&self.row_counts, &row_set));
         total.push_str(&Field::make_neighbour_constraints(&neighbour_set));
         total.push_str(&Field::make_correspondence_constraints(&tents, &id_mapping));
-
         (total, tent_mapping)
     }
 
@@ -169,9 +168,9 @@ impl Field {
         let stdin = process.stdin.as_mut().unwrap();
         stdin.write_all(formular.as_bytes()).unwrap();
         let output = process.wait_with_output().unwrap();
-        let vec: Vec<TentPlace> = String::from_utf8(output.stdout)
-            .unwrap()
-            .lines()
+        let output_string = String::from_utf8(output.stdout).unwrap();
+        eprintln!("{}", output_string);
+        let vec: Vec<TentPlace> = output_string.lines()
             .skip(1)
             .map(|line| {
                 line.split_ascii_whitespace()
@@ -205,7 +204,6 @@ impl Field {
                 .and_modify(|v| v.push(*id))
                 .or_insert(vec![*id]);
         }
-
         out
     }
 
@@ -256,8 +254,8 @@ impl Field {
         let mut out = neigh.iter()
             .map(|(x,y)|{
                 format!("-{} -{}", x, y) // Not both neighbours
-            }).join(" 0 \n");
-        out.push_str(" 0");
+            }).join(" 0\n");
+        out.push_str(" 0\n");
         out
     }
 
