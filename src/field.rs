@@ -8,6 +8,7 @@ use std::io::Write;
 use itertools::Itertools;
 
 type TentPlace = (usize, usize);
+type TreePlace = (usize, usize);
 
 type AxisSet = HashMap<usize, Vec<usize>>;
 type NeiSet = Vec<(usize, usize)>;
@@ -25,6 +26,12 @@ pub struct Field {
     pub column_counts: Vec<usize>,
     pub height : usize,
     pub width : usize,
+}
+
+#[derive (PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+struct Assignment {
+    tent : TentPlace,
+    tree : TreePlace
 }
 
 impl Field {
@@ -133,7 +140,7 @@ impl Field {
             .enumerate()
             .map(|(id, coord)| (id+1, *coord))
             .collect::<HashMap<usize,TentPlace>>();
-        
+
         // Coordinate to id
         let id_mapping = tent_mapping.iter()
             .map(|(id, coord)| (*coord, *id))
@@ -151,7 +158,7 @@ impl Field {
         total.push_str(&Field::make_count_constraints(&self.column_counts, &col_set));
         total.push_str(&Field::make_count_constraints(&self.row_counts, &row_set));
         total.push_str(&Field::make_neighbour_constraints(&neighbour_set));
-        total.push_str(&Field::make_correspondence_constraints(&tents, &id_mapping));
+        // total.push_str(&Field::make_correspondence_constraints(&self, &id_mapping));
         (total, tent_mapping)
     }
 
@@ -169,6 +176,7 @@ impl Field {
         stdin.write_all(formular.as_bytes()).unwrap();
         let output = process.wait_with_output().unwrap();
         let output_string = String::from_utf8(output.stdout).unwrap();
+        eprintln!("! {}", output_string);
         let vec: Vec<TentPlace> = output_string.lines()
             .skip(1)
             .map(|line| {
@@ -179,13 +187,13 @@ impl Field {
                         number.parse::<isize>().unwrap()
                     })
                     .filter(
-                        |number| { *number > 0 }
+                        |number| { *number > 0 && (*number as usize) < mapping.len()}
                     ).map(|id| {
                         *mapping.get(&(id as usize)).unwrap()
                     })
             }).flatten()
                 .collect();
-        
+
         for (x,y) in vec.into_iter() {
             self.cells[x][y] = CellType::Tent;
         }
@@ -258,19 +266,180 @@ impl Field {
         out
     }
 
-    fn make_correspondence_constraints(tents_by_tree: &Vec<Vec<TentPlace>>, id_mapping: &HashMap<TentPlace, usize>) -> String {
-        let mut clauses = tents_by_tree.iter()
-            .map(|tree| {
-                tree.iter()
-                    // For all neighbours of a tree: Any must be true.
-                    .map(|tent| id_mapping
-                            .get(tent)
-                            .unwrap()
-                            .to_string())
-                    .join(" ")
-            }).join(" 0 \n");
-        clauses.push_str(" 0 \n");
-        clauses
+    fn make_correspondence_constraints(
+        &self,
+        id_mapping: &HashMap<TentPlace, usize>) -> String {
+
+        let mut oneof_packs : Vec<Vec<Assignment>> = vec![];
+        let mut cond_oneof_packs : Vec<(TentPlace, Vec<Assignment>)> = vec![];
+
+        let mut assignments : Vec<Assignment> = vec![];
+        for (x, row) in self.cells.iter().enumerate() {
+            for (y, cell) in row.iter().enumerate() {
+                if *cell == CellType::Tree || *cell == CellType::Meadow {
+                    let is_tree = *cell == CellType::Tree;
+                    let looking_for = if is_tree {CellType::Meadow} else {CellType::Tree};
+
+                    let left = x as isize - 1;
+                    let right = x + 1;
+                    let top = y as isize - 1;
+                    let bottom = y + 1;
+
+                    let mut pack : Vec<Assignment> = vec![];
+
+                    if left >= 0 && self.cells[left as usize][y] == looking_for {
+                        let asg = if is_tree {
+                            Assignment{
+                                tent: (left as usize, y),
+                                tree: (x, y)
+                            }
+                        } else {
+                            Assignment{
+                                tree: (left as usize, y),
+                                tent: (x, y)
+                            }
+                        };
+                        pack.push(asg);
+                        assignments.push(asg);
+                    }
+                    if right < self.width && self.cells[right][y] == looking_for {
+                        let asg = if  is_tree {
+                            Assignment{
+                                tent: (right as usize, y),
+                                tree: (x, y)
+                            }
+                        } else {
+                            Assignment{
+                                tree: (right as usize, y),
+                                tent: (x, y)
+                            }
+                        };
+                        pack.push(asg);
+                        assignments.push(asg);
+                    }
+                    if top >= 0 && self.cells[x][top as usize] == looking_for {
+                        let asg = if  is_tree {
+                            Assignment{
+                                tent: (x, top as usize),
+                                tree: (x, y)
+                            }
+                        } else {
+                            Assignment{
+                                tree: (x, top as usize),
+                                tent: (x, y)
+                            }
+                        };
+                        pack.push(asg);
+                        assignments.push(asg);
+                    }
+                    if bottom < self.height && self.cells[x][bottom] == looking_for {
+                        let asg = if  is_tree {
+                            Assignment{
+                                tent: (x, bottom as usize),
+                                tree: (x, y)
+                            }
+                        } else {
+                            Assignment{
+                                tree: (x, bottom as usize),
+                                tent: (x, y)
+                            }
+                        };
+                        pack.push(asg);
+                        assignments.push(asg);
+                    }
+                    if pack.len() != 0 {
+                        if is_tree {
+                            oneof_packs.push(pack);
+                        } else {
+                            cond_oneof_packs.push(((x, y), pack));
+                        }
+                    }
+                }
+            }
+        }
+
+        assignments.sort();
+        assignments.dedup();
+
+        let assg_mapping = assignments.iter()
+            .unique()
+            .enumerate()
+            .map(|(id, coord)| (id + id_mapping.len(), *coord))
+            .collect::<HashMap<usize, Assignment>>();
+
+        let assg_id_mapping = assg_mapping.iter()
+            .map(|(id, coord)| (*coord, *id))
+            .collect::<HashMap<Assignment, usize>>();
+
+
+        fn makeoneof(
+            id_mapping : &HashMap<TentPlace, usize>,
+            assg_id_mapping : &HashMap<Assignment, usize>,
+            pack : &Vec<Assignment>,
+            cond : Option<TentPlace>
+        ) -> String {
+            let ids : Vec<&usize> = pack
+                .iter()
+                .map(|assg| assg_id_mapping
+                     .get(assg)
+                     .unwrap()
+                     ).collect();
+            let any_of =
+                match cond {
+                    Some(x) => String::from("-") + &id_mapping.get(&x).unwrap().to_string()
+                        + " " + &ids.iter().map(|x| x.to_string()).join(" "),
+                    None => ids.iter().map(|x| x.to_string()).join(" ")
+                };
+
+            let no_two = {
+                let mut out = vec![];
+                for i in &ids {
+                    for j in &ids {
+                        if i < j {
+                            out.push(
+                                match cond {
+                                    Some(x) => String::from("-") + &id_mapping.get(&x).unwrap().to_string()
+                                        + " -" + &i.to_string() + " -" + &j.to_string(),
+                                    None => String::from("-") + &i.to_string() + " -" + &j.to_string()
+                                });
+                        }
+                    }
+                }
+                out.join(" 0 \n")
+            };
+            if pack.len() == 1 {
+                any_of
+            }
+            else {
+                vec![any_of, no_two].join(" 0 \n")
+            }
+        }
+
+        let pack_formula =
+            oneof_packs
+            .iter()
+            .map(|p| makeoneof(&id_mapping, &assg_id_mapping, p, None))
+            .join(" 0 \n");
+
+        let cond_pack_formula =
+            cond_oneof_packs
+            .iter()
+            .map(|(cond, p)| makeoneof(&id_mapping, &assg_id_mapping, p, Some(*cond)))
+            .join(" 0 \n");
+
+        let tent_exists_formula =
+            assignments
+            .iter()
+            .map(|a| id_mapping.get(&a.tent).unwrap().to_string() + " -"
+                 + &assg_id_mapping.get(a).unwrap().to_string())
+            .join(" 0 \n");
+
+        println!("FOR TREES : {}\n\nFOR TENTS : {}\n\nFOR EXISTENCE : {}\n\n", pack_formula, cond_pack_formula, tent_exists_formula);
+
+        vec![pack_formula,
+             cond_pack_formula,
+             tent_exists_formula
+        ].iter().join(" 0 \n") + " 0"
     }
 
     pub fn axis_constraint(variables: &Vec<usize>, count: usize) -> String {
@@ -292,7 +461,7 @@ impl Field {
             if !upper_bound_clauses.is_empty() { " 0 \n" }
             else { "\n" }
         );
-        
+
         lower_bound_clauses.push_str(&upper_bound_clauses);
         lower_bound_clauses
     }
