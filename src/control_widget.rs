@@ -35,7 +35,7 @@ impl ControlWidget {
                     Message::SolvePuzzle
                 ));
         }
-        control.into()
+        control.spacing(10).into()
     }
     
     fn button<'a>(state: &'a mut State, text: &str, message: Message) -> Button<'a, Message> {

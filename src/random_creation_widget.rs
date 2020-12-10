@@ -47,7 +47,7 @@ impl RandomCreationWidget {
                 .width(Length::Fill)
             ).width(Length::Fill)
                 .on_press(Message::CreateRandomPuzzle{width, height}).into();
-        Column::with_children(vec![size_widget, submission]).into()
+        Column::with_children(vec![size_widget, submission]).spacing(10).into()
     }
 
     pub fn update(&mut self, width: usize, height: usize) {

@@ -130,7 +130,7 @@ impl Field {
         tents_by_trees
     }
 
-    pub fn to_formula(&self) -> (String, HashMap<usize,TentPlace>, Vec<(Assignment, usize)>) {
+    fn to_formula(&self) -> (String, HashMap<usize,TentPlace>, Vec<(Assignment, usize)>) {
         let tents = self.tent_coordinates();
 
         // Id to coordinate
@@ -178,7 +178,7 @@ impl Field {
         stdin.write_all(formular.as_bytes()).unwrap();
         let output = process.wait_with_output().unwrap();
         let output_string = String::from_utf8(output.stdout).unwrap();
-        eprintln!("! {}", output_string);
+
         let vec: Vec<TentPlace> = output_string.lines()
             .skip(1)
             .map(|line| {
@@ -441,8 +441,6 @@ impl Field {
             .map(|a| id_mapping.get(&a.tent).unwrap().to_string() + " -"
                  + &assg_id_mapping.get(a).unwrap().to_string())
             .join(" 0 \n");
-
-        println!("FOR TREES : {}\n\nFOR TENTS : {}\n\nFOR EXISTENCE : {}\n\n", pack_formula, cond_pack_formula, tent_exists_formula);
 
         (vec![pack_formula,
              cond_pack_formula,
