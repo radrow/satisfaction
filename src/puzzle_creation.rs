@@ -215,7 +215,7 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
     }
     fill_col_row_count(&mut field);
     remove_tents(&mut field);
-    print_field(&field);
+    //print_field(&field);
     Ok(field)
 }
 

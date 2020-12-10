@@ -1,17 +1,11 @@
-use std::{collections::{HashSet, HashMap}, env::var};
+use std::{collections::{HashSet, HashMap}};
 use std::io;
 use std::path::Path;
 use std::fs;
 use std::process::{Command, Stdio};
 use std::io::Write;
 
-use cadical;
-use num_integer::binomial;
 use itertools::Itertools;
-use numtoa::NumToA;
-
-use crate::formula::*;
-
 
 type TentPlace = (usize, usize);
 
@@ -20,15 +14,9 @@ type NeiSet = Vec<(usize, usize)>;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum CellType {
-    Unknown,
     Tent,
     Tree,
     Meadow,
-}
-
-
-pub fn mk_var_name((x, y) : TentPlace) -> String {
-    return String::from("v_") + &x.to_string() + "_" + &y.to_string();
 }
 
 pub struct Field {
@@ -101,10 +89,12 @@ impl Field {
         })
     }
 
-    pub fn tent_coordinates(&self) -> HashSet<TentPlace> {
+    pub fn tent_coordinates(&self) -> Vec<Vec<TentPlace>> {
         let mut tent_coordinates: HashSet<TentPlace> = HashSet::new();
         let width = self.cells.len();
         let height = self.cells[0].len();
+        let mut tents_by_trees = Vec::new();
+
         for (x, row) in self.cells.iter().enumerate() {
             for (y, cell) in row.iter().enumerate() {
                 if *cell == CellType::Tree {
@@ -112,36 +102,42 @@ impl Field {
                     let right = x + 1;
                     let top = y as isize - 1;
                     let bottom = y + 1;
+                    let mut potential_tents = Vec::with_capacity(4);
 
                     if left >= 0 && self.cells[left as usize][y] != CellType::Tree {
+                        potential_tents.push((left as usize, y));
                         tent_coordinates.insert((left as usize, y));
                     }
                     if right < width && self.cells[right][y] != CellType::Tree {
-                        tent_coordinates.insert((right, y));
+                        potential_tents.push((right, y));
                     }
                     if top >= 0 && self.cells[x][top as usize] != CellType::Tree {
-                        tent_coordinates.insert((x, top as usize));
+                        potential_tents.push((x, top as usize));
                     }
                     if bottom < height && self.cells[x][bottom] != CellType::Tree {
-                        tent_coordinates.insert((x, bottom));
+                        potential_tents.push((x, bottom));
                     }
+                    tents_by_trees.push(potential_tents);
                 }
             }
         }
-        tent_coordinates
+        tents_by_trees
     }
 
     pub fn to_formula(&self) -> (String, HashMap<usize,TentPlace>) {
-        let tents = &self.tent_coordinates();
+        let tents = self.tent_coordinates();
+
+        // Id to coordinate
         let tent_mapping = tents.iter()
-            .cloned()
+            .flatten()
             .enumerate()
-            .map(|(id, coord)| (id+1, coord))
+            .map(|(id, coord)| (id+1, *coord))
             .collect::<HashMap<usize,TentPlace>>();
+        
+        // Coordinate to id
         let id_mapping = tent_mapping.iter()
             .map(|(id, coord)| (*coord, *id))
             .collect::<HashMap<TentPlace, usize>>();
-        eprintln!("{:?}", tent_mapping.len());
 
         let col_set: AxisSet = Field::make_coord_set_by(
             &|x : &TentPlace| -> usize {x.1}, &tent_mapping
@@ -149,20 +145,18 @@ impl Field {
         let row_set: AxisSet = Field::make_coord_set_by(
             &|x : &TentPlace| -> usize {x.0}, &tent_mapping
         );
-        let nei_set: NeiSet = Field::make_nei_set(&tent_mapping, &id_mapping);
+        let neighbour_set: NeiSet = Field::make_neighbour_set(&tent_mapping, &id_mapping);
 
         let mut total = "p cnf 1 1\n".to_string();
         total.push_str(&Field::make_count_constraints(&self.column_counts, &col_set));
         total.push_str(&Field::make_count_constraints(&self.row_counts, &row_set));
-        total.push_str(&Field::make_nei_constraints(&nei_set));
+        total.push_str(&Field::make_neighbour_constraints(&neighbour_set));
+        total.push_str(&Field::make_correspondence_constraints(&tents, &id_mapping));
 
         (total, tent_mapping)
     }
 
     pub fn solve(&mut self) {
-        println!("Generating CNF...");
-        println!("Done. Solving...");
-
         let (formular, mapping) = self.to_formula();
         let mut process = Command::new("cadical")
             .arg("-f")
@@ -171,6 +165,7 @@ impl Field {
             .stdout(Stdio::piped())
             .spawn()
             .unwrap();
+
         let stdin = process.stdin.as_mut().unwrap();
         stdin.write_all(formular.as_bytes()).unwrap();
         let output = process.wait_with_output().unwrap();
@@ -196,35 +191,6 @@ impl Field {
         for (x,y) in vec.into_iter() {
             self.cells[x][y] = CellType::Tent;
         }
-
-
-
-        /*let var_map = cnf.create_variable_mapping();
-        let mut solver = cnf.to_solver();
-        match solver.solve() {
-            None => panic!("failed :(((("),
-            Some(satisfiable) => {
-                println!("Solved.");
-                if satisfiable {
-                    for y in 0..self.height {
-                        for x in 0..self.width {
-                            match
-                                var_map.get(mk_var_name((y, x)).as_str())
-                                .and_then(|var_name| solver.value(*var_name)) {
-                                    None => (),
-                                    Some(true) => self.cells[y][x] = {
-                                        CellType::Tent
-                                    },
-                                    Some(false) => self.cells[y][x] = CellType::Meadow
-                                }
-                        }
-                    }
-                }
-                else {
-                    panic!("no solution")
-                }
-            }
-        }*/
     }
 
 
@@ -243,7 +209,7 @@ impl Field {
         out
     }
 
-    fn make_nei_set(id_to_coord : &HashMap<usize, TentPlace>, coord_to_id: &HashMap<TentPlace, usize>) -> NeiSet {
+    fn make_neighbour_set(id_to_coord : &HashMap<usize, TentPlace>, coord_to_id: &HashMap<TentPlace, usize>) -> NeiSet {
         let mut out : NeiSet = Vec::new();
 
         for (id, tent) in id_to_coord {
@@ -286,13 +252,28 @@ impl Field {
     }
 
 
-    fn make_nei_constraints(neigh : &NeiSet) -> String {
+    fn make_neighbour_constraints(neigh : &NeiSet) -> String {
         let mut out = neigh.iter()
             .map(|(x,y)|{
-                format!("-{} -{}", x, y)
+                format!("-{} -{}", x, y) // Not both neighbours
             }).join(" 0 \n");
         out.push_str(" 0");
         out
+    }
+
+    fn make_correspondence_constraints(tents_by_tree: &Vec<Vec<TentPlace>>, id_mapping: &HashMap<TentPlace, usize>) -> String {
+        let mut clauses = tents_by_tree.iter()
+            .map(|tree| {
+                tree.iter()
+                    // For all neighbours of a tree: Any must be true.
+                    .map(|tent| id_mapping
+                            .get(tent)
+                            .unwrap()
+                            .to_string())
+                    .join(" ")
+            }).join(" 0 \n");
+        clauses.push_str(" 0 \n");
+        clauses
     }
 
     pub fn axis_constraint(variables: &Vec<usize>, count: usize) -> String {
