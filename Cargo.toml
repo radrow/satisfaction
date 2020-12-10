@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = [
     "radrow <radrowicki@gmail.com>",
     "lankheit <a.lankheit@campus.lmu.de>",
+    "federholzner <K.Federholzner@campus.lmu.de>",
 ]
 edition = "2018"
 
