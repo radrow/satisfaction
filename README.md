@@ -5,12 +5,12 @@ Rust was used as a programming language. If it is not already installed, [rustup
 Also the Iced framework might require Vulkan to be set up and Cadical to be available globaly from the commandline. 
 
 Libraries used:
--[Iced Native](https://crates.io/crates/iced_native)
--[Rand](https://crates.io/crates/rand)
--[Cadical](https://crates.io/crates/cadical)
--[Itertools](https://crates.io/crates/itertools)
--[numtoa](https://crates.io/crates/numtoa)
--[num-integer](https://crates.io/crates/num-integer)
+[Iced Native](https://crates.io/crates/iced_native)
+[Rand](https://crates.io/crates/rand)
+[Cadical](https://crates.io/crates/cadical)
+[Itertools](https://crates.io/crates/itertools)
+[numtoa](https://crates.io/crates/numtoa)
+[num-integer](https://crates.io/crates/num-integer)
 
 To compile and run the program: `cargo run --release`.
 
