@@ -130,7 +130,7 @@ impl Field {
         tents_by_trees
     }
 
-    pub fn to_formula(&self) -> (CNF, HashMap<TentPlace, usize>, Vec<(Assignment, usize)>) {
+    fn to_formula(&self) -> (CNF, HashMap<TentPlace, usize>, Vec<(Assignment, usize)>) {
         let tents = self.tent_coordinates();
 
         // Id to coordinate
@@ -271,6 +271,8 @@ impl Field {
         let mut oneof_packs : Vec<Vec<Assignment>> = vec![];
         let mut cond_oneof_packs : Vec<(TentPlace, Vec<Assignment>)> = vec![];
 
+        let width = self.cells.len();
+        let height = self.cells[0].len();
         let mut assignments : Vec<Assignment> = vec![];
         for (x, row) in self.cells.iter().enumerate() {
             for (y, cell) in row.iter().enumerate() {
@@ -300,7 +302,7 @@ impl Field {
                         pack.push(asg);
                         assignments.push(asg);
                     }
-                    if right < self.width && self.cells[right][y] == looking_for {
+                    if right < width && self.cells[right][y] == looking_for {
                         let asg = if  is_tree {
                             Assignment{
                                 tent: (right as usize, y),
@@ -330,7 +332,7 @@ impl Field {
                         pack.push(asg);
                         assignments.push(asg);
                     }
-                    if bottom < self.height && self.cells[x][bottom] == looking_for {
+                    if bottom < height && self.cells[x][bottom] == looking_for {
                         let asg = if  is_tree {
                             Assignment{
                                 tent: (x, bottom as usize),
