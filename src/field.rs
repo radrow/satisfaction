@@ -372,7 +372,7 @@ impl Field {
         let assg_mapping = assignments.iter()
             .unique()
             .enumerate()
-            .map(|(id, coord)| (id + id_mapping.len(), *coord))
+            .map(|(id, coord)| (id + id_mapping.len() + 1, *coord))
             .collect::<HashMap<usize, Assignment>>();
 
         let assg_id_mapping = assg_mapping.iter()
