@@ -8,9 +8,7 @@ Libraries used:
 [Iced Native](https://crates.io/crates/iced_native),
 [Rand](https://crates.io/crates/rand),
 [Cadical](https://crates.io/crates/cadical),
-[Itertools](https://crates.io/crates/itertools),
-[numtoa](https://crates.io/crates/numtoa),
-[num-integer](https://crates.io/crates/num-integer)
+[Itertools](https://crates.io/crates/itertools)
 
 To compile and run the program: `cargo run --release`.
 
