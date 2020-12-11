@@ -34,6 +34,7 @@ impl CNF {
         self.clauses.extend(c.clauses)
     }
 
+    #[allow(dead_code)]
     pub fn to_dimacs(&self) -> String {
         let mut out : String = String::from("");
 
@@ -88,6 +89,7 @@ impl CNFClause {
         CNFClause{vars: vec![]}
     }
 
+    #[allow(dead_code)]
     pub fn single(var : CNFVar) -> CNFClause {
         CNFClause{vars: vec![var]}
     }
@@ -96,6 +98,7 @@ impl CNFClause {
         self.vars.push(v)
     }
 
+    #[allow(dead_code)]
     pub fn extend(&mut self, c : CNFClause) {
         self.vars.extend(c.vars)
     }
@@ -135,7 +138,7 @@ impl CNFVar {
 impl fmt::Display for CNF {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for c in &self.clauses {
-            write!(f, "{}\n", c);
+            write!(f, "{}\n", c)?;
         }
         write!(f, "")
     }
@@ -143,7 +146,7 @@ impl fmt::Display for CNF {
 impl fmt::Display for CNFClause {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for c in &self.vars {
-            write!(f, "({})  ", c);
+            write!(f, "({})  ", c)?;
         }
         write!(f, "")
     }

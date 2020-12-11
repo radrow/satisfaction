@@ -171,7 +171,6 @@ impl Field {
             None => panic!("was zur hölle"),
             Some(satisfiable) => {
                 if satisfiable {
-                    println!("Success!");
                     for y in 0..self.height {
                         for x in 0..self.width {
                             match
