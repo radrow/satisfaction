@@ -10,6 +10,7 @@ use iced_native::{
 use crate::{control_widget::*, field::*, field_widget::*, message::*, puzzle_creation};
 
 use std::collections::{HashMap};
+use std::path::Path;
 
 pub struct Game {
     field: Option<Field>,
@@ -24,10 +25,13 @@ impl Application for Game {
     type Flags = ();
 
     fn new(_flags: ()) -> (Self, Command<Self::Message>) {
+        let image_directory = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("images/");
+
         let mut svgs = HashMap::new();
-        svgs.insert(CellType::Meadow, Svg::from_path("images/meadow.svg"));
-        svgs.insert(CellType::Tent, Svg::from_path("images/tent.svg"));
-        svgs.insert(CellType::Tree, Svg::from_path("images/tree.svg"));
+        svgs.insert(CellType::Meadow, Svg::from_path(image_directory.join("meadow.svg")));
+        svgs.insert(CellType::Tent, Svg::from_path(image_directory.join("tent.svg")));
+        svgs.insert(CellType::Tree, Svg::from_path(image_directory.join("tree.svg")));
 
 
         let field_widget = FieldWidget::new(15, 2, 2, svgs);
