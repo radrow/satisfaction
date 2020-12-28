@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "solver",
+    "solver-cli",
+#    "tents",
+]
