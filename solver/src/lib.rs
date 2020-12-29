@@ -1,7 +1,8 @@
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+pub mod cnf;
+mod solver;
+mod cadical_solver;
+
+pub use cnf::{CNFClause, CNFVar};
+pub use solver::{Solver, Assignment};
+pub use cadical_solver::CadicalSolver;
+
