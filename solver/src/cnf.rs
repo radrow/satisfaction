@@ -8,10 +8,12 @@ pub struct CNF {
     pub clauses : Vec<CNFClause>
 }
 
+#[derive(Clone, Debug)]
 pub struct CNFClause {
     pub vars : Vec<CNFVar>
 }
 
+#[derive(Clone, Debug)]
 pub enum CNFVar {
     Pos(u32),
     Neg(u32)
