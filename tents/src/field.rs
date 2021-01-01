@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::io;
 use std::path::Path;
 use tokio::fs::read_to_string;
 
@@ -53,12 +52,12 @@ impl Field {
         }
     }
 
-    pub async fn from_file(path: impl AsRef<Path>) -> io::Result<Field> {
+    pub async fn from_file(path: impl AsRef<Path>) -> Result<Field, Box<dyn std::error::Error>> {
         let contents: String = read_to_string(path).await?;
         let mut split = contents.split(|c| c == '\n' || c == ' ' || c == '\r');
 
-        let height: usize = split.next().unwrap().parse::<usize>().unwrap();
-        let width: usize = split.next().unwrap().parse::<usize>().unwrap();
+        let height: usize = split.next().unwrap().parse::<usize>()?;
+        let width: usize = split.next().unwrap().parse::<usize>()?;
 
         let mut field: Vec<String> = Vec::new();
         let mut row_counts: Vec<usize> = Vec::new();
@@ -66,15 +65,12 @@ impl Field {
 
         for _ in 0..height {
             field.push(split.next().unwrap().to_string());
-            row_counts.push(split.next().unwrap().parse::<usize>().unwrap());
+            row_counts.push(split.next().unwrap().parse::<usize>()?);
         }
 
-        let column_counts: Vec<usize> = split.filter_map(
-            |x| match x.parse::<usize>() {
-                Err(_) => None,
-                Ok(x) => Some(x)
-            }
-        ).collect();
+        let column_counts = split.map(
+            |x| x.parse::<usize>()
+        ).collect::<Result<Vec<usize>, std::num::ParseIntError>>()?;
 
         let mut cells: Vec<Vec<CellType>> = Vec::new();
         for row in field {

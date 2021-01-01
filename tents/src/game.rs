@@ -61,7 +61,7 @@ impl Application for Game {
                 return Command::perform(
                     Field::from_file(path),
                     |result| result.map(Message::FieldLoaded)
-                        .unwrap_or_else(Into::into)
+                        .unwrap_or_else(|error| Message::ErrorOccurred(error.to_string()))
                 )
             },
             Message::FieldLoaded(field) => self.set_field(field),
