@@ -16,6 +16,14 @@ pub struct Game {
     control_widget: ControlWidget,
 }
 
+impl Game {
+    fn set_field(&mut self, field: Field) {
+        self.field = Some(field);
+        self.puzzle_solved = false;
+    }
+
+}
+
 impl Application for Game {
     type Executor = iced_futures::executor::Tokio;
     type Message = Message;
@@ -56,10 +64,7 @@ impl Application for Game {
                         .unwrap_or_else(Into::into)
                 )
             },
-            Message::FieldLoaded(field) => {
-                self.field = Some(field);
-                self.puzzle_solved = false;
-            }
+            Message::FieldLoaded(field) => self.set_field(field),
             Message::SolvePuzzle => {
                 let field = self.field.as_mut().unwrap();
                 self.field_widget.arrows = field.solve();
@@ -70,8 +75,7 @@ impl Application for Game {
             },
             Message::CreateRandomPuzzle{width , height} => {
                 let field = puzzle_creation::create_random_puzzle(height, width).unwrap();
-                self.field = Some(field);
-                self.puzzle_solved = false;
+                self.set_field(field);
             },
             Message::ErrorOccurred(error) => {
                 println!("{}", error);
@@ -79,7 +83,6 @@ impl Application for Game {
         };
         Command::none()
     }
-
 
     fn view(&mut self) -> Element<Self::Message> {
         Row::new()
