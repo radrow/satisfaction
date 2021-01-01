@@ -4,7 +4,7 @@ use crate::{CNFClause, Solver, Assignment};
 pub struct CadicalSolver;
 
 impl Solver for CadicalSolver {
-    fn solve(&self, clauses: impl Iterator<Item=CNFClause>, num_variables: u32) -> Option<Assignment> {
+    fn solve(&self, clauses: impl Iterator<Item=CNFClause>, num_variables: usize) -> Option<Assignment> {
         let mut solver: cadical::Solver = Default::default();
         
         clauses.for_each(|clause| {

@@ -15,8 +15,8 @@ pub struct CNFClause {
 
 #[derive(Clone, Debug)]
 pub enum CNFVar {
-    Pos(u32),
-    Neg(u32)
+    Pos(usize),
+    Neg(usize)
 }
 
 impl CNF {
@@ -40,7 +40,7 @@ impl CNF {
     pub fn to_dimacs(&self) -> String {
         let mut out : String = String::from("");
 
-        let distinct : HashSet<u32> =
+        let distinct : HashSet<usize> =
             self.clauses.iter().flat_map(|clause| clause.vars.iter().map(|v| v.name()))
             .collect();
 
@@ -122,7 +122,7 @@ impl IntoIterator for CNFClause {
 }
 
 impl CNFVar {
-    pub fn name(&self) -> u32 {
+    pub fn name(&self) -> usize {
         match self {
             CNFVar::Pos(s) => *s,
             CNFVar::Neg(s) => *s,
