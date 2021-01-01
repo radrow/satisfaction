@@ -1,11 +1,8 @@
 extern crate iced;
 
-use iced::{executor};
 use iced::{Length, Align};
 use iced::{Element, Row, Application, Svg, Text, Command, Subscription, HorizontalAlignment, VerticalAlignment, Container};
-use iced_native::{
-    window::Event,
-};
+use iced_native::window::Event;
 
 use crate::{control_widget::*, field::*, field_widget::*, message::*, puzzle_creation};
 
@@ -20,7 +17,7 @@ pub struct Game {
 }
 
 impl Application for Game {
-    type Executor = executor::Default;
+    type Executor = iced_futures::executor::Tokio;
     type Message = Message;
     type Flags = ();
 
@@ -53,12 +50,16 @@ impl Application for Game {
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match message {
             Message::FileDropped(path) => {
-                // TODO: Handle exception appropriately
-                let field = Field::from_file(&path)
-                    .unwrap();
+                return Command::perform(
+                    Field::from_file(path),
+                    |result| result.map(Message::FieldLoaded)
+                        .unwrap_or_else(Into::into)
+                )
+            },
+            Message::FieldLoaded(field) => {
                 self.field = Some(field);
                 self.puzzle_solved = false;
-            },
+            }
             Message::SolvePuzzle => {
                 let field = self.field.as_mut().unwrap();
                 self.field_widget.arrows = field.solve();
@@ -72,6 +73,9 @@ impl Application for Game {
                 self.field = Some(field);
                 self.puzzle_solved = false;
             },
+            Message::ErrorOccurred(error) => {
+                println!("{}", error);
+            }
         };
         Command::none()
     }

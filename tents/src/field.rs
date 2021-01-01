@@ -1,7 +1,7 @@
-use std::{collections::{HashMap}};
+use std::collections::HashMap;
 use std::io;
 use std::path::Path;
-use std::fs;
+use tokio::fs::read_to_string;
 
 use itertools::Itertools;
 
@@ -20,6 +20,7 @@ pub enum CellType {
     Meadow,
 }
 
+#[derive(Debug,Clone)] // TODO: Write a appropriate debug printing
 pub struct Field {
     pub cells: Vec<Vec<CellType>>,
     pub row_counts: Vec<usize>,
@@ -52,8 +53,8 @@ impl Field {
         }
     }
 
-    pub fn from_file(path: &Path) -> io::Result<Field> {
-        let contents: String = fs::read_to_string(path)?;
+    pub async fn from_file(path: impl AsRef<Path>) -> io::Result<Field> {
+        let contents: String = read_to_string(path).await?;
         let mut split = contents.split(|c| c == '\n' || c == ' ' || c == '\r');
 
         let height: usize = split.next().unwrap().parse::<usize>().unwrap();

@@ -8,9 +8,8 @@ mod puzzle_creation;
 mod number_input;
 mod cnf;
 
+use iced::{Settings, Application};
 use game::Game;
-
-use iced::{Application, Settings};
 
 fn main() -> iced::Result {
     Game::run(Settings::default())
