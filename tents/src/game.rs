@@ -78,7 +78,7 @@ impl Application for Game {
                 self.set_field(field);
             },
             Message::ErrorOccurred(error) => {
-                println!("{}", error);
+                self.control_widget.log_widget.add_error(error);
             }
         };
         Command::none()
