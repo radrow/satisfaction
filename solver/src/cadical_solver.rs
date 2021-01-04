@@ -16,7 +16,7 @@ impl Solver for CadicalSolver {
             None | Some(false) => None,
             Some(true) => {
                 // TODO: Use more index independent formulation
-                Some((1..num_variables)
+                Some((1..=num_variables)
                     .map(|variable| {
                         solver.value(variable as i32)
                             // If None, the variable can be choosen arbitrarily and thus true. TODO: Discuss behaviour.
