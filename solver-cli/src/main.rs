@@ -120,12 +120,24 @@ fn dpll(cnf: &CNF, num_of_vars: usize) -> Result<(), Box<dyn Error>> {
         loop {
             match unit_queue.pop_front() {
                 Some(var_index) => {
-                    set_literal(var_index, &mut variables, &mut clauses, &mut assignment_stack, &mut unit_queue)?;
+                    variables[var_index].value = VarValue::Pos;
+                    assignment_stack.push(Assignment {variable: var_index, assignment_type: AssignmentType::Forced});
+                    if unit_propagation(var_index, &mut variables, &mut clauses, &mut unit_queue, &mut assignment_stack)?.assignment_type == AssignmentType::Branching {
+                    }
                 },
                 None => break
             }
         }
     }
+
+    println!("");
+    for var in &variables {
+        print!("{}", var);
+    }
+    for cl in &clauses {
+        print!("{}", cl);
+    }
+
     Ok(())
 }
 
@@ -141,38 +153,55 @@ fn set_literal(i: usize, variables: &mut Variables, clauses: &mut Clauses, assig
 }
 
 fn unit_propagation(i: usize, variables: &mut Variables, clauses: &mut Clauses, unit_queue: &mut VecDeque<usize>, assign_stack: &mut Vec<Assignment>) -> Result<Assignment, Box<dyn Error>>{
-    variables[i].pos_occ.iter().for_each(|p_occ| clauses[*p_occ].satisfied = i as isize);
-    for u in 0..variables[i].neg_occ.len() {
-        let n_occ = variables[i].neg_occ[u];
-        
-        clauses[n_occ].active_cl -= 1;
+    if variables[i].value == VarValue::Pos {
+        variables[i].pos_occ.iter().for_each(|p_occ| clauses[*p_occ].satisfied = i as isize);
+        for u in 0..variables[i].neg_occ.len() {
+            let n_occ = variables[i].neg_occ[u];
+            
+            clauses[n_occ].active_cl -= 1;
 
-        if clauses[n_occ].active_cl == 1 {
-            let unit_var_index = find_unit_variable_index(&clauses[n_occ], &variables)?;
-            unit_queue.push_back(unit_var_index);
-        } else if clauses[n_occ].active_cl <= 0 {
-            unit_queue.clear();
-            return backtracking(assign_stack, variables, clauses);
-        }
-    };
+            if clauses[n_occ].active_cl == 1 {
+                let unit_var_index = find_unit_variable_index(&clauses[n_occ], &variables)?;
+                unit_queue.push_back(unit_var_index);
+            } else if clauses[n_occ].active_cl <= 0 {
+                unit_queue.clear();
+                return backtracking(assign_stack, variables, clauses);
+            }
+        };
+    } else if variables[i].value == VarValue::Neg {
+        variables[i].neg_occ.iter().for_each(|n_occ| clauses[*n_occ].satisfied = i as isize);
+        for u in 0..variables[i].pos_occ.len() {
+            let p_occ = variables[i].pos_occ[u];
+            
+            clauses[p_occ].active_cl -= 1;
+
+            if clauses[p_occ].active_cl == 1 {
+                let unit_var_index = find_unit_variable_index(&clauses[p_occ], &variables)?;
+                unit_queue.push_back(unit_var_index);
+            } else if clauses[p_occ].active_cl <= 0 {
+                unit_queue.clear();
+                return backtracking(assign_stack, variables, clauses);
+            }
+        };
+ 
+    }
     Ok(Assignment {variable: 0, assignment_type: AssignmentType::Forced})
 }
 
 fn backtracking(assignment_stack: &mut Vec<Assignment>, variables: &mut Variables, clauses: &mut Clauses) -> Result<Assignment, Box<dyn Error>> {
     while let Some(assign) = assignment_stack.pop() {
-        if assign.assignment_type == AssignmentType::Forced {
-            variables[assign.variable as usize].value = VarValue::Free;
-            for i in 0..variables[assign.variable as usize].neg_occ.len() {
-                let n_occ = variables[assign.variable as usize].neg_occ[i];
-                clauses[n_occ].active_cl += 1;
+        variables[assign.variable as usize].value = VarValue::Free;
+        for i in 0..variables[assign.variable as usize].neg_occ.len() {
+            let n_occ = variables[assign.variable as usize].neg_occ[i];
+            clauses[n_occ].active_cl += 1;
+        }
+        for i in 0..variables[assign.variable as usize].pos_occ.len() {
+            let p_occ = variables[assign.variable as usize].pos_occ[i];
+            if clauses[p_occ].satisfied == assign.variable as isize{
+                clauses[p_occ].satisfied = -1
             }
-            for i in 0..variables[assign.variable as usize].pos_occ.len() {
-                let p_occ = variables[assign.variable as usize].pos_occ[i];
-                if clauses[p_occ].satisfied == assign.variable as isize{
-                    clauses[p_occ].satisfied = -1
-                }
-            }
-        } else {
+        }
+        if assign.assignment_type == AssignmentType::Branching {
             return Ok(assign)
         }
     }
