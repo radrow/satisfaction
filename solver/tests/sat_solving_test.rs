@@ -14,12 +14,12 @@ fn setup_custom_solver() -> CadicalSolver {
     CadicalSolver
 }
 
-fn execute_solvers(formula: Vec<CNFClause>, num_variables: usize) -> (Option<Assignment>, Option<Assignment>) {
+fn execute_solvers(formula: impl Iterator<Item=CNFClause>+Clone, num_variables: usize) -> (Option<Assignment>, Option<Assignment>) {
     let testing_solver = setup_custom_solver();
     let reference_solver = CadicalSolver;
 
-    let testing_solution = testing_solver.solve(formula.iter().cloned(), num_variables);
-    let reference_solution = reference_solver.solve(formula.into_iter(), num_variables);
+    let testing_solution = testing_solver.solve(formula.clone(), num_variables);
+    let reference_solution = reference_solver.solve(formula, num_variables);
 
     (testing_solution, reference_solution)
 }
@@ -40,9 +40,9 @@ proptest! {
     fn only_positive_unit_clauses(num_variables in 1..=MAX_NUM_VARIABLES ) {
         let formula = (1..=num_variables)
             .map(|variable| CNFClause{vars: vec![CNFVar::Pos(variable)]})
-            .collect();
+            .collect::<Vec<_>>();
 
-        let (custom, reference) = execute_solvers(formula, num_variables);
+        let (custom, reference) = execute_solvers(formula.into_iter(), num_variables);
 
         prop_assert_eq!(custom, reference);
     }
@@ -51,9 +51,9 @@ proptest! {
     fn only_negative_unit_clauses(num_variables in 1..=MAX_NUM_VARIABLES ) {
         let formula = (1..=num_variables)
             .map(|variable| CNFClause{vars: vec![CNFVar::Neg(variable)]})
-            .collect();
+            .collect::<Vec<_>>();
 
-        let (custom, reference) = execute_solvers(formula, num_variables);
+        let (custom, reference) = execute_solvers(formula.into_iter(), num_variables);
 
         prop_assert_eq!(custom, reference);
     }
@@ -69,9 +69,9 @@ proptest! {
                     false => CNFVar::Neg,
                 };
                 CNFClause{vars: vec![literal((variable )+1)]}
-            }).collect();
+            }).collect::<Vec<_>>();
 
-        let (custom, reference) = execute_solvers(formula, num_variables);
+        let (custom, reference) = execute_solvers(formula.into_iter(), num_variables);
         prop_assert_eq!(custom, reference);
     }
 
@@ -85,7 +85,7 @@ proptest! {
             .max()
             .expect("There are zero clauses!");
 
-        let formula: Vec<CNFClause> = clauses.iter()
+        let formula = clauses.iter()
             .map(|clause| 
                 CNFClause{ vars:
                 clause.iter()
@@ -96,10 +96,10 @@ proptest! {
                         };
                         literal(*variable)
                     }).collect()
-                }).collect();
+                }).collect::<Vec<_>>();
 
         println!("{:?}", &formula);
-        let (custom, reference) = execute_solvers(formula.clone(), num_variables);
+        let (custom, reference) = execute_solvers(formula.iter().cloned(), num_variables);
 
         // The result regarding satisfiability is correct.
         prop_assert_eq!(custom.is_none(), reference.is_none());
