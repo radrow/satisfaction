@@ -92,6 +92,16 @@ impl fmt::Display for Variable {
     }
 }
 
+fn print_datastructures(variables: &Variables, clauses: &Clauses) {
+    for var in variables {
+        print!("{}", var);
+    }
+    for cl in clauses {
+        print!("{}", cl);
+    }
+    println!("");
+}
+
 fn create_data_structures(cnf: &CNF, num_of_vars: usize) -> (Variables, Clauses) {
     let mut variables: Variables = Vec::new();
     let mut clauses: Clauses = Vec::new();
@@ -102,19 +112,14 @@ fn create_data_structures(cnf: &CNF, num_of_vars: usize) -> (Variables, Clauses)
     (variables, clauses)
 }
 
-fn dpll(cnf: &CNF, num_of_vars: usize) -> Result<(), Box<dyn Error>> {
+fn dpll(cnf: &CNF, num_of_vars: usize) -> Result<Variables, Box<dyn Error>> {
     let (mut variables, mut clauses) = create_data_structures(&cnf, num_of_vars);
     let mut unit_queue: VecDeque<usize> = VecDeque::new();
     let mut assignment_stack: Vec<Assignment> = Vec::new();
 
-    for var in &variables {
-        print!("{}", var);
-    }
-    for cl in &clauses {
-        print!("{}", cl);
-    }
+    print_datastructures(&variables, &clauses);
 
-    for i in 0..variables.len() {
+    while let Some(i) = pick_branching_variable(&variables) {
         set_literal(i, &mut variables, &mut clauses, &mut assignment_stack, &mut unit_queue)?;
 
         loop {
@@ -123,6 +128,7 @@ fn dpll(cnf: &CNF, num_of_vars: usize) -> Result<(), Box<dyn Error>> {
                     variables[var_index].value = VarValue::Pos;
                     assignment_stack.push(Assignment {variable: var_index, assignment_type: AssignmentType::Forced});
                     if unit_propagation(var_index, &mut variables, &mut clauses, &mut unit_queue, &mut assignment_stack)?.assignment_type == AssignmentType::Branching {
+                        //todo
                     }
                 },
                 None => break
@@ -130,15 +136,18 @@ fn dpll(cnf: &CNF, num_of_vars: usize) -> Result<(), Box<dyn Error>> {
         }
     }
 
-    println!("");
-    for var in &variables {
-        print!("{}", var);
-    }
-    for cl in &clauses {
-        print!("{}", cl);
-    }
+    Ok(variables)
+}
 
-    Ok(())
+// if function returns none there couldnt be any variable picked anymore
+fn pick_branching_variable(variables: &Variables) -> Option<usize> {
+    // add heuristiks to chose variables
+    for (i, v) in variables.iter().enumerate() {
+        if v.value == VarValue::Free {
+            return Some(i);
+        }
+    }
+    None
 }
 
 fn set_literal(i: usize, variables: &mut Variables, clauses: &mut Clauses, assignment_stack: &mut Vec<Assignment>, unit_queue: &mut VecDeque<usize>) -> Result<(), Box<dyn Error>> {
@@ -237,6 +246,9 @@ fn main() {
         }
         cnf.push(cnf_clause);
     }
-    dpll(&cnf, 7);
+    match dpll(&cnf, 7) {
+        Ok(variables) => variables.iter().for_each(|v| print!("{}", v)),
+        Err(e) => print!("{}", e)
+    }
 
 }
