@@ -4,6 +4,9 @@ use std::path::Path;
 use std::fs;
 
 use itertools::Itertools;
+use rayon::prelude::*;
+use rayon::iter::*;
+use rayon;
 
 use crate::cnf::{CNF, CNFClause, CNFVar};
 
@@ -155,11 +158,19 @@ impl Field {
         let neighbour_set: NeiSet = Field::make_neighbour_set(&tent_mapping, &id_mapping);
 
         let mut total = CNF::new();
-        total.extend(Field::make_count_constraints(&self.column_counts, &col_set));
-        total.extend(Field::make_count_constraints(&self.row_counts, &row_set));
-        total.extend(Field::make_neighbour_constraints(&neighbour_set));
-        let (neistr, assg_mapping) = Field::make_correspondence_constraints(&self, &id_mapping);
-        total.extend(neistr);
+        let ((count_col_form, count_row_form), (neigs_form, (corr_form, assg_mapping))) =
+            rayon::join(
+                | | rayon::join(| | Field::make_count_constraints(&self.column_counts, &col_set),
+                                | | Field::make_count_constraints(&self.row_counts, &row_set)
+                ),
+                | | rayon::join(| | Field::make_neighbour_constraints(&neighbour_set),
+                                | | Field::make_correspondence_constraints(&self, &id_mapping)
+                )
+            );
+        total.extend(count_col_form);
+        total.extend(count_row_form);
+        total.extend(neigs_form);
+        total.extend(corr_form);
         (total, id_mapping, assg_mapping.clone().to_vec())
     }
 
@@ -376,7 +387,7 @@ impl Field {
             assg_id_mapping : &HashMap<Assignment, usize>,
             pack : &Vec<Assignment>,
             cond : Option<TentPlace>
-        ) -> CNF {
+        ) -> Vec<CNFClause> {
             let ids : Vec<&usize> = pack
                 .iter()
                 .map(|assg| assg_id_mapping
@@ -384,7 +395,7 @@ impl Field {
                      .unwrap()
                      ).collect();
             let mut any_of =
-                CNF::single(
+                vec![
                     match cond {
                         Some(x) => {
                             let mut c = ids.iter().map(|i| CNFVar::Pos(**i as u32)).collect::<CNFClause>();
@@ -393,10 +404,10 @@ impl Field {
                         },
                         None => ids.iter().map(|i| CNFVar::Pos(**i as u32)).collect::<CNFClause>()
                     }
-                );
+                ];
 
             let no_two = {
-                let mut out = CNF::new();
+                let mut out = vec![];
                 for i in &ids {
                     for j in &ids {
                         if i < j {
@@ -427,17 +438,17 @@ impl Field {
 
         let pack_formula =
             oneof_packs
-            .iter()
+            .par_iter()
             .flat_map(|p| makeoneof(&id_mapping, &assg_id_mapping, p, None));
 
         let cond_pack_formula =
             cond_oneof_packs
-            .iter()
+            .par_iter()
             .flat_map(|(cond, p)| makeoneof(&id_mapping, &assg_id_mapping, p, Some(*cond)));
 
         let tent_exists_formula =
             assignments
-            .iter()
+            .par_iter()
             .map(|a|
                  CNFClause{
                      vars: vec![
@@ -457,13 +468,13 @@ impl Field {
         let lower_bound_clauses =
             variables.iter()
             .map(|v| *v as u32)
-            .combinations(variables.len() - count + 1)
+            .combinations(variables.len() - count + 1).par_bridge()
             .map(|vs| vs.iter().map(|v| CNFVar::Pos(*v)).collect::<CNFClause>());
 
         let upper_bound_clauses =
             variables.iter()
             .map(|v| *v as u32)
-            .combinations(count+1)
+            .combinations(count+1).par_bridge()
             .map(|vs| vs.iter().map(|v| CNFVar::Neg(*v)).collect::<CNFClause>());
 
         lower_bound_clauses.chain(upper_bound_clauses)

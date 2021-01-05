@@ -2,7 +2,7 @@
 name = "solver"
 version = "0.1.0"
 authors = [
-    "Radoslaw Rowicki <radrowicki@gmail.com>",
+    "Radosław Rowicki <radrowicki@gmail.com>",
     "Alexander Lankheit <a.lankheit@campus.lmu.de>",
     "Korbinian Federholzner <k.federholzner@campus.lmu.de>",
 ]

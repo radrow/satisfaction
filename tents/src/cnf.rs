@@ -2,6 +2,9 @@ use std::fmt;
 use std::iter::FromIterator;
 use std::collections::HashSet;
 
+use rayon::iter::*;
+use dimacs::parse_dimacs;
+
 use cadical;
 
 pub struct CNF {
@@ -66,6 +69,33 @@ impl CNF {
         }
 
         sat
+    }
+
+    pub fn from_dimacs(input : &str) -> Result<CNF, dimacs::ParseError> {
+        let inst = parse_dimacs(input);
+
+        match inst {
+            Ok(dimacs::Instance::Cnf{clauses: clauses, ..}) =>
+                Ok(clauses.iter()
+                .map(|clause|
+                     clause.lits().iter()
+                     .map(|lit|
+                          match lit.sign() {
+                              dimacs::Sign::Pos => CNFVar::Pos(lit.var().to_u64() as u32),
+                              dimacs::Sign::Neg => CNFVar::Neg(lit.var().to_u64() as u32)
+                          }
+                     ).collect()
+                ).collect()),
+            Ok(_) => panic!("was zum kuh"),
+            Err(e) => Err(e)
+
+        }
+    }
+}
+
+impl FromParallelIterator<CNFClause> for CNF {
+    fn from_par_iter<I : IntoParallelIterator<Item=CNFClause>>(iter: I) -> Self {
+        CNF{clauses: iter.into_par_iter().collect()}
     }
 }
 
