@@ -151,15 +151,15 @@ fn pick_branching_variable(variables: &Variables) -> Option<usize> {
 fn set_literal(i: usize, variables: &mut Variables, clauses: &mut Clauses, assignment_stack: &mut Vec<Assignment>, unit_queue: &mut VecDeque<usize>) -> Result<(), Box<dyn Error>> {
     variables[i].value = VarValue::Pos;
     assignment_stack.push(Assignment {variable: i, assignment_type: AssignmentType::Branching});
-    if unit_propagation(i, variables, clauses, unit_queue, assignment_stack)?.assignment_type == AssignmentType::Branching {
-        variables[i].value = VarValue::Neg;
-        assignment_stack.push(Assignment {variable: i, assignment_type: AssignmentType::Forced});
-        unit_propagation(i, variables, clauses, unit_queue, assignment_stack)?;
+    if let Some(assignment) = unit_propagation(i, variables, clauses, unit_queue, assignment_stack)? {
+        variables[assignment.variable].value = VarValue::Neg;
+        assignment_stack.push(Assignment {variable: assignment.variable, assignment_type: AssignmentType::Forced});
+        unit_propagation(assignment.variable, variables, clauses, unit_queue, assignment_stack)?;
     }
     Ok(())
 }
 
-fn unit_propagation(i: usize, variables: &mut Variables, clauses: &mut Clauses, unit_queue: &mut VecDeque<usize>, assign_stack: &mut Vec<Assignment>) -> Result<Assignment, Box<dyn Error>>{
+fn unit_propagation(i: usize, variables: &mut Variables, clauses: &mut Clauses, unit_queue: &mut VecDeque<usize>, assign_stack: &mut Vec<Assignment>) -> Result<Option<Assignment>, Box<dyn Error>>{
     let mut pos_occ: &Vec<usize> = &variables[i].pos_occ;
     let mut neg_occ: &Vec<usize> = &variables[i].neg_occ;
     if variables[i].value == VarValue::Neg {
@@ -178,10 +178,10 @@ fn unit_propagation(i: usize, variables: &mut Variables, clauses: &mut Clauses, 
             unit_queue.push_back(unit_var_index);
         } else if clauses[n_occ].active_cl <= 0 {
             unit_queue.clear();
-            return backtracking(assign_stack, variables, clauses);
+            return Some(backtracking(assign_stack, variables, clauses)).transpose();
         }
     };
-    Ok(Assignment {variable: 0, assignment_type: AssignmentType::Forced})
+    Ok(None)
 }
 
 fn backtracking(assignment_stack: &mut Vec<Assignment>, variables: &mut Variables, clauses: &mut Clauses) -> Result<Assignment, Box<dyn Error>> {
