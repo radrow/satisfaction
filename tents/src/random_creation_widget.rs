@@ -9,7 +9,7 @@ use iced::{
     Row,
 };
 
-use crate::message::{Message};
+use crate::message::Message;
 use crate::number_input::NumberInput;
 
 pub struct RandomCreationWidget  {
@@ -32,22 +32,25 @@ impl RandomCreationWidget {
     pub fn view(&mut self) -> Element<Message> {
         let width = self.width_input.value;
         let height = self.height_input.value;
-        let size_widget = Row::new()
+        let size_widget: Row<Message> = Row::new()
             .push(Text::new("Grid size: "))
-            .push(self.width_input.view(move |width| Message::GridSizeInputChanged{width, height})
-            ).push(
-                Text::new(" x ")
-            ).push(self.height_input.view(move |height| Message::GridSizeInputChanged{width, height}))
+            .push(self.width_input.view(move |width| Message::GridSizeInputChanged{width, height}))
+            .push(Text::new(" x "))
+            .push(self.height_input.view(move |height| Message::GridSizeInputChanged{width, height}))
             .into();
 
-        let submission = Button::new(
+        let submission: Button<Message> = Button::new(
             &mut self.submission_button_state, 
             Text::new("Create Random Puzzle")
                 .horizontal_alignment(HorizontalAlignment::Center)
                 .width(Length::Fill)
             ).width(Length::Fill)
                 .on_press(Message::CreateRandomPuzzle{width, height}).into();
-        Column::with_children(vec![size_widget, submission]).spacing(10).into()
+
+        Column::new()
+            .push(size_widget)
+            .push(submission)
+            .spacing(10).into()
     }
 
     pub fn update(&mut self, width: usize, height: usize) {

@@ -1,14 +1,16 @@
 use crate::{message::*, log_widget::LogWidget};
 use crate::random_creation_widget::RandomCreationWidget;
+use crate::log::Log;
+
 use iced::button::State;
-use iced::{Length, HorizontalAlignment, Element, Button, Text, Column};
+use iced::{Length, HorizontalAlignment, Element, Button, Text, Column, Align};
 
 
 pub struct ControlWidget {
     width: Length,
 
     pub field_creation_widget: RandomCreationWidget,
-    pub log_widget: LogWidget,
+    log_widget: LogWidget,
 
     solve_puzzle_button: State,
 }
@@ -18,17 +20,17 @@ impl ControlWidget {
         ControlWidget {
             width: Length::Units(width),
             field_creation_widget: RandomCreationWidget::new(10, 10),
-            log_widget: LogWidget::new(),
+            log_widget: LogWidget::new(12), // TODO: Use dynamic font size
 
             solve_puzzle_button: State::new(),
         }
     }
 
-    pub fn view(&mut self, solvable: bool) -> Element<Message> {
+    pub fn view(&mut self, solvable: bool, log: &Log) -> Element<Message> {
         let mut control = Column::new()
+            .spacing(10)
             .width(self.width)
-            .push(self.field_creation_widget.view())
-            .push(self.log_widget.view());
+            .push(self.field_creation_widget.view());
 
         if solvable {
             control = control.push(
@@ -38,7 +40,8 @@ impl ControlWidget {
                     Message::SolvePuzzle
                 ));
         }
-        control.spacing(10).into()
+        control.push(self.log_widget.view(log))
+            .into()
     }
 
     

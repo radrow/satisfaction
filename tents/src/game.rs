@@ -1,17 +1,24 @@
 extern crate iced;
 
 use iced::{Length, Align};
-use iced::{Element, Row, Application, Svg, Text, Command, Subscription, HorizontalAlignment, VerticalAlignment, Container};
+use iced::{Element, Row, Application, Text, Command, Subscription, HorizontalAlignment, VerticalAlignment, Container};
 use iced_native::window::Event;
 
-use crate::{control_widget::*, field::*, field_widget::*, message::*, puzzle_creation};
+use crate::{
+    message::Message, 
+    field::*, 
+    log::Log,
+    control_widget::*, 
+    field_widget::FieldWidget,
+    puzzle_creation,
+};
 
-use std::collections::HashMap;
-use std::path::Path;
 
 pub struct Game {
     field: Option<Field>,
     puzzle_solved: bool,
+    log: Log,
+
     field_widget: FieldWidget,
     control_widget: ControlWidget,
 }
@@ -30,21 +37,14 @@ impl Application for Game {
     type Flags = ();
 
     fn new(_flags: ()) -> (Self, Command<Self::Message>) {
-        let image_directory = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("images/");
-
-        let mut svgs = HashMap::new();
-        svgs.insert(CellType::Meadow, Svg::from_path(image_directory.join("meadow.svg")));
-        svgs.insert(CellType::Tent, Svg::from_path(image_directory.join("tent.svg")));
-        svgs.insert(CellType::Tree, Svg::from_path(image_directory.join("tree.svg")));
-
-
         let field_widget = FieldWidget::new(15, 2, 2);
         let control_widget = ControlWidget::new(180);
 
         let game = Game {
             field: None,
             puzzle_solved: false,
+            log: Log::new(),
+
             field_widget,
             control_widget,
         };
@@ -78,7 +78,7 @@ impl Application for Game {
                 self.set_field(field);
             },
             Message::ErrorOccurred(error) => {
-                self.control_widget.log_widget.add_error(error);
+                self.log.add_error(error);
             }
         };
         Command::none()
@@ -87,7 +87,7 @@ impl Application for Game {
     fn view(&mut self) -> Element<Self::Message> {
         Row::new()
         .align_items(Align::Start)
-        .push(self.control_widget.view(!self.puzzle_solved && self.field.is_some()))
+        .push(self.control_widget.view(!self.puzzle_solved && self.field.is_some(), &self.log))
         .push(Container::new(
             match &mut self.field {
                 None => Element::from(
