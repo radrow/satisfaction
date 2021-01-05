@@ -1,5 +1,4 @@
 use crate::field::Field;
-use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub enum Message {

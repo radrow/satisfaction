@@ -25,7 +25,7 @@ impl LogWidget {
         }
     }
 
-    fn add_message(&mut self, mut msg: String, type_: LogType) {
+    fn add_message(&mut self, msg: String, type_: LogType) {
         self.log.push(Log(type_, msg));
     }
 

@@ -6,7 +6,7 @@ use iced_native::window::Event;
 
 use crate::{control_widget::*, field::*, field_widget::*, message::*, puzzle_creation};
 
-use std::collections::{HashMap};
+use std::collections::HashMap;
 use std::path::Path;
 
 pub struct Game {
@@ -39,7 +39,7 @@ impl Application for Game {
         svgs.insert(CellType::Tree, Svg::from_path(image_directory.join("tree.svg")));
 
 
-        let field_widget = FieldWidget::new(15, 2, 2, svgs);
+        let field_widget = FieldWidget::new(15, 2, 2);
         let control_widget = ControlWidget::new(180);
 
         let game = Game {
