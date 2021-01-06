@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::path::Path;
-use tokio::fs::read_to_string;
+use std::error::Error;
 
+use tokio::fs::read_to_string;
 use itertools::Itertools;
 
 use crate::cnf::{CNF, CNFClause, CNFVar};
@@ -11,6 +12,34 @@ type TreePlace = (usize, usize);
 
 type AxisSet = HashMap<usize, Vec<usize>>;
 type NeiSet = Vec<(usize, usize)>;
+
+
+#[derive(Debug)]
+enum FieldParserError {
+    WidthNotSpecified,
+    HeightNotSpecified,
+    MissingRowCount(usize),
+    WrongNumberOfCells{expected: usize, found: usize, line: usize},
+    MissingColumnCounts{expected: usize, found: usize},
+    InvalidCharacter(char),
+    ParsingFailed(usize),
+}
+
+impl std::fmt::Display for FieldParserError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            FieldParserError::WidthNotSpecified => "A width was expected but not found".to_string(),
+            FieldParserError::HeightNotSpecified => "A height was expected but not found".to_string(),
+            FieldParserError::MissingRowCount(line) => format!("In line {} no tent count was specified", line),
+            FieldParserError::WrongNumberOfCells{line, expected, found} => format!("Not enough cells were specified in line {}: Expected {} but found {}", line, expected, found),
+            FieldParserError::MissingColumnCounts{expected, found} => format!("Could not find enough column counts in last line: Expected {} but found {}", expected, found),
+            FieldParserError::InvalidCharacter(character) => format!("Encountered an invalid character {}", character),
+            FieldParserError::ParsingFailed(line) => format!("Parsing failed in line {}", line),
+        })
+    }
+}
+
+impl Error for FieldParserError {}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum CellType {
@@ -54,36 +83,32 @@ impl Field {
 
     pub async fn from_file(path: impl AsRef<Path>) -> Result<Field, Box<dyn std::error::Error>> {
         let contents: String = read_to_string(path).await?;
-        let mut split = contents.split(|c| c == '\n' || c == ' ' || c == '\r');
 
-        let height: usize = split.next().unwrap().parse::<usize>()?;
-        let width: usize = split.next().unwrap().parse::<usize>()?;
+        if let Some(c) = contents.chars()
+            .filter(|c| !(c.is_ascii_whitespace() || c.is_numeric() || *c == 'T' || *c == '.'))
+            .next() {
+            return Err(FieldParserError::InvalidCharacter(c).into());
+        };
 
-        let mut field: Vec<String> = Vec::new();
-        let mut row_counts: Vec<usize> = Vec::new();
+        let mut lines = contents.lines();
+        
+        let (width, height) = Field::parse_size(
+            lines.next()
+                .ok_or(FieldParserError::HeightNotSpecified)?
+        )?;
 
+        let mut lines_with_numbers = lines.zip(1..);
 
-        for _ in 0..height {
-            field.push(split.next().unwrap().to_string());
-            row_counts.push(split.next().unwrap().parse::<usize>()?);
-        }
+        let (cells, row_counts) = lines_with_numbers.by_ref()
+            .take(height)
+            .map(|(line, number)| Field::parse_tent_line(line, number, width))
+            .collect::<Result<Vec<_>, FieldParserError>>()?
+            .into_iter().unzip();
 
-        let column_counts = split.map(
-            |x| x.parse::<usize>()
-        ).collect::<Result<Vec<usize>, std::num::ParseIntError>>()?;
+        let column_counts = lines_with_numbers.next()
+            .ok_or(FieldParserError::MissingColumnCounts{expected: width, found: 0})
+            .and_then(|(line, number)| Field::parse_column_counts(line, number, width))?;
 
-        let mut cells: Vec<Vec<CellType>> = Vec::new();
-        for row in field {
-            let mut rows: Vec<CellType> = Vec::new();
-            for character in row.chars() {
-                if character == 'T' {
-                    rows.push(CellType::Tree);
-                } else {
-                    rows.push(CellType::Meadow);
-                }
-            }
-            cells.push(rows);
-        }
 
         Ok(Field {
             row_counts,
@@ -92,6 +117,67 @@ impl Field {
             height: height,
             width: width
         })
+    }
+
+    fn parse_size(line: &str) -> Result<(usize, usize), FieldParserError> {
+        let mut split = line.split(' ');
+
+        let height: usize = split.next()
+            .ok_or(FieldParserError::HeightNotSpecified)?
+            .parse::<usize>()
+            .ok()
+            .ok_or(FieldParserError::ParsingFailed(1))?;
+
+        let width: usize = split.next()
+            .ok_or(FieldParserError::WidthNotSpecified)?
+            .parse::<usize>()
+            .ok()
+            .ok_or(FieldParserError::ParsingFailed(1))?;
+
+        Ok((width, height))
+    }
+
+    fn parse_tent_line(line: &str, line_number: usize, width: usize) -> Result<(Vec<CellType>, usize), FieldParserError> {
+        let mut split = line.splitn(2, ' ');
+
+        let cells = split.next()
+            .ok_or(FieldParserError::WrongNumberOfCells{line: line_number, expected: width, found: 0})?;
+
+        let row_count = split.next()
+            .ok_or(FieldParserError::MissingRowCount(line_number))?
+            .parse::<usize>()
+            .ok()
+            .ok_or(FieldParserError::ParsingFailed(line_number))?;
+
+        if cells.len() != width {
+            return Err(FieldParserError::WrongNumberOfCells{expected: width, found: cells.len(), line: line_number}.into());
+        }
+
+        let row = cells.chars()
+            .map(|c| {
+                match c {
+                    'T' => Ok(CellType::Tree),
+                    '.' => Ok(CellType::Meadow),
+                    // TODO: More precise location
+                    _   => Err(FieldParserError::InvalidCharacter(c)),
+                }
+            }).collect::<Result<Vec<CellType>, FieldParserError>>()?;
+
+        Ok((row, row_count))
+    }
+
+    fn parse_column_counts(line: &str, line_number: usize, width: usize) -> Result<Vec<usize>, FieldParserError> {
+        line.split(' ')
+            .map(|number| {
+                number.parse::<usize>()
+                    .ok()
+                    .ok_or(FieldParserError::ParsingFailed(line_number))
+            }).collect::<Result<Vec<usize>, FieldParserError>>()
+            .and_then(|vec|{
+                if vec.len() == width { Ok(vec) }
+                else { Err(FieldParserError::MissingColumnCounts{expected: width, found: vec.len()}) }
+            })
+            
     }
 
     pub fn tent_coordinates(&self) -> Vec<Vec<TentPlace>> {
