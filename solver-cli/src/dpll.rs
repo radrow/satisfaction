@@ -7,19 +7,20 @@ use std::fmt;
 use std::collections::VecDeque;
 use std::error::Error;
 
-#[derive(Clone, Debug, PartialEq)]
-enum VarValue {
-    Pos, Neg, Free
-}
-
 #[derive(PartialEq)]
 enum AssignmentType {
     Forced, Branching
 }
-
+/// Used to store assignments made in the past, for undoing them with backtracking
 struct Assignment {
     variable: usize,
     assignment_type: AssignmentType
+}
+
+
+#[derive(Clone, Debug, PartialEq)]
+enum VarValue {
+    Pos, Neg, Free
 }
 
 pub struct Variable {
@@ -120,14 +121,14 @@ pub fn dpll(cnf: &CNF, num_of_vars: usize) -> Result<Variables, Box<dyn Error>> 
     print_datastructures(&variables, &clauses);
 
     while let Some(i) = pick_branching_variable(&variables) {
-        set_literal(i, &mut variables, &mut clauses, &mut assignment_stack, &mut unit_queue)?;
+        set_literal(i, &mut variables, &mut clauses, &mut assignment_stack, &mut unit_queue, AssignmentType::Branching)?;
 
         loop {
             match unit_queue.pop_front() {
                 Some(var_index) => {
                     variables[var_index].value = VarValue::Pos;
                     assignment_stack.push(Assignment {variable: var_index, assignment_type: AssignmentType::Forced});
-                    set_literal(var_index, &mut variables, &mut clauses, &mut assignment_stack, &mut unit_queue)?;
+                    set_literal(var_index, &mut variables, &mut clauses, &mut assignment_stack, &mut unit_queue, AssignmentType::Forced)?;
                 },
                 None => break
             }
@@ -137,9 +138,10 @@ pub fn dpll(cnf: &CNF, num_of_vars: usize) -> Result<Variables, Box<dyn Error>> 
     Ok(variables)
 }
 
-// if function returns none there couldnt be any variable picked anymore
+/// Funtion that picks the next variable to be chosen for branching.
+/// Returns the index of the next variable, or None if there is no Variable to be picked
 fn pick_branching_variable(variables: &Variables) -> Option<usize> {
-    // todo -> add heuristiks to chose variables
+    // TODO -> add heuristics to chose Variables
     for (i, v) in variables.iter().enumerate() {
         if v.value == VarValue::Free {
             return Some(i);
@@ -148,9 +150,9 @@ fn pick_branching_variable(variables: &Variables) -> Option<usize> {
     None
 }
 
-fn set_literal(i: usize, variables: &mut Variables, clauses: &mut Clauses, assignment_stack: &mut Vec<Assignment>, unit_queue: &mut VecDeque<usize>) -> Result<(), Box<dyn Error>> {
+fn set_literal(i: usize, variables: &mut Variables, clauses: &mut Clauses, assignment_stack: &mut Vec<Assignment>, unit_queue: &mut VecDeque<usize>, assgn_type: AssignmentType) -> Result<(), Box<dyn Error>> {
     variables[i].value = VarValue::Pos;
-    assignment_stack.push(Assignment {variable: i, assignment_type: AssignmentType::Branching});
+    assignment_stack.push(Assignment {variable: i, assignment_type: assgn_type});
     if let Some(assignment) = unit_propagation(i, variables, clauses, unit_queue, assignment_stack)? {
         variables[assignment.variable].value = VarValue::Neg;
         assignment_stack.push(Assignment {variable: assignment.variable, assignment_type: AssignmentType::Forced});
@@ -201,7 +203,7 @@ fn backtracking(assignment_stack: &mut Vec<Assignment>, variables: &mut Variable
             return Ok(assign)
         }
     }
-    Err("unsat".into())
+    Err("unsatisfied".into())
 }
 
 fn find_unit_variable_index(clause: &Clause, variables: &Variables) -> Result<usize, Box<dyn Error>> {
