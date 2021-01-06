@@ -2,8 +2,6 @@ use std::fmt;
 use std::iter::FromIterator;
 use std::collections::HashSet;
 
-//use cadical;
-
 pub struct CNF {
     pub clauses : Vec<CNFClause>
 }
@@ -58,16 +56,6 @@ impl CNF {
         }
         out
     }
-
-    //pub fn to_solver(&self) -> cadical::Solver {
-    //    let mut sat: cadical::Solver = Default::default();
-
-    //    for clause in &self.clauses {
-    //        sat.add_clause(clause.vars.iter().map(|var| var.to_i32()));
-    //    }
-
-    //    sat
-    //}
 }
 
 impl FromIterator<CNFClause> for CNF {
