@@ -5,10 +5,9 @@ use std::fs;
 
 use itertools::Itertools;
 use rayon::prelude::*;
-use rayon::iter::*;
 use rayon;
 
-use crate::cnf::{CNF, CNFClause, CNFVar};
+use solver::cnf::{CNF, CNFClause, CNFVar, VarId};
 
 type TentPlace = (usize, usize);
 type TreePlace = (usize, usize);
@@ -157,7 +156,7 @@ impl Field {
         );
         let neighbour_set: NeiSet = Field::make_neighbour_set(&tent_mapping, &id_mapping);
 
-        let mut total = CNF::new();
+        let mut total = CNF::empty();
         let ((count_col_form, count_row_form), (neigs_form, (corr_form, assg_mapping))) =
             rayon::join(
                 | | rayon::join(| | Field::make_count_constraints(&self.column_counts, &col_set),
@@ -251,7 +250,7 @@ impl Field {
     }
 
     fn make_count_constraints(counts : &Vec<usize>, axes : &AxisSet) -> CNF {
-        let mut clauses = CNF::new();
+        let mut clauses = CNF::empty();
 
         // Conjunction of constranits per each axis
         for (axis, tents) in axes {
@@ -270,7 +269,7 @@ impl Field {
         neigh
             .iter()
             .map(|(x,y)|{
-                CNFClause{vars: vec![CNFVar::Neg(*x as u32), CNFVar::Neg(*y as u32)]}
+                CNFClause{vars: vec![CNFVar::neg(*x as VarId), CNFVar::neg(*y as VarId)]}
             }).collect()
     }
 
@@ -398,11 +397,11 @@ impl Field {
                 vec![
                     match cond {
                         Some(x) => {
-                            let mut c = ids.iter().map(|i| CNFVar::Pos(**i as u32)).collect::<CNFClause>();
-                            c.push(CNFVar::Neg(*id_mapping.get(&x).unwrap() as u32));
+                            let mut c = ids.iter().map(|i| CNFVar::pos(**i as VarId)).collect::<CNFClause>();
+                            c.push(CNFVar::neg(*id_mapping.get(&x).unwrap() as VarId));
                             c
                         },
-                        None => ids.iter().map(|i| CNFVar::Pos(**i as u32)).collect::<CNFClause>()
+                        None => ids.iter().map(|i| CNFVar::pos(**i as VarId)).collect::<CNFClause>()
                     }
                 ];
 
@@ -415,15 +414,15 @@ impl Field {
                                 match cond {
                                     Some(x) => {
                                         let mut c = CNFClause::new();
-                                        c.push(CNFVar::Neg(**i as u32));
-                                        c.push(CNFVar::Neg(**j as u32));
-                                        c.push(CNFVar::Neg(*id_mapping.get(&x).unwrap() as u32));
+                                        c.push(CNFVar::neg(**i as VarId));
+                                        c.push(CNFVar::neg(**j as VarId));
+                                        c.push(CNFVar::neg(*id_mapping.get(&x).unwrap() as VarId));
                                         c
                                     },
                                     None => {
                                         let mut c = CNFClause::new();
-                                        c.push(CNFVar::Neg(**i as u32));
-                                        c.push(CNFVar::Neg(**j as u32));
+                                        c.push(CNFVar::neg(**i as VarId));
+                                        c.push(CNFVar::neg(**j as VarId));
                                         c
                                     }
                                 });
@@ -452,8 +451,8 @@ impl Field {
             .map(|a|
                  CNFClause{
                      vars: vec![
-                         CNFVar::Neg(*assg_id_mapping.get(a).unwrap() as u32),
-                         CNFVar::Pos(*id_mapping.get(&a.tent).unwrap() as u32)
+                         CNFVar::neg(*assg_id_mapping.get(a).unwrap() as VarId),
+                         CNFVar::pos(*id_mapping.get(&a.tent).unwrap() as VarId)
                      ]
                  });
 
@@ -469,13 +468,13 @@ impl Field {
             variables.iter()
             .map(|v| *v as u32)
             .combinations(variables.len() - count + 1).par_bridge()
-            .map(|vs| vs.iter().map(|v| CNFVar::Pos(*v)).collect::<CNFClause>());
+            .map(|vs| vs.iter().map(|v| CNFVar::pos(*v as VarId)).collect::<CNFClause>());
 
         let upper_bound_clauses =
             variables.iter()
             .map(|v| *v as u32)
             .combinations(count+1).par_bridge()
-            .map(|vs| vs.iter().map(|v| CNFVar::Neg(*v)).collect::<CNFClause>());
+            .map(|vs| vs.iter().map(|v| CNFVar::neg(*v as VarId)).collect::<CNFClause>());
 
         lower_bound_clauses.chain(upper_bound_clauses)
             .collect::<CNF>()

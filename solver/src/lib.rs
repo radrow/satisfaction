@@ -1,3 +1,6 @@
+pub mod cnf;
+pub mod sat_solver;
+
 #[cfg(test)]
 mod tests {
     #[test]
