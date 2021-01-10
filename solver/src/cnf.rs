@@ -2,7 +2,12 @@ use std::fmt;
 use std::iter::FromIterator;
 use std::collections::HashSet;
 
+use rayon::iter::*;
+use dimacs::parse_dimacs;
+
 use cadical;
+
+pub type VarId = usize;
 
 pub struct CNF {
     pub clauses : Vec<CNFClause>
@@ -12,13 +17,13 @@ pub struct CNFClause {
     pub vars : Vec<CNFVar>
 }
 
-pub enum CNFVar {
-    Pos(u32),
-    Neg(u32)
+pub struct CNFVar {
+    id: VarId,
+    sign: bool,
 }
 
 impl CNF {
-    pub fn new() -> CNF {
+    pub fn empty() -> CNF {
         CNF{clauses: vec![]}
     }
 
@@ -38,8 +43,8 @@ impl CNF {
     pub fn to_dimacs(&self) -> String {
         let mut out : String = String::from("");
 
-        let distinct : HashSet<u32> =
-            self.clauses.iter().flat_map(|clause| clause.vars.iter().map(|v| v.name()))
+        let distinct : HashSet<VarId> =
+            self.clauses.iter().flat_map(|clause| clause.vars.iter().map(|v| v.id()))
             .collect();
 
         out.extend("p cnf ".chars());
@@ -66,6 +71,33 @@ impl CNF {
         }
 
         sat
+    }
+
+    pub fn from_dimacs(input : &str) -> Result<CNF, dimacs::ParseError> {
+        let inst = parse_dimacs(input);
+
+        match inst {
+            Ok(dimacs::Instance::Cnf{clauses, ..}) =>
+                Ok(clauses.iter()
+                .map(|clause|
+                     clause.lits().iter()
+                     .map(|lit|
+                          CNFVar {
+                              id: lit.var().to_u64() as VarId,
+                              sign: lit.sign() == dimacs::Sign::Pos
+                          }
+                     ).collect()
+                ).collect()),
+            Ok(_) => panic!("was zum kuh"),
+            Err(e) => Err(e)
+
+        }
+    }
+}
+
+impl FromParallelIterator<CNFClause> for CNF {
+    fn from_par_iter<I : IntoParallelIterator<Item=CNFClause>>(iter: I) -> Self {
+        CNF{clauses: iter.into_par_iter().collect()}
     }
 }
 
@@ -120,16 +152,31 @@ impl IntoIterator for CNFClause {
 }
 
 impl CNFVar {
-    pub fn name(&self) -> u32 {
-        match self {
-            CNFVar::Pos(s) => *s,
-            CNFVar::Neg(s) => *s,
-        }
+    pub fn new(id: VarId, sign: bool) -> CNFVar {
+        CNFVar{id: id, sign: sign}
     }
+
+    pub fn pos(id: VarId) -> CNFVar {
+        CNFVar{id: id, sign: true}
+    }
+
+    pub fn neg(id: VarId) -> CNFVar{
+        CNFVar{id: id, sign: false}
+    }
+
+    pub fn id(&self) -> VarId {
+        self.id
+    }
+
+    pub fn sign(&self) -> bool {
+        self.sign
+    }
+
     pub fn to_i32(&self) -> i32 {
-        match self {
-            CNFVar::Pos(s) => *s as i32,
-            CNFVar::Neg(s) => -(*s as i32),
+        if self.sign {
+            self.id as i32
+        } else {
+            -(self.id as i32)
         }
     }
 }
@@ -153,11 +200,6 @@ impl fmt::Display for CNFClause {
 }
 impl fmt::Display for CNFVar {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            CNFVar::Pos(s) =>
-                write!(f, "{}", s),
-            CNFVar::Neg(s) =>
-                write!(f, "!{}", s),
-        }
+        write!(f, "{}", self.to_i32())
     }
 }
