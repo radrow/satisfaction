@@ -3,15 +3,14 @@ use proptest::{
     collection::vec,
     bool::weighted,
 };
-use solver::{CadicalSolver, Solver, CNFClause, CNFVar, Assignment, CNF};
+use solver::{CadicalSolver, Solver, CNFClause, CNFVar, Assignment, CNF, SatisfactionSolver};
 
 const MAX_NUM_VARIABLES: usize = 50;
 const MAX_NUM_LITERALS: usize = 10;
 const MAX_NUM_CLAUSES: usize = 5;
 
-fn setup_custom_solver() -> CadicalSolver {
-    // TODO: Replace with custom solver
-    CadicalSolver
+fn setup_custom_solver() -> SatisfactionSolver {
+    SatisfactionSolver
 }
 
 fn execute_solvers(formula: CNF, num_variables: usize) -> (Option<Assignment>, Option<Assignment>) {

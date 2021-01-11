@@ -10,8 +10,8 @@ use crate::{Solver, Assignment};
 pub struct SatisfactionSolver;
 
 impl Solver for SatisfactionSolver {
-    fn solve(&self, clauses: impl Iterator<Item=CNFClause>, num_variables: usize) -> Option<Assignment> { 
-        dpll(&clauses.collect(), num_variables)
+    fn solve(&self, formula: CNF, num_variables: usize) -> Option<Assignment> {
+        dpll(&formula, num_variables)
     }
 }
 
@@ -51,14 +51,14 @@ impl Variable {
         Variable {
             value: VarValue::Free,
             neg_occ: cnf.clauses.iter().enumerate().filter_map(|(index, clause)| {
-                    if clause.vars.contains(&CNFVar::Neg(var_num)) {
+                    if clause.vars.contains(&CNFVar {id: var_num, sign: false}) {
                         Some(index)
                     } else {
                         None
                     }
                 }).collect(),
             pos_occ: cnf.clauses.iter().enumerate().filter_map(|(index, clause)| {
-                    if clause.vars.contains(&CNFVar::Pos(var_num as usize)) {
+                    if clause.vars.contains(&CNFVar {id: var_num, sign: true}) {
                         Some(index)
                     } else {
                         None
@@ -74,9 +74,10 @@ impl Clause {
             active_cl: cnf_clause.vars.len(),
             satisfied: None,
             literals: cnf_clause.vars.iter().map(|var| {
-                match var {
-                    CNFVar::Pos(s) => *s as isize,
-                    CNFVar::Neg(s) => -(*s as isize)
+                if var.sign {
+                    return var.id as isize;
+                } else {
+                    return -1 * (var.id as isize);
                 }
             }).collect()
         }
@@ -118,7 +119,7 @@ fn create_data_structures(cnf: &CNF, num_of_vars: usize) -> (Variables, Clauses)
     (variables, clauses)
 }
 
-pub fn dpll(cnf: &CNF, num_of_vars: usize) -> Option<Vec<bool>> {
+pub fn dpll(cnf: &CNF, num_of_vars: usize) -> Option<Assignment> {
     let (mut variables, mut clauses) = create_data_structures(cnf, num_of_vars);
     let mut unit_queue: VecDeque<usize> = VecDeque::new();
     let mut assignment_stack: Vec<PrevAssignment> = Vec::new();
