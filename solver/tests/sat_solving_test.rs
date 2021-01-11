@@ -10,7 +10,7 @@ const MAX_NUM_LITERALS: usize = 3;
 const MAX_NUM_CLAUSES: usize = 5;
 
 fn execute_solvers(formula: Vec<CNFClause>, num_variables: usize) -> (Option<Assignment>, Option<Assignment>) {
-    let testing_solver = SatisfactionSolver; // TODO: Replace testing_solver with custom solver
+    let testing_solver = SatisfactionSolver;
     let reference_solver = CadicalSolver;
 
     let testing_solution = testing_solver.solve(formula.clone().into_iter(), num_variables);

@@ -1,5 +1,6 @@
 use crate::cnf;
 
+use cnf::CNF;
 use cnf::CNFClause;
 use cnf::CNFVar;
 use std::fmt;
@@ -10,7 +11,7 @@ pub struct SatisfactionSolver;
 
 impl Solver for SatisfactionSolver {
     fn solve(&self, clauses: impl Iterator<Item=CNFClause>, num_variables: usize) -> Option<Assignment> { 
-        dpll(clauses, num_variables)
+        dpll(&clauses.collect(), num_variables)
     }
 }
 
@@ -46,17 +47,17 @@ type Variables = Vec<Variable>;
 type Clauses = Vec<Clause>;
 
 impl Variable {
-    fn new(cnf_clauses: &mut impl Iterator<Item=CNFClause>, var_num: usize) -> Variable {
+    fn new(cnf: &CNF, var_num: usize) -> Variable {
         Variable {
             value: VarValue::Free,
-            neg_occ: cnf_clauses.enumerate().filter_map(|(index, clause)| {
-                    if clause.vars.contains(&CNFVar::Neg(var_num as usize)) {
+            neg_occ: cnf.clauses.iter().enumerate().filter_map(|(index, clause)| {
+                    if clause.vars.contains(&CNFVar::Neg(var_num)) {
                         Some(index)
                     } else {
                         None
                     }
                 }).collect(),
-            pos_occ: cnf_clauses.enumerate().filter_map(|(index, clause)| {
+            pos_occ: cnf.clauses.iter().enumerate().filter_map(|(index, clause)| {
                     if clause.vars.contains(&CNFVar::Pos(var_num as usize)) {
                         Some(index)
                     } else {
@@ -110,22 +111,19 @@ fn print_datastructures(variables: &Variables, clauses: &Clauses) {
     println!("");
 }
 
-fn create_data_structures(cnf_clauses: &mut impl Iterator<Item=CNFClause>, num_of_vars: usize) -> (Variables, Clauses) {
-    let clauses: Clauses = cnf_clauses.map(|cnf_clause| Clause::new(&cnf_clause)).collect();
-    let variables: Variables = (1..=num_of_vars).map(|i| Variable::new(cnf_clauses, i)).collect();
+fn create_data_structures(cnf: &CNF, num_of_vars: usize) -> (Variables, Clauses) {
+    let clauses: Clauses = cnf.clauses.iter().map(|cnf_clause| Clause::new(&cnf_clause)).collect();
+    let variables: Variables = (1..=num_of_vars).map(|i| Variable::new(cnf, i)).collect();
 
     (variables, clauses)
 }
 
-
- 
-
-pub fn dpll(mut cnf_clauses: impl Iterator<Item=CNFClause>, num_of_vars: usize) -> Option<Vec<bool>> {
-    let (mut variables, mut clauses) = create_data_structures(&mut cnf_clauses, num_of_vars);
+pub fn dpll(cnf: &CNF, num_of_vars: usize) -> Option<Vec<bool>> {
+    let (mut variables, mut clauses) = create_data_structures(cnf, num_of_vars);
     let mut unit_queue: VecDeque<usize> = VecDeque::new();
     let mut assignment_stack: Vec<PrevAssignment> = Vec::new();
 
-    //print_datastructures(&variables, &clauses);
+    print_datastructures(&variables, &clauses);
 
     while let Some(i) = pick_branching_variable(&variables) {
         set_literal(i, &mut variables, &mut clauses, &mut assignment_stack, &mut unit_queue, AssignmentType::Branching)?;
@@ -141,6 +139,9 @@ pub fn dpll(mut cnf_clauses: impl Iterator<Item=CNFClause>, num_of_vars: usize) 
             }
         }
     }
+    println!("variable results: ");
+    variables.iter().for_each(|v| print!("{:?} ", v.value));
+    println!("\n-----------");
 
     Some(variables.iter().map(|x| match x.value {
         VarValue::Pos => true,
