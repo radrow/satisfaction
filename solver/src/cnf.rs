@@ -19,17 +19,10 @@ pub struct CNFClause {
     pub vars : Vec<CNFVar>
 }
 
-<<<<<<< HEAD
-#[derive(Clone, Debug, PartialEq)]
-pub enum CNFVar {
-    Pos(usize),
-    Neg(usize)
-=======
 #[derive(Clone, Debug)]
 pub struct CNFVar {
     pub id: VarId,
     pub sign: bool,
->>>>>>> property_based_testing
 }
 
 impl CNF {

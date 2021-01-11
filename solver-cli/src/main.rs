@@ -46,10 +46,5 @@ fn make_config<'a>() -> Config<'a> {
 
 
 fn main() {
-<<<<<<< HEAD
-    println!("Hello, world!");
-}
-=======
     let _config = make_config();
 }
->>>>>>> property_based_testing
