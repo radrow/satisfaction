@@ -1,7 +1,7 @@
-use crate::CNFClause;
+use crate::cnf::CNF;
 
 pub type Assignment = Vec<bool>;
 
 pub trait Solver {
-    fn solve(&self, clauses: impl Iterator<Item=CNFClause>, num_variables: usize) -> Option<Assignment>;
+    fn solve(&self, formula: CNF, num_variables: usize) -> Option<Assignment>;
 }

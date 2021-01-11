@@ -1,13 +1,13 @@
 use cadical;
-use crate::{CNFClause, Solver, Assignment};
+use crate::{Solver, Assignment, CNF};
 
 pub struct CadicalSolver;
 
 impl Solver for CadicalSolver {
-    fn solve(&self, clauses: impl Iterator<Item=CNFClause>, num_variables: usize) -> Option<Assignment> {
+    fn solve(&self, clauses: CNF, num_variables: usize) -> Option<Assignment> {
         let mut solver: cadical::Solver = Default::default();
         
-        clauses.for_each(|clause| {
+        clauses.clauses.into_iter().for_each(|clause| {
             solver.add_clause(clause.into_iter()
                 .map(|literal| literal.to_i32()));
         });

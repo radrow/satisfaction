@@ -6,7 +6,6 @@ mod control_widget;
 mod random_creation_widget;
 mod puzzle_creation;
 mod number_input;
-mod cnf;
 
 use game::Game;
 

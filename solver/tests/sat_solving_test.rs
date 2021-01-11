@@ -3,7 +3,7 @@ use proptest::{
     collection::vec,
     bool::weighted,
 };
-use solver::{CadicalSolver, Solver, CNFClause, CNFVar, Assignment};
+use solver::{CadicalSolver, Solver, CNFClause, CNFVar, Assignment, CNF};
 
 const MAX_NUM_VARIABLES: usize = 50;
 const MAX_NUM_LITERALS: usize = 10;
@@ -14,7 +14,9 @@ fn setup_custom_solver() -> CadicalSolver {
     CadicalSolver
 }
 
-fn execute_solvers(formula: impl Iterator<Item=CNFClause>+Clone, num_variables: usize) -> (Option<Assignment>, Option<Assignment>) {
+fn execute_solvers(formula: CNF, num_variables: usize) -> (Option<Assignment>, Option<Assignment>) {
+    println!("{:?}", &formula);
+
     let testing_solver = setup_custom_solver();
     let reference_solver = CadicalSolver;
 
@@ -27,22 +29,23 @@ fn execute_solvers(formula: impl Iterator<Item=CNFClause>+Clone, num_variables: 
 
 fn is_satisfied(mut formula: impl Iterator<Item=CNFClause>, assignment: Assignment) -> bool {
     formula.all(|clause|
-            clause.vars
-                .iter()
-                .any(|v| match v {
-                    CNFVar::Pos(s) => assignment[*s-1],
-                    CNFVar::Neg(s) => !assignment[*s-1],
-                }))
+        clause.vars.iter()
+            .any(|var|
+                // If sign is negative assignment is inverted
+                // else it is passed by.
+                !(assignment[var.id-1] ^ var.sign)
+            )
+        )
 }
     
 proptest! {
     #[test]
     fn only_positive_unit_clauses(num_variables in 1..=MAX_NUM_VARIABLES ) {
         let formula = (1..=num_variables)
-            .map(|variable| CNFClause{vars: vec![CNFVar::Pos(variable)]})
+            .map(|variable| CNFClause::single(CNFVar{id: variable, sign: true}))
             .collect::<Vec<_>>();
 
-        let (custom, reference) = execute_solvers(formula.into_iter(), num_variables);
+        let (custom, reference) = execute_solvers(CNF{clauses:formula}, num_variables);
 
         prop_assert_eq!(custom, reference);
     }
@@ -50,10 +53,10 @@ proptest! {
     #[test]
     fn only_negative_unit_clauses(num_variables in 1..=MAX_NUM_VARIABLES ) {
         let formula = (1..=num_variables)
-            .map(|variable| CNFClause{vars: vec![CNFVar::Neg(variable)]})
+            .map(|variable| CNFClause::single(CNFVar{id: variable, sign: false}))
             .collect::<Vec<_>>();
 
-        let (custom, reference) = execute_solvers(formula.into_iter(), num_variables);
+        let (custom, reference) = execute_solvers(CNF{clauses:formula}, num_variables);
 
         prop_assert_eq!(custom, reference);
     }
@@ -62,16 +65,13 @@ proptest! {
     fn only_unit_clauses(signs in vec(weighted(0.5), 1..=MAX_NUM_VARIABLES)) {
         let num_variables = signs.len() ;
         let formula = signs.iter()
+            .cloned()
             .enumerate()
-            .map(|(variable, sign)| {
-                let literal = match sign {
-                    true => CNFVar::Pos,
-                    false => CNFVar::Neg,
-                };
-                CNFClause{vars: vec![literal((variable )+1)]}
+            .map(|(id, sign)| {
+                CNFClause::single(CNFVar{id: id+1, sign})
             }).collect::<Vec<_>>();
 
-        let (custom, reference) = execute_solvers(formula.into_iter(), num_variables);
+        let (custom, reference) = execute_solvers(CNF{clauses:formula}, num_variables);
         prop_assert_eq!(custom, reference);
     }
 
@@ -89,17 +89,13 @@ proptest! {
             .map(|clause| 
                 CNFClause{ vars:
                 clause.iter()
-                    .map(|(variable, sign)| {
-                        let literal = match sign {
-                            true => CNFVar::Pos,
-                            false => CNFVar::Neg,
-                        };
-                        literal(*variable)
+                    .cloned()
+                    .map(|(id, sign)| {
+                        CNFVar{id, sign}
                     }).collect()
                 }).collect::<Vec<_>>();
 
-        println!("{:?}", &formula);
-        let (custom, reference) = execute_solvers(formula.iter().cloned(), num_variables);
+        let (custom, reference) = execute_solvers(CNF{clauses:formula.clone()}, num_variables);
 
         // The result regarding satisfiability is correct.
         prop_assert_eq!(custom.is_none(), reference.is_none());
