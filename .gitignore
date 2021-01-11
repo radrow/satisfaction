@@ -16,3 +16,7 @@ Cargo.lock
 /solver/target
 /solver-cli/target
 /target
+
+
+# Ignore output of proptest
+**/*.proptest-regressions
