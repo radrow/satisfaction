@@ -13,7 +13,7 @@ pub struct CNFClause {
     pub vars : Vec<CNFVar>
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CNFVar {
     Pos(usize),
     Neg(usize)
