@@ -7,6 +7,10 @@ use std::fmt;
 use std::collections::VecDeque;
 use crate::{Solver, Assignment};
 
+pub trait BranchingStrategy {
+    fn pick_branching_variable(&mut self, variables: &Variables, clauses: &Clauses) -> Option<usize>;
+}
+
 pub struct SatisfactionSolver;
 
 impl Solver for SatisfactionSolver {
@@ -126,7 +130,9 @@ pub fn dpll(cnf: &CNF, num_of_vars: usize) -> Assignment {
 
     print_datastructures(&variables, &clauses);
 
+    // As long as there are variable left pick one of them.
     while let Some(i) = pick_branching_variable(&variables) {
+
         if set_literal(i, &mut variables, &mut clauses, &mut assignment_stack, &mut unit_queue, AssignmentType::Branching).is_none() {
             return Assignment::Unsatisfiable;
         }
