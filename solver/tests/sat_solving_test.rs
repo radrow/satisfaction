@@ -13,7 +13,7 @@ fn setup_custom_solver() -> SatisfactionSolver {
     SatisfactionSolver
 }
 
-fn execute_solvers(formula: CNF, num_variables: usize) -> (Option<Assignment>, Option<Assignment>) {
+fn execute_solvers(formula: CNF, num_variables: usize) -> (Assignment, Assignment) {
     println!("{:?}", &formula);
 
     let testing_solver = setup_custom_solver();
@@ -26,7 +26,7 @@ fn execute_solvers(formula: CNF, num_variables: usize) -> (Option<Assignment>, O
 }
 
 
-fn is_satisfied(mut formula: impl Iterator<Item=CNFClause>, assignment: Assignment) -> bool {
+fn is_satisfied(mut formula: impl Iterator<Item=CNFClause>, assignment: Vec<bool>) -> bool {
     formula.all(|clause|
         clause.vars.iter()
             .any(|var|
@@ -97,10 +97,11 @@ proptest! {
         let (custom, reference) = execute_solvers(CNF{clauses:formula.clone()}, num_variables);
 
         // The result regarding satisfiability is correct.
-        prop_assert_eq!(custom.is_none(), reference.is_none());
+        prop_assert_eq!(custom.is_unsat(), reference.is_unsat());
+        prop_assert_eq!(custom.is_unknown(), reference.is_unknown());
 
         // The found assignment does indeed satisfies the formula.
-        if let Some(assignment) = custom {
+        if let Assignment::Satisfiable(assignment) = custom {
             println!("{:?}", assignment);
             prop_assert!(is_satisfied(formula.into_iter(), assignment));
         }

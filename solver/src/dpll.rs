@@ -10,7 +10,7 @@ use crate::{Solver, Assignment};
 pub struct SatisfactionSolver;
 
 impl Solver for SatisfactionSolver {
-    fn solve(&self, formula: CNF, num_variables: usize) -> Option<Assignment> {
+    fn solve(&self, formula: CNF, num_variables: usize) -> Assignment {
         dpll(&formula, num_variables)
     }
 }
@@ -119,7 +119,7 @@ fn create_data_structures(cnf: &CNF, num_of_vars: usize) -> (Variables, Clauses)
     (variables, clauses)
 }
 
-pub fn dpll(cnf: &CNF, num_of_vars: usize) -> Option<Assignment> {
+pub fn dpll(cnf: &CNF, num_of_vars: usize) -> Assignment {
     let (mut variables, mut clauses) = create_data_structures(cnf, num_of_vars);
     let mut unit_queue: VecDeque<usize> = VecDeque::new();
     let mut assignment_stack: Vec<PrevAssignment> = Vec::new();
@@ -127,14 +127,18 @@ pub fn dpll(cnf: &CNF, num_of_vars: usize) -> Option<Assignment> {
     print_datastructures(&variables, &clauses);
 
     while let Some(i) = pick_branching_variable(&variables) {
-        set_literal(i, &mut variables, &mut clauses, &mut assignment_stack, &mut unit_queue, AssignmentType::Branching)?;
+        if set_literal(i, &mut variables, &mut clauses, &mut assignment_stack, &mut unit_queue, AssignmentType::Branching).is_none() {
+            return Assignment::Unsatisfiable;
+        }
 
         loop {
             match unit_queue.pop_front() {
                 Some(var_index) => {
                     variables[var_index].value = VarValue::Pos;
                     assignment_stack.push(PrevAssignment {variable: var_index, assignment_type: AssignmentType::Forced});
-                    set_literal(var_index, &mut variables, &mut clauses, &mut assignment_stack, &mut unit_queue, AssignmentType::Forced)?;
+                    if set_literal(var_index, &mut variables, &mut clauses, &mut assignment_stack, &mut unit_queue, AssignmentType::Forced).is_none() {
+                        return Assignment::Unsatisfiable;
+                    }
                 },
                 None => break
             }
@@ -144,11 +148,11 @@ pub fn dpll(cnf: &CNF, num_of_vars: usize) -> Option<Assignment> {
     variables.iter().for_each(|v| print!("{:?} ", v.value));
     println!("\n-----------");
 
-    Some(variables.iter().map(|x| match x.value {
+    variables.iter().map(|x| match x.value {
         VarValue::Pos => true,
         VarValue::Neg => false,
         _ => false
-    }).collect())
+    }).collect()
 }
 
 /// Funtion that picks the next variable to be chosen for branching.
