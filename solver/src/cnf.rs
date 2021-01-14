@@ -19,7 +19,7 @@ pub struct CNFClause {
     pub vars : Vec<CNFVar>
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub struct CNFVar {
     pub id: VarId,
     pub sign: bool,

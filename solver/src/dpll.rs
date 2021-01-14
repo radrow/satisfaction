@@ -79,8 +79,13 @@ impl Variable {
 
 impl Clause {
     fn new(cnf_clause: &CNFClause) -> Clause {
+        // remove douplicated variables, cause they wont matter in an or statement
+        let mut cnf_variables = cnf_clause.vars.clone();
+        cnf_variables.sort();
+        cnf_variables.dedup();
+
         Clause {
-            active_lits: cnf_clause.vars.len(),
+            active_lits: cnf_variables.len(),
             satisfied: None,
             literals: cnf_clause.vars.iter().map(|var| {
                 if var.sign {
