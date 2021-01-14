@@ -118,29 +118,10 @@ impl fmt::Display for Variable {
 }
 
 impl SatisfactionSolver {
-    fn create_data_structures(&self, cnf: &CNF, num_of_vars: usize) -> (Variables, Clauses) {
-        let clauses: Clauses = cnf.clauses.iter().map(|cnf_clause| Clause::new(&cnf_clause)).collect();
-        let variables: Variables = (1..=num_of_vars).map(|i| Variable::new(cnf, i)).collect();
-
-        (variables, clauses)
-    }
-
-    fn satisfaction_check(&self, clauses: &Clauses) -> bool {
-        let mut satisfied = true;
-        clauses.iter().for_each(|clause| {
-            if clause.satisfied == None {
-                satisfied = false;
-            }
-        });
-        satisfied
-    }
-
     fn dpll(&self, cnf: &CNF, num_of_vars: usize) -> Assignment {
         let (mut variables, mut clauses) = self.create_data_structures(cnf, num_of_vars);
         let mut unit_queue: VecDeque<isize> = VecDeque::new();
         let mut assignment_stack: Vec<PrevAssignment> = Vec::new();
-
-        self.print_datastructures(&variables, &clauses);
 
         if self.inital_unit_propagation(&mut variables, &mut clauses, &mut unit_queue, &mut assignment_stack) == false {
             return Assignment::Unsatisfiable;
@@ -166,6 +147,23 @@ impl SatisfactionSolver {
             VarValue::Neg => false,
             _ => false
         }).collect()
+    }
+
+    fn create_data_structures(&self, cnf: &CNF, num_of_vars: usize) -> (Variables, Clauses) {
+        let clauses: Clauses = cnf.clauses.iter().map(|cnf_clause| Clause::new(&cnf_clause)).collect();
+        let variables: Variables = (1..=num_of_vars).map(|i| Variable::new(cnf, i)).collect();
+
+        (variables, clauses)
+    }
+
+    fn satisfaction_check(&self, clauses: &Clauses) -> bool {
+        let mut satisfied = true;
+        clauses.iter().for_each(|clause| {
+            if clause.satisfied == None {
+                satisfied = false;
+            }
+        });
+        satisfied
     }
 
     /// Funtion that picks the next variable to be chosen for branching.
@@ -270,7 +268,7 @@ impl SatisfactionSolver {
                 return Some(assign)
             }
         }
-        // unsat
+        // unsatisfied
         None
     }
 
@@ -288,6 +286,7 @@ impl SatisfactionSolver {
         variable
     }
     
+    #[allow(dead_code)]
     fn print_datastructures(&self, variables: &Variables, clauses: &Clauses) {
         for var in variables {
             print!("{}", var);
@@ -298,7 +297,3 @@ impl SatisfactionSolver {
         println!("");
     }
 }
-
-
-
-
