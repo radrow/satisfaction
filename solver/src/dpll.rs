@@ -42,7 +42,7 @@ struct Variable {
 }
 
 struct Clause {
-    active_cl: usize,
+    active_lits: usize,
     satisfied: Option<usize>,
     literals: Vec<isize>
 }
@@ -52,7 +52,7 @@ type Clauses = Vec<Clause>;
 
 impl Variable {
     fn new(cnf: &CNF, var_num: usize) -> Variable {
-        Variable {
+        let mut v = Variable {
             value: VarValue::Free,
             neg_occ: cnf.clauses.iter().enumerate().filter_map(|(index, clause)| {
                     if clause.vars.contains(&CNFVar {id: var_num, sign: false}) {
@@ -68,14 +68,19 @@ impl Variable {
                         None
                     }
                 }).collect()
+        };
+        // if variable is not used set it to false
+        if v.neg_occ.len() == 0 && v.pos_occ.len() == 0 {
+            v.value = VarValue::Neg;
         }
+        v
     }
 }
 
 impl Clause {
     fn new(cnf_clause: &CNFClause) -> Clause {
         Clause {
-            active_cl: cnf_clause.vars.len(),
+            active_lits: cnf_clause.vars.len(),
             satisfied: None,
             literals: cnf_clause.vars.iter().map(|var| {
                 if var.sign {
@@ -90,7 +95,7 @@ impl Clause {
 
 impl fmt::Display for Clause {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "act: {}, sat: {:?}, lit: ", self.active_cl, self.satisfied);
+        write!(f, "act: {}, sat: {:?}, lit: ", self.active_lits, self.satisfied);
         self.literals.iter().for_each(|lit| {write!(f, "{} ", lit);});
         write!(f, "\n")
     }
@@ -123,6 +128,16 @@ fn create_data_structures(cnf: &CNF, num_of_vars: usize) -> (Variables, Clauses)
     (variables, clauses)
 }
 
+fn satisfaction_check(clauses: &Clauses) -> bool {
+    let mut satisfied = true;
+    clauses.iter().for_each(|clause| {
+        if clause.satisfied == None {
+            satisfied = false;
+        }
+    });
+    satisfied
+}
+
 pub fn dpll(cnf: &CNF, num_of_vars: usize) -> Assignment {
     let (mut variables, mut clauses) = create_data_structures(cnf, num_of_vars);
     let mut unit_queue: VecDeque<usize> = VecDeque::new();
@@ -132,12 +147,19 @@ pub fn dpll(cnf: &CNF, num_of_vars: usize) -> Assignment {
 
     // As long as there are variable left pick one of them.
     while let Some(i) = pick_branching_variable(&variables) {
+        let sat = satisfaction_check(&clauses);
+        if sat {
+            break;
+        }
 
         if set_literal(i, &mut variables, &mut clauses, &mut assignment_stack, &mut unit_queue, AssignmentType::Branching).is_none() {
             return Assignment::Unsatisfiable;
         }
 
         loop {
+            for u in &unit_queue {
+                println!("unit_queue: {}", u);
+            }
             match unit_queue.pop_front() {
                 Some(var_index) => {
                     variables[var_index].value = VarValue::Pos;
@@ -193,18 +215,24 @@ fn unit_propagation(i: usize, variables: &mut Variables, clauses: &mut Clauses, 
         pos_occ = &variables[i].neg_occ;
     }
 
-    pos_occ.iter().for_each(|p_occ| {clauses[*p_occ].satisfied = Some(i)});
+    pos_occ.iter().for_each(|p_occ| {
+        if clauses[*p_occ].satisfied == None {
+            clauses[*p_occ].satisfied = Some(i)
+        }
+    });
     for u in 0..neg_occ.len() {
         let n_occ = neg_occ[u];
         
-        clauses[n_occ].active_cl -= 1;
+        if clauses[n_occ].satisfied == None {
+            clauses[n_occ].active_lits -= 1;
 
-        if clauses[n_occ].active_cl == 1 {
-            let unit_var_index = find_unit_variable_index(&clauses[n_occ], &variables);
-            unit_queue.push_back(unit_var_index);
-        } else if clauses[n_occ].active_cl <= 0 {
-            unit_queue.clear();
-            return backtracking(assign_stack, variables, clauses);
+            if clauses[n_occ].active_lits == 1 {
+                let unit_var_index = find_unit_variable_index(&clauses[n_occ], &variables);
+                unit_queue.push_back(unit_var_index);
+            } else if clauses[n_occ].active_lits <= 0 {
+                unit_queue.clear();
+                return backtracking(assign_stack, variables, clauses);
+            }
         }
     };
     Some(PrevAssignment {variable: i, assignment_type: AssignmentType::Empty})
@@ -215,7 +243,7 @@ fn backtracking(assignment_stack: &mut Vec<PrevAssignment>, variables: &mut Vari
         variables[assign.variable as usize].value = VarValue::Free;
         for i in 0..variables[assign.variable as usize].neg_occ.len() {
             let n_occ = variables[assign.variable as usize].neg_occ[i];
-            clauses[n_occ].active_cl += 1;
+            clauses[n_occ].active_lits += 1;
         }
         for i in 0..variables[assign.variable as usize].pos_occ.len() {
             let p_occ = variables[assign.variable as usize].pos_occ[i];
@@ -240,6 +268,9 @@ fn find_unit_variable_index(clause: &Clause, variables: &Variables) -> usize {
             variable_index = lit.abs() - 1;
             break;
         }
+    }
+    if variable_index == -1 {
+        panic!("clause had only 1 more active variable, but no such active variable could be found!");
     }
     variable_index as usize
 }
