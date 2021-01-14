@@ -79,7 +79,7 @@ impl Variable {
 
 impl Clause {
     fn new(cnf_clause: &CNFClause) -> Clause {
-        // remove douplicated variables, cause they wont matter in an or statement
+        // remove douplicated variables for active_lit, because they count as only 1 active literal
         let mut cnf_variables = cnf_clause.vars.clone();
         cnf_variables.sort();
         cnf_variables.dedup();
@@ -150,10 +150,13 @@ pub fn dpll(cnf: &CNF, num_of_vars: usize) -> Assignment {
 
     print_datastructures(&variables, &clauses);
 
+    if inital_unit_propagation(&mut variables, &mut clauses, &mut unit_queue, &mut assignment_stack) == false {
+        return Assignment::Unsatisfiable;
+    }
+
     // As long as there are variable left pick one of them.
     while let Some(i) = pick_branching_variable(&variables) {
-        let sat = satisfaction_check(&clauses);
-        if sat {
+        if satisfaction_check(&clauses) {
             break;
         }
 
@@ -161,25 +164,10 @@ pub fn dpll(cnf: &CNF, num_of_vars: usize) -> Assignment {
             return Assignment::Unsatisfiable;
         }
 
-        loop {
-            for u in &unit_queue {
-                println!("unit_queue: {}", u);
-            }
-            match unit_queue.pop_front() {
-                Some(var_index) => {
-                    variables[var_index].value = VarValue::Pos;
-                    assignment_stack.push(PrevAssignment {variable: var_index, assignment_type: AssignmentType::Forced});
-                    if set_literal(var_index, &mut variables, &mut clauses, &mut assignment_stack, &mut unit_queue, AssignmentType::Forced).is_none() {
-                        return Assignment::Unsatisfiable;
-                    }
-                },
-                None => break
-            }
+        if process_unit_queue(&mut unit_queue, &mut variables, &mut clauses, &mut assignment_stack) == false {
+            return Assignment::Unsatisfiable;
         }
     }
-    println!("variable results: ");
-    variables.iter().for_each(|v| print!("{:?} ", v.value));
-    println!("\n-----------");
 
     variables.iter().map(|x| match x.value {
         VarValue::Pos => true,
@@ -210,6 +198,33 @@ fn set_literal(i: usize, variables: &mut Variables, clauses: &mut Clauses, assig
         unit_propagation(assignment.variable, variables, clauses, unit_queue, assignment_stack)?;
     }
     Some(())
+}
+
+fn process_unit_queue(unit_queue: &mut VecDeque<usize>, variables: &mut Variables, clauses: &mut Clauses, assign_stack: &mut Vec<PrevAssignment>) -> bool{
+    loop {
+        match unit_queue.pop_front() {
+            Some(var_index) => {
+                variables[var_index].value = VarValue::Pos;
+                assign_stack.push(PrevAssignment {variable: var_index, assignment_type: AssignmentType::Forced});
+                if set_literal(var_index, variables, clauses, assign_stack, unit_queue, AssignmentType::Forced).is_none() {
+                    return false;
+                }
+            },
+            None => break
+        }
+    }
+    true
+}
+
+fn inital_unit_propagation(variables: &mut Variables, clauses: &mut Clauses, unit_queue: &mut VecDeque<usize>, assign_stack: &mut Vec<PrevAssignment>) -> bool {
+    for i in 0..clauses.len() {
+        if clauses[i].active_lits == 1 {
+            let unit_var_index = find_unit_variable_index(&clauses[i], &variables);
+            unit_queue.push_back(unit_var_index);
+        }
+    }
+    
+    process_unit_queue(unit_queue, variables, clauses, assign_stack)
 }
 
 fn unit_propagation(i: usize, variables: &mut Variables, clauses: &mut Clauses, unit_queue: &mut VecDeque<usize>, assign_stack: &mut Vec<PrevAssignment>) -> Option<PrevAssignment> {
