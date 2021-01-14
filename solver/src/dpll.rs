@@ -3,6 +3,7 @@ use crate::cnf;
 use cnf::CNF;
 use cnf::CNFClause;
 use cnf::CNFVar;
+use core::panic;
 use std::fmt;
 use std::collections::VecDeque;
 use crate::{Solver, Assignment};
@@ -145,7 +146,7 @@ fn satisfaction_check(clauses: &Clauses) -> bool {
 
 pub fn dpll(cnf: &CNF, num_of_vars: usize) -> Assignment {
     let (mut variables, mut clauses) = create_data_structures(cnf, num_of_vars);
-    let mut unit_queue: VecDeque<usize> = VecDeque::new();
+    let mut unit_queue: VecDeque<isize> = VecDeque::new();
     let mut assignment_stack: Vec<PrevAssignment> = Vec::new();
 
     print_datastructures(&variables, &clauses);
@@ -160,7 +161,7 @@ pub fn dpll(cnf: &CNF, num_of_vars: usize) -> Assignment {
             break;
         }
 
-        if set_literal(i, &mut variables, &mut clauses, &mut assignment_stack, &mut unit_queue, AssignmentType::Branching).is_none() {
+        if set_literal(i, &mut variables, &mut clauses, &mut assignment_stack, &mut unit_queue, AssignmentType::Branching, VarValue::Pos).is_none() {
             return Assignment::Unsatisfiable;
         }
 
@@ -188,8 +189,8 @@ fn pick_branching_variable(variables: &Variables) -> Option<usize> {
     None
 }
 
-fn set_literal(i: usize, variables: &mut Variables, clauses: &mut Clauses, assignment_stack: &mut Vec<PrevAssignment>, unit_queue: &mut VecDeque<usize>, assgn_type: AssignmentType) -> Option<()> {
-    variables[i].value = VarValue::Pos;
+fn set_literal(i: usize, variables: &mut Variables, clauses: &mut Clauses, assignment_stack: &mut Vec<PrevAssignment>, unit_queue: &mut VecDeque<isize>, assgn_type: AssignmentType, sign: VarValue) -> Option<()> {
+    variables[i].value = sign;
     assignment_stack.push(PrevAssignment {variable: i, assignment_type: assgn_type});
     let assignment = unit_propagation(i, variables, clauses, unit_queue, assignment_stack)?;
     if assignment.assignment_type == AssignmentType::Branching {
@@ -200,11 +201,15 @@ fn set_literal(i: usize, variables: &mut Variables, clauses: &mut Clauses, assig
     Some(())
 }
 
-fn process_unit_queue(unit_queue: &mut VecDeque<usize>, variables: &mut Variables, clauses: &mut Clauses, assign_stack: &mut Vec<PrevAssignment>) -> bool{
+fn process_unit_queue(unit_queue: &mut VecDeque<isize>, variables: &mut Variables, clauses: &mut Clauses, assign_stack: &mut Vec<PrevAssignment>) -> bool{
     loop {
         match unit_queue.pop_front() {
-            Some(var_index) => {
-                if set_literal(var_index, variables, clauses, assign_stack, unit_queue, AssignmentType::Forced).is_none() {
+            Some(var) => {
+                let mut sign = VarValue::Pos;
+                if var < 0 {
+                    sign = VarValue::Neg;
+                }
+                if set_literal((var.abs() - 1) as usize, variables, clauses, assign_stack, unit_queue, AssignmentType::Forced, sign).is_none() {
                     return false;
                 }
             },
@@ -214,10 +219,10 @@ fn process_unit_queue(unit_queue: &mut VecDeque<usize>, variables: &mut Variable
     true
 }
 
-fn inital_unit_propagation(variables: &mut Variables, clauses: &mut Clauses, unit_queue: &mut VecDeque<usize>, assign_stack: &mut Vec<PrevAssignment>) -> bool {
+fn inital_unit_propagation(variables: &mut Variables, clauses: &mut Clauses, unit_queue: &mut VecDeque<isize>, assign_stack: &mut Vec<PrevAssignment>) -> bool {
     for i in 0..clauses.len() {
         if clauses[i].active_lits == 1 {
-            let unit_var_index = find_unit_variable_index(&clauses[i], &variables);
+            let unit_var_index: isize = find_unit_variable(&clauses[i], &variables);
             unit_queue.push_back(unit_var_index);
         }
     }
@@ -225,7 +230,7 @@ fn inital_unit_propagation(variables: &mut Variables, clauses: &mut Clauses, uni
     process_unit_queue(unit_queue, variables, clauses, assign_stack)
 }
 
-fn unit_propagation(i: usize, variables: &mut Variables, clauses: &mut Clauses, unit_queue: &mut VecDeque<usize>, assign_stack: &mut Vec<PrevAssignment>) -> Option<PrevAssignment> {
+fn unit_propagation(i: usize, variables: &mut Variables, clauses: &mut Clauses, unit_queue: &mut VecDeque<isize>, assign_stack: &mut Vec<PrevAssignment>) -> Option<PrevAssignment> {
     let mut pos_occ: &Vec<usize> = &variables[i].pos_occ;
     let mut neg_occ: &Vec<usize> = &variables[i].neg_occ;
     if variables[i].value == VarValue::Neg {
@@ -244,7 +249,7 @@ fn unit_propagation(i: usize, variables: &mut Variables, clauses: &mut Clauses, 
             clauses[n_occ].active_lits -= 1;
 
             if clauses[n_occ].active_lits == 1 {
-                let unit_var_index = find_unit_variable_index(&clauses[n_occ], &variables);
+                let unit_var_index: isize = find_unit_variable(&clauses[n_occ], &variables);
                 unit_queue.push_back(unit_var_index);
             } else if clauses[n_occ].active_lits <= 0 {
                 unit_queue.clear();
@@ -278,16 +283,16 @@ fn backtracking(assignment_stack: &mut Vec<PrevAssignment>, variables: &mut Vari
     None
 }
 
-fn find_unit_variable_index(clause: &Clause, variables: &Variables) -> usize {
-    let mut variable_index: isize = -1;
+fn find_unit_variable(clause: &Clause, variables: &Variables) -> isize {
+    let mut variable: isize = 0;
     for lit in &clause.literals {
         if variables[(lit.abs()-1) as usize].value == VarValue::Free {
-            variable_index = lit.abs() - 1;
+            variable = *lit;
             break;
         }
     }
-    if variable_index == -1 {
-        panic!("clause had only 1 more active variable, but no such active variable could be found!");
+    if variable == 0 {
+        panic!("no unit variable could be found!");
     }
-    variable_index as usize
+    variable
 }

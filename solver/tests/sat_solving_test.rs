@@ -38,41 +38,41 @@ fn is_satisfied(mut formula: impl Iterator<Item=CNFClause>, assignment: Vec<bool
 }
     
 proptest! {
-    //#[test]
-    //fn only_positive_unit_clauses(num_variables in 1..=MAX_NUM_VARIABLES ) {
-    //    let formula = (1..=num_variables)
-    //        .map(|variable| CNFClause::single(CNFVar{id: variable, sign: true}))
-    //        .collect::<Vec<_>>();
+    #[test]
+    fn only_positive_unit_clauses(num_variables in 1..=MAX_NUM_VARIABLES ) {
+        let formula = (1..=num_variables)
+            .map(|variable| CNFClause::single(CNFVar{id: variable, sign: true}))
+            .collect::<Vec<_>>();
 
-    //    let (custom, reference) = execute_solvers(CNF{clauses:formula}, num_variables);
+        let (custom, reference) = execute_solvers(CNF{clauses:formula}, num_variables);
 
-    //    prop_assert_eq!(custom, reference);
-    //}
+        prop_assert_eq!(custom, reference);
+    }
     
-    //#[test]
-    //fn only_negative_unit_clauses(num_variables in 1..=MAX_NUM_VARIABLES ) {
-    //    let formula = (1..=num_variables)
-    //        .map(|variable| CNFClause::single(CNFVar{id: variable, sign: false}))
-    //        .collect::<Vec<_>>();
+    #[test]
+    fn only_negative_unit_clauses(num_variables in 1..=MAX_NUM_VARIABLES ) {
+        let formula = (1..=num_variables)
+            .map(|variable| CNFClause::single(CNFVar{id: variable, sign: false}))
+            .collect::<Vec<_>>();
 
-    //    let (custom, reference) = execute_solvers(CNF{clauses:formula}, num_variables);
+        let (custom, reference) = execute_solvers(CNF{clauses:formula}, num_variables);
 
-    //    prop_assert_eq!(custom, reference);
-    //}
+        prop_assert_eq!(custom, reference);
+    }
 
-    //#[test]
-    //fn only_unit_clauses(signs in vec(weighted(0.5), 1..=MAX_NUM_VARIABLES)) {
-    //    let num_variables = signs.len() ;
-    //    let formula = signs.iter()
-    //        .cloned()
-    //        .enumerate()
-    //        .map(|(id, sign)| {
-    //            CNFClause::single(CNFVar{id: id+1, sign})
-    //        }).collect::<Vec<_>>();
+    #[test]
+    fn only_unit_clauses(signs in vec(weighted(0.5), 1..=MAX_NUM_VARIABLES)) {
+        let num_variables = signs.len() ;
+        let formula = signs.iter()
+            .cloned()
+            .enumerate()
+            .map(|(id, sign)| {
+                CNFClause::single(CNFVar{id: id+1, sign})
+            }).collect::<Vec<_>>();
 
-    //    let (custom, reference) = execute_solvers(CNF{clauses:formula}, num_variables);
-    //    prop_assert_eq!(custom, reference);
-    //}
+        let (custom, reference) = execute_solvers(CNF{clauses:formula}, num_variables);
+        prop_assert_eq!(custom, reference);
+    }
 
     #[test]
     fn arbitrary_cnf_formula(clauses in vec(vec((1..=MAX_NUM_VARIABLES, weighted(0.5)), 1..=MAX_NUM_LITERALS), 1..=MAX_NUM_CLAUSES)) {
