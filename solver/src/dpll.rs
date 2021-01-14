@@ -101,18 +101,18 @@ impl Clause {
 
 impl fmt::Display for Clause {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "act: {}, sat: {:?}, lit: ", self.active_lits, self.satisfied);
-        self.literals.iter().for_each(|lit| {write!(f, "{} ", lit);});
+        write!(f, "act: {}, sat: {:?}, lit: ", self.active_lits, self.satisfied)?;
+        self.literals.iter().for_each(|lit| {if let Err(e) = write!(f, "{} ", lit){println!("{}", e)}});
         write!(f, "\n")
     }
 }
 
 impl fmt::Display for Variable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "val: {:?}, pos: ", self.value);
-        self.pos_occ.iter().for_each(|var| {write!(f, "{} ", var);});
-        write!(f, "| neg: ");
-        self.neg_occ.iter().for_each(|var| {write!(f, "{} ", var);});
+        write!(f, "val: {:?}, pos: ", self.value)?;
+        self.pos_occ.iter().for_each(|var| {if let Err(e) = write!(f, "{} ", var){println!("{}", e)}});
+        write!(f, "| neg: ")?;
+        self.neg_occ.iter().for_each(|var| {if let Err(e) = write!(f, "{} ", var){println!("{}", e)}});
         write!(f, "\n")
     }
 }
