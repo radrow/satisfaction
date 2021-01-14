@@ -204,8 +204,6 @@ fn process_unit_queue(unit_queue: &mut VecDeque<usize>, variables: &mut Variable
     loop {
         match unit_queue.pop_front() {
             Some(var_index) => {
-                variables[var_index].value = VarValue::Pos;
-                assign_stack.push(PrevAssignment {variable: var_index, assignment_type: AssignmentType::Forced});
                 if set_literal(var_index, variables, clauses, assign_stack, unit_queue, AssignmentType::Forced).is_none() {
                     return false;
                 }
@@ -242,7 +240,6 @@ fn unit_propagation(i: usize, variables: &mut Variables, clauses: &mut Clauses, 
     });
     for u in 0..neg_occ.len() {
         let n_occ = neg_occ[u];
-        
         if clauses[n_occ].satisfied == None {
             clauses[n_occ].active_lits -= 1;
 
