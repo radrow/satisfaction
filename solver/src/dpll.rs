@@ -3,7 +3,6 @@ use crate::cnf;
 use cnf::CNF;
 use cnf::CNFClause;
 use cnf::CNFVar;
-use core::panic;
 use std::fmt;
 use std::collections::VecDeque;
 use crate::{Solver, Assignment};
@@ -90,13 +89,13 @@ impl From<bool> for VarValue {
 pub struct Variable {
     value: VarValue, 
     pos_occ: Vec<usize>,
-    neg_occ: Vec<usize>
+    neg_occ: Vec<usize>,
 }
 
 pub struct Clause {
     active_lits: usize,
     satisfied: Option<usize>,
-    literals: Vec<isize>
+    literals: Vec<CNFVar>,
 }
 
 pub type Variables = Vec<Variable>;
@@ -153,18 +152,13 @@ impl Clause {
         let mut cnf_variables = cnf_clause.vars.clone();
         cnf_variables.sort();
         cnf_variables.dedup();
+        cnf_variables.iter_mut()
+            .for_each(|var| var.id -= 1);
 
         Clause {
             active_lits: cnf_variables.len(),
             satisfied: None,
-            literals: cnf_clause.vars.iter().map(|var| {
-                if var.sign {
-                    var.id as isize
-                } else {
-                    -1 * (var.id as isize)
-                }
-            }).collect()
-
+            literals: cnf_variables,
         }
     }
 }
@@ -172,7 +166,7 @@ impl Clause {
 struct DataStructures {
     variables: Vec<Variable>,
     clauses: Vec<Clause>,
-    unit_queue: VecDeque<isize>,
+    unit_queue: VecDeque<CNFVar>,
     assignment_stack: Vec<PrevAssignment>,
 }
 
@@ -246,11 +240,7 @@ impl DataStructures {
         loop {
             match self.unit_queue.pop_front() {
                 Some(var) => {
-                    let mut sign = VarValue::Pos;
-                    if var < 0 {
-                        sign = VarValue::Neg;
-                    }
-                    if self.set_literal((var.abs() - 1) as usize, AssignmentType::Forced, sign).is_none() {
+                    if self.set_literal(var.id, AssignmentType::Forced, var.sign.into()).is_none() {
                         return false;
                     }
                 },
@@ -263,8 +253,8 @@ impl DataStructures {
     fn inital_unit_propagation(&mut self) -> bool {
         for i in 0..self.clauses.len() {
             if self.clauses[i].active_lits == 1 {
-                let unit_var_index: isize = self.find_unit_variable(&self.clauses[i]);
-                self.unit_queue.push_back(unit_var_index);
+                let unit_literal = self.find_unit_variable(&self.clauses[i]);
+                self.unit_queue.push_back(unit_literal);
             }
         }
         
@@ -291,8 +281,8 @@ impl DataStructures {
                 self.clauses[n_occ].active_lits -= 1;
 
                 if self.clauses[n_occ].active_lits == 1 {
-                    let unit_var_index: isize = self.find_unit_variable(&self.clauses[n_occ]);
-                    self.unit_queue.push_back(unit_var_index);
+                    let unit_literal = self.find_unit_variable(&self.clauses[n_occ]);
+                    self.unit_queue.push_back(unit_literal);
                 } else if self.clauses[n_occ].active_lits <= 0 {
                     self.unit_queue.clear();
                     return self.backtracking();
@@ -325,18 +315,12 @@ impl DataStructures {
         None
     }
 
-    fn find_unit_variable(&self, clause: &Clause) -> isize {
-        let mut variable: isize = 0;
-        for lit in &clause.literals {
-            if self.variables[(lit.abs()-1) as usize].value == VarValue::Free {
-                variable = *lit;
-                break;
-            }
-        }
-        if variable == 0 {
-            panic!("no unit variable could be found!");
-        }
-        variable
+    fn find_unit_variable(&self, clause: &Clause) -> CNFVar {
+        clause.literals.iter()
+            .filter(|lit| self.variables[lit.id].value == VarValue::Free)
+            .next()
+            .expect("The only left literal cound not be found!")
+            .clone()
     }
     
     #[allow(dead_code)]
