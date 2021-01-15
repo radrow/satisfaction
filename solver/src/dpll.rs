@@ -8,22 +8,52 @@ use std::fmt;
 use std::collections::VecDeque;
 use crate::{Solver, Assignment};
 
-pub trait BranchingStrategy {
+pub trait BranchingStrategy: Clone {
+    /// Funtion that picks the next variable to be chosen for branching.
+    /// Returns the index of the next variable, or None if there is no Variable to be picked
     fn pick_branching_variable(&mut self, variables: &Variables, clauses: &Clauses) -> Option<usize>;
 }
 
-pub struct SatisfactionSolver;
+#[derive(Clone)]
+pub struct NaiveBranching;
 
-impl Solver for SatisfactionSolver {
-    fn solve(&self, formula: CNF, num_variables: usize) -> Assignment {
-        self.dpll(&formula, num_variables)
+impl BranchingStrategy for NaiveBranching {
+    fn pick_branching_variable(&mut self, variables: &Variables, _clauses: &Clauses) -> Option<usize> {
+        // TODO -> add heuristics to chose Variables
+        variables.iter()
+            .enumerate()
+            .filter_map(|(i,v)| match v.value {
+                VarValue::Free  => Some(i),
+                _               => None,
+            }).next()
     }
 }
 
-#[derive(PartialEq)]
+pub struct SatisfactionSolver<B: BranchingStrategy> {
+    strategy: B,
+}
+
+impl<B: BranchingStrategy> SatisfactionSolver<B> {
+    pub fn new(strategy: B) -> SatisfactionSolver<B> {
+        SatisfactionSolver {
+            strategy
+        }
+    }
+}
+
+impl<B: BranchingStrategy> Solver for SatisfactionSolver<B> {
+    fn solve(&self, formula: CNF, num_variables: usize) -> Assignment {
+        let mut data = DataStructures::new(formula, num_variables);
+        data.dpll(self.strategy.clone())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AssignmentType {
     Forced, Branching, Empty
 }
+
+
 /// Used to store assignments made in the past, for undoing them with backtracking
 struct PrevAssignment {
     variable: usize,
@@ -31,25 +61,46 @@ struct PrevAssignment {
 }
 
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum VarValue {
     Pos, Neg, Free
 }
 
-struct Variable {
+impl std::ops::Neg for VarValue {
+    type Output = VarValue;
+
+    fn neg(self) -> Self::Output {
+        match self {
+            VarValue::Pos => VarValue::Neg,
+            VarValue::Neg => VarValue::Pos,
+            VarValue::Free => VarValue::Free,
+        }
+    }
+}
+
+impl From<bool> for VarValue {
+    fn from(sign: bool) -> Self {
+        match sign {
+            true => VarValue::Pos,
+            false => VarValue::Neg,
+        }
+    }
+}
+
+pub struct Variable {
     value: VarValue, 
     pos_occ: Vec<usize>,
     neg_occ: Vec<usize>
 }
 
-struct Clause {
+pub struct Clause {
     active_lits: usize,
     satisfied: Option<usize>,
     literals: Vec<isize>
 }
 
-type Variables = Vec<Variable>;
-type Clauses = Vec<Clause>;
+pub type Variables = Vec<Variable>;
+pub type Clauses = Vec<Clause>;
 
 impl Variable {
     fn new(cnf: &CNF, var_num: usize) -> Variable {
@@ -78,27 +129,6 @@ impl Variable {
     }
 }
 
-impl Clause {
-    fn new(cnf_clause: &CNFClause) -> Clause {
-        // remove douplicated variables for active_lit, because they count as only 1 active literal
-        let mut cnf_variables = cnf_clause.vars.clone();
-        cnf_variables.sort();
-        cnf_variables.dedup();
-
-        Clause {
-            active_lits: cnf_variables.len(),
-            satisfied: None,
-            literals: cnf_clause.vars.iter().map(|var| {
-                if var.sign {
-                    return var.id as isize;
-                } else {
-                    return -1 * (var.id as isize);
-                }
-            }).collect()
-        }
-    }
-}
-
 impl fmt::Display for Clause {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "act: {}, sat: {:?}, lit: ", self.active_lits, self.satisfied)?;
@@ -117,48 +147,82 @@ impl fmt::Display for Variable {
     }
 }
 
-impl SatisfactionSolver {
-    fn dpll(&self, cnf: &CNF, num_of_vars: usize) -> Assignment {
-        let (mut variables, mut clauses) = self.create_data_structures(cnf, num_of_vars);
-        let mut unit_queue: VecDeque<isize> = VecDeque::new();
-        let mut assignment_stack: Vec<PrevAssignment> = Vec::new();
+impl Clause {
+    fn new(cnf_clause: &CNFClause) -> Clause {
+        // remove douplicated variables for active_lit, because they count as only 1 active literal
+        let mut cnf_variables = cnf_clause.vars.clone();
+        cnf_variables.sort();
+        cnf_variables.dedup();
 
-        if self.inital_unit_propagation(&mut variables, &mut clauses, &mut unit_queue, &mut assignment_stack) == false {
+        Clause {
+            active_lits: cnf_variables.len(),
+            satisfied: None,
+            literals: cnf_clause.vars.iter().map(|var| {
+                if var.sign {
+                    var.id as isize
+                } else {
+                    -1 * (var.id as isize)
+                }
+            }).collect()
+
+        }
+    }
+}
+
+struct DataStructures {
+    variables: Vec<Variable>,
+    clauses: Vec<Clause>,
+    unit_queue: VecDeque<isize>,
+    assignment_stack: Vec<PrevAssignment>,
+}
+
+impl DataStructures {
+    fn new(cnf: CNF, num_variables: usize) -> DataStructures {
+        let clauses: Vec<Clause> = cnf.clauses.iter().map(|cnf_clause| Clause::new(&cnf_clause)).collect();
+        let variables = (1..=num_variables).map(|i| Variable::new(&cnf, i)).collect();
+        let unit_queue = VecDeque::with_capacity(num_variables);
+        let assignment_stack = Vec::with_capacity(num_variables);
+
+        DataStructures {
+            variables,
+            clauses,
+            unit_queue,
+            assignment_stack,
+        }
+    }
+
+    fn dpll(&mut self, mut branching: impl BranchingStrategy) -> Assignment {
+
+        if !self.inital_unit_propagation() {
             return Assignment::Unsatisfiable;
         }
 
+
         // As long as there are variable left pick one of them.
-        while let Some(i) = self.pick_branching_variable(&variables) {
-            if self.satisfaction_check(&clauses) {
+        while let Some(i) = branching.pick_branching_variable(&self.variables, &self.clauses) {
+            if self.satisfaction_check() {
                 break;
             }
 
-            if self.set_literal(i, &mut variables, &mut clauses, &mut assignment_stack, &mut unit_queue, AssignmentType::Branching, VarValue::Pos).is_none() {
+            if self.set_literal(i, AssignmentType::Branching, VarValue::Pos).is_none() {
                 return Assignment::Unsatisfiable;
             }
 
-            if self.process_unit_queue(&mut unit_queue, &mut variables, &mut clauses, &mut assignment_stack) == false {
+            if self.process_unit_queue() == false {
                 return Assignment::Unsatisfiable;
             }
         }
 
-        variables.iter().map(|x| match x.value {
+        self.variables.iter().map(|x| match x.value {
             VarValue::Pos => true,
             VarValue::Neg => false,
             _ => false
         }).collect()
     }
 
-    fn create_data_structures(&self, cnf: &CNF, num_of_vars: usize) -> (Variables, Clauses) {
-        let clauses: Clauses = cnf.clauses.iter().map(|cnf_clause| Clause::new(&cnf_clause)).collect();
-        let variables: Variables = (1..=num_of_vars).map(|i| Variable::new(cnf, i)).collect();
-
-        (variables, clauses)
-    }
-
-    fn satisfaction_check(&self, clauses: &Clauses) -> bool {
+    fn satisfaction_check(&mut self) -> bool {
         let mut satisfied = true;
-        clauses.iter().for_each(|clause| {
+        self.clauses.iter().for_each(|clause| {
             if clause.satisfied == None {
                 satisfied = false;
             }
@@ -166,39 +230,27 @@ impl SatisfactionSolver {
         satisfied
     }
 
-    /// Funtion that picks the next variable to be chosen for branching.
-    /// Returns the index of the next variable, or None if there is no Variable to be picked
-    fn pick_branching_variable(&self, variables: &Variables) -> Option<usize> {
-        // TODO -> add heuristics to chose Variables
-        for (i, v) in variables.iter().enumerate() {
-            if v.value == VarValue::Free {
-                return Some(i);
-            }
-        }
-        None
-    }
-
-    fn set_literal(&self, i: usize, variables: &mut Variables, clauses: &mut Clauses, assignment_stack: &mut Vec<PrevAssignment>, unit_queue: &mut VecDeque<isize>, assgn_type: AssignmentType, sign: VarValue) -> Option<()> {
-        variables[i].value = sign;
-        assignment_stack.push(PrevAssignment {variable: i, assignment_type: assgn_type});
-        let assignment = self.unit_propagation(i, variables, clauses, unit_queue, assignment_stack)?;
+    fn set_literal(&mut self, i: usize, assign_type: AssignmentType, sign: VarValue) -> Option<()> {
+        self.variables[i].value = sign;
+        self.assignment_stack.push(PrevAssignment {variable: i, assignment_type: assign_type});
+        let assignment = self.unit_propagation(i)?;
         if assignment.assignment_type == AssignmentType::Branching {
-            variables[assignment.variable].value = VarValue::Neg;
-            assignment_stack.push(PrevAssignment {variable: assignment.variable, assignment_type: AssignmentType::Forced});
-            self.unit_propagation(assignment.variable, variables, clauses, unit_queue, assignment_stack)?;
+            self.variables[assignment.variable].value = VarValue::Neg;
+            self.assignment_stack.push(PrevAssignment {variable: assignment.variable, assignment_type: AssignmentType::Forced});
+            self.unit_propagation(assignment.variable)?;
         }
         Some(())
     }
 
-    fn process_unit_queue(&self, unit_queue: &mut VecDeque<isize>, variables: &mut Variables, clauses: &mut Clauses, assign_stack: &mut Vec<PrevAssignment>) -> bool{
+    fn process_unit_queue(&mut self) -> bool{
         loop {
-            match unit_queue.pop_front() {
+            match self.unit_queue.pop_front() {
                 Some(var) => {
                     let mut sign = VarValue::Pos;
                     if var < 0 {
                         sign = VarValue::Neg;
                     }
-                    if self.set_literal((var.abs() - 1) as usize, variables, clauses, assign_stack, unit_queue, AssignmentType::Forced, sign).is_none() {
+                    if self.set_literal((var.abs() - 1) as usize, AssignmentType::Forced, sign).is_none() {
                         return false;
                     }
                 },
@@ -208,23 +260,24 @@ impl SatisfactionSolver {
         true
     }
 
-    fn inital_unit_propagation(&self, variables: &mut Variables, clauses: &mut Clauses, unit_queue: &mut VecDeque<isize>, assign_stack: &mut Vec<PrevAssignment>) -> bool {
-        for i in 0..clauses.len() {
-            if clauses[i].active_lits == 1 {
-                let unit_var_index: isize = self.find_unit_variable(&clauses[i], &variables);
-                unit_queue.push_back(unit_var_index);
+    fn inital_unit_propagation(&mut self) -> bool {
+        for i in 0..self.clauses.len() {
+            if self.clauses[i].active_lits == 1 {
+                let unit_var_index: isize = self.find_unit_variable(&self.clauses[i]);
+                self.unit_queue.push_back(unit_var_index);
             }
         }
         
-        self.process_unit_queue(unit_queue, variables, clauses, assign_stack)
+        self.process_unit_queue()
     }
 
-    fn unit_propagation(&self, i: usize, variables: &mut Variables, clauses: &mut Clauses, unit_queue: &mut VecDeque<isize>, assign_stack: &mut Vec<PrevAssignment>) -> Option<PrevAssignment> {
-        let mut pos_occ: &Vec<usize> = &variables[i].pos_occ;
-        let mut neg_occ: &Vec<usize> = &variables[i].neg_occ;
-        if variables[i].value == VarValue::Neg {
-            neg_occ = &variables[i].pos_occ;
-            pos_occ = &variables[i].neg_occ;
+    fn unit_propagation(&mut self, i: usize) -> Option<PrevAssignment> {
+        let mut pos_occ: &Vec<usize> = &self.variables[i].pos_occ;
+        let mut neg_occ: &Vec<usize> = &self.variables[i].neg_occ;
+        let clauses = &mut self.clauses;
+        if self.variables[i].value == VarValue::Neg {
+            neg_occ = &self.variables[i].pos_occ;
+            pos_occ = &self.variables[i].neg_occ;
         }
 
         pos_occ.iter().for_each(|p_occ| {
@@ -234,33 +287,33 @@ impl SatisfactionSolver {
         });
         for u in 0..neg_occ.len() {
             let n_occ = neg_occ[u];
-            if clauses[n_occ].satisfied == None {
-                clauses[n_occ].active_lits -= 1;
+            if self.clauses[n_occ].satisfied == None {
+                self.clauses[n_occ].active_lits -= 1;
 
-                if clauses[n_occ].active_lits == 1 {
-                    let unit_var_index: isize = self.find_unit_variable(&clauses[n_occ], &variables);
-                    unit_queue.push_back(unit_var_index);
-                } else if clauses[n_occ].active_lits <= 0 {
-                    unit_queue.clear();
-                    return self.backtracking(assign_stack, variables, clauses);
+                if self.clauses[n_occ].active_lits == 1 {
+                    let unit_var_index: isize = self.find_unit_variable(&self.clauses[n_occ]);
+                    self.unit_queue.push_back(unit_var_index);
+                } else if self.clauses[n_occ].active_lits <= 0 {
+                    self.unit_queue.clear();
+                    return self.backtracking();
                 }
             }
         };
         Some(PrevAssignment {variable: i, assignment_type: AssignmentType::Empty})
     }
 
-    fn backtracking(&self, assignment_stack: &mut Vec<PrevAssignment>, variables: &mut Variables, clauses: &mut Clauses) -> Option<PrevAssignment> {
-        while let Some(assign) = assignment_stack.pop() {
-            variables[assign.variable as usize].value = VarValue::Free;
-            for i in 0..variables[assign.variable as usize].neg_occ.len() {
-                let n_occ = variables[assign.variable as usize].neg_occ[i];
-                clauses[n_occ].active_lits += 1;
+    fn backtracking(&mut self) -> Option<PrevAssignment> {
+        while let Some(assign) = self.assignment_stack.pop() {
+            self.variables[assign.variable as usize].value = VarValue::Free;
+            for i in 0..self.variables[assign.variable as usize].neg_occ.len() {
+                let n_occ = self.variables[assign.variable as usize].neg_occ[i];
+                self.clauses[n_occ].active_lits += 1;
             }
-            for i in 0..variables[assign.variable as usize].pos_occ.len() {
-                let p_occ = variables[assign.variable as usize].pos_occ[i];
-                if let Some(cl) = clauses[p_occ].satisfied {
+            for i in 0..self.variables[assign.variable as usize].pos_occ.len() {
+                let p_occ = self.variables[assign.variable as usize].pos_occ[i];
+                if let Some(cl) = self.clauses[p_occ].satisfied {
                     if cl == assign.variable {
-                        clauses[p_occ].satisfied = None
+                        self.clauses[p_occ].satisfied = None
                     }
                 }
             }
@@ -272,10 +325,10 @@ impl SatisfactionSolver {
         None
     }
 
-    fn find_unit_variable(&self, clause: &Clause, variables: &Variables) -> isize {
+    fn find_unit_variable(&self, clause: &Clause) -> isize {
         let mut variable: isize = 0;
         for lit in &clause.literals {
-            if variables[(lit.abs()-1) as usize].value == VarValue::Free {
+            if self.variables[(lit.abs()-1) as usize].value == VarValue::Free {
                 variable = *lit;
                 break;
             }
@@ -287,13 +340,14 @@ impl SatisfactionSolver {
     }
     
     #[allow(dead_code)]
-    fn print_datastructures(&self, variables: &Variables, clauses: &Clauses) {
-        for var in variables {
+    fn print_data_structures(&self) {
+        for var in self.variables.iter() {
             print!("{}", var);
         }
-        for cl in clauses {
+        for cl in self.clauses.iter() {
             print!("{}", cl);
         }
         println!("");
     }
 }
+

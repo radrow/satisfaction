@@ -3,14 +3,14 @@ use proptest::{
     collection::vec,
     bool::weighted,
 };
-use solver::{CadicalSolver, Solver, CNFClause, CNFVar, Assignment, CNF, SatisfactionSolver};
+use solver::{CadicalSolver, Solver, CNFClause, CNFVar, Assignment, CNF, SatisfactionSolver, NaiveBranching};
 
 const MAX_NUM_VARIABLES: usize = 50;
 const MAX_NUM_LITERALS: usize = 10;
 const MAX_NUM_CLAUSES: usize = 5;
 
-fn setup_custom_solver() -> SatisfactionSolver {
-    SatisfactionSolver
+fn setup_custom_solver() -> SatisfactionSolver<NaiveBranching> {
+    SatisfactionSolver::new(NaiveBranching)
 }
 
 fn execute_solvers(formula: CNF, num_variables: usize) -> (Assignment, Assignment) {

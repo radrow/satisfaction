@@ -7,5 +7,5 @@ mod assignment;
 pub use cnf::{CNFClause, CNFVar, CNF};
 pub use sat_solver::Solver;
 pub use cadical_solver::CadicalSolver;
-pub use dpll::SatisfactionSolver;
+pub use dpll::{SatisfactionSolver, BranchingStrategy, NaiveBranching};
 pub use assignment::Assignment;
