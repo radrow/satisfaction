@@ -7,7 +7,7 @@ use solver::{CadicalSolver, Solver, CNFClause, CNFVar, Assignment, CNF, Satisfac
 
 const MAX_NUM_VARIABLES: usize = 50;
 const MAX_NUM_LITERALS: usize = 10;
-const MAX_NUM_CLAUSES: usize = 5;
+const MAX_NUM_CLAUSES: usize = 50;
 
 fn setup_custom_solver() -> SatisfactionSolver<NaiveBranching> {
     SatisfactionSolver::new(NaiveBranching)
@@ -36,6 +36,24 @@ fn is_satisfied(mut formula: impl Iterator<Item=CNFClause>, assignment: Vec<bool
             )
         )
 }
+
+#[test]
+fn failed_proptest_instance() {
+    let formula = CNF { clauses: vec![
+        CNFClause::single(CNFVar::new(26, false)),
+        CNFClause {
+            vars: vec![
+                CNFVar::new(26, true),
+                CNFVar::new( 1, false),
+            ]
+        },
+        CNFClause::single(CNFVar::new(26, false)),
+    ] };
+    let (custom, reference) = execute_solvers(formula, 26);
+
+    assert_eq!(custom, reference);
+}
+
     
 proptest! {
     #[test]
