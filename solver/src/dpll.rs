@@ -187,10 +187,11 @@ impl DataStructures {
 
     fn dpll(&mut self, mut branching: impl BranchingStrategy) -> Assignment {
 
+        self.print_data_structures();
+
         if !self.inital_unit_propagation() {
             return Assignment::Unsatisfiable;
         }
-
 
         // As long as there are variable left pick one of them.
         while let Some(i) = branching.pick_branching_variable(&self.variables, &self.clauses) {
@@ -236,7 +237,7 @@ impl DataStructures {
         Some(())
     }
 
-    fn process_unit_queue(&mut self) -> bool{
+    fn process_unit_queue(&mut self) -> bool {
         loop {
             match self.unit_queue.pop_front() {
                 Some(var) => {
@@ -254,7 +255,9 @@ impl DataStructures {
         for i in 0..self.clauses.len() {
             if self.clauses[i].active_lits == 1 {
                 let unit_literal = self.find_unit_variable(&self.clauses[i]);
-                self.unit_queue.push_back(unit_literal);
+                if !self.unit_queue.contains(&unit_literal) {
+                    self.unit_queue.push_back(unit_literal);
+                }
             }
         }
         
@@ -282,7 +285,9 @@ impl DataStructures {
 
                 if self.clauses[n_occ].active_lits == 1 {
                     let unit_literal = self.find_unit_variable(&self.clauses[n_occ]);
-                    self.unit_queue.push_back(unit_literal);
+                    if !self.unit_queue.contains(&unit_literal) {
+                        self.unit_queue.push_back(unit_literal);
+                    }
                 } else if self.clauses[n_occ].active_lits <= 0 {
                     self.unit_queue.clear();
                     return self.backtracking();
