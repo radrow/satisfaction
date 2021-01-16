@@ -186,8 +186,6 @@ impl DataStructures {
     }
 
     fn dpll(&mut self, mut branching: impl BranchingStrategy) -> Assignment {
-        self.print_data_structures();
-
         // unit propagation
         if !self.inital_unit_propagation() {
             return Assignment::Unsatisfiable;

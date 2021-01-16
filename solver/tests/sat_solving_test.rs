@@ -40,16 +40,20 @@ fn is_satisfied(mut formula: impl Iterator<Item=CNFClause>, assignment: Vec<bool
 #[test]
 fn failed_proptest_instance() {
     let formula = CNF { clauses: vec![
-        CNFClause::single(CNFVar::new(26, false)),
         CNFClause {
             vars: vec![
-                CNFVar::new(26, true),
-                CNFVar::new( 1, false),
+                CNFVar::new(37, false),
+                CNFVar::new(39, false),
             ]
         },
-        CNFClause::single(CNFVar::new(26, false)),
+        CNFClause {
+            vars: vec![
+                CNFVar::new(37, false),
+                CNFVar::new(39, true),
+            ]
+        },
     ] };
-    let (custom, reference) = execute_solvers(formula, 26);
+    let (custom, reference) = execute_solvers(formula, 39);
 
     assert_eq!(custom, reference);
 }
