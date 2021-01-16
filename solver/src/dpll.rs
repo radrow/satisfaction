@@ -60,7 +60,7 @@ struct PrevAssignment {
 }
 
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Copy)]
 enum VarValue {
     Pos, Neg, Free
 }
@@ -186,28 +186,37 @@ impl DataStructures {
     }
 
     fn dpll(&mut self, mut branching: impl BranchingStrategy) -> Assignment {
-
         self.print_data_structures();
 
+        // unit propagation
         if !self.inital_unit_propagation() {
             return Assignment::Unsatisfiable;
         }
 
-        // As long as there are variable left pick one of them.
+        // repeat & choose literal b 
         while let Some(i) = branching.pick_branching_variable(&self.variables, &self.clauses) {
+            let mut conflict = false;
+
+            // set value b
+            conflict = !self.set_variable(i, AssignmentType::Branching, VarValue::Pos);
+
+            // unit propagation
+            if !conflict {
+                conflict = !self.unit_propagation();
+            }
+
+            if conflict == true {
+                if self.backtracking() == false {
+                    return Assignment::Unsatisfiable;
+                }
+            }
+
             if self.satisfaction_check() {
                 break;
             }
-
-            if self.set_literal(i, AssignmentType::Branching, VarValue::Pos).is_none() {
-                return Assignment::Unsatisfiable;
-            }
-
-            if self.process_unit_queue() == false {
-                return Assignment::Unsatisfiable;
-            }
         }
 
+        // output assignment
         self.variables.iter().map(|x| match x.value {
             VarValue::Pos => true,
             VarValue::Neg => false,
@@ -215,43 +224,8 @@ impl DataStructures {
         }).collect()
     }
 
-    fn satisfaction_check(&mut self) -> bool {
-        let mut satisfied = true;
-        self.clauses.iter().for_each(|clause| {
-            if clause.satisfied == None {
-                satisfied = false;
-            }
-        });
-        satisfied
-    }
-
-    fn set_literal(&mut self, i: usize, assign_type: AssignmentType, sign: VarValue) -> Option<()> {
-        self.variables[i].value = sign;
-        self.assignment_stack.push(PrevAssignment {variable: i, assignment_type: assign_type});
-        let assignment = self.unit_propagation(i)?;
-        if assignment.assignment_type == AssignmentType::Branching {
-            self.variables[assignment.variable].value = VarValue::Neg;
-            self.assignment_stack.push(PrevAssignment {variable: assignment.variable, assignment_type: AssignmentType::Forced});
-            self.unit_propagation(assignment.variable)?;
-        }
-        Some(())
-    }
-
-    fn process_unit_queue(&mut self) -> bool {
-        loop {
-            match self.unit_queue.pop_front() {
-                Some(var) => {
-                    if self.set_literal(var.id, AssignmentType::Forced, var.sign.into()).is_none() {
-                        return false;
-                    }
-                },
-                None => break
-            }
-        }
-        true
-    }
-
     fn inital_unit_propagation(&mut self) -> bool {
+        // find all unit clauses and enqueue the variables in the queue
         for i in 0..self.clauses.len() {
             if self.clauses[i].active_lits == 1 {
                 let unit_literal = self.find_unit_variable(&self.clauses[i]);
@@ -261,10 +235,15 @@ impl DataStructures {
             }
         }
         
-        self.process_unit_queue()
+        self.unit_propagation()
     }
 
-    fn unit_propagation(&mut self, i: usize) -> Option<PrevAssignment> {
+    
+
+    fn set_variable(&mut self, i: usize, assign_type: AssignmentType, sign: VarValue) -> bool {
+        self.variables[i].value = sign;
+        self.assignment_stack.push(PrevAssignment {variable: i, assignment_type: assign_type});
+
         let mut pos_occ: &Vec<usize> = &self.variables[i].pos_occ;
         let mut neg_occ: &Vec<usize> = &self.variables[i].neg_occ;
         let clauses = &mut self.clauses;
@@ -278,46 +257,79 @@ impl DataStructures {
                 clauses[*p_occ].satisfied = Some(i)
             }
         });
+
         for u in 0..neg_occ.len() {
             let n_occ = neg_occ[u];
             if self.clauses[n_occ].satisfied == None {
                 self.clauses[n_occ].active_lits -= 1;
 
                 if self.clauses[n_occ].active_lits == 1 {
+                    // unit literal detected
                     let unit_literal = self.find_unit_variable(&self.clauses[n_occ]);
                     if !self.unit_queue.contains(&unit_literal) {
                         self.unit_queue.push_back(unit_literal);
                     }
                 } else if self.clauses[n_occ].active_lits <= 0 {
-                    self.unit_queue.clear();
-                    return self.backtracking();
+                    // conflict
+                    return false;
                 }
             }
         };
-        Some(PrevAssignment {variable: i, assignment_type: AssignmentType::Empty})
+        true
     }
 
-    fn backtracking(&mut self) -> Option<PrevAssignment> {
+    fn unit_propagation(&mut self) -> bool {
+        loop {
+            match self.unit_queue.pop_front() {
+                Some(var) => {
+                    if self.set_variable(var.id, AssignmentType::Forced, var.sign.into()) == false {
+                        return false;
+                    }
+                },
+                None => break
+            }
+        }
+        true
+    }
+
+    fn backtracking(&mut self) -> bool {
         while let Some(assign) = self.assignment_stack.pop() {
-            self.variables[assign.variable as usize].value = VarValue::Free;
-            for i in 0..self.variables[assign.variable as usize].neg_occ.len() {
-                let n_occ = self.variables[assign.variable as usize].neg_occ[i];
+            let mut pos_occ: &Vec<usize> = &self.variables[assign.variable as usize].pos_occ;
+            let mut neg_occ: &Vec<usize> = &self.variables[assign.variable as usize].neg_occ;
+            if self.variables[assign.variable as usize].value == VarValue::Neg {
+                neg_occ = &self.variables[assign.variable as usize].pos_occ;
+                pos_occ = &self.variables[assign.variable as usize].neg_occ;
+            }
+
+            for i in 0..neg_occ.len() {
+                let n_occ = neg_occ[i];
                 self.clauses[n_occ].active_lits += 1;
             }
-            for i in 0..self.variables[assign.variable as usize].pos_occ.len() {
-                let p_occ = self.variables[assign.variable as usize].pos_occ[i];
+            for i in 0..pos_occ.len() {
+                let p_occ = pos_occ[i];
                 if let Some(cl) = self.clauses[p_occ].satisfied {
                     if cl == assign.variable {
                         self.clauses[p_occ].satisfied = None
                     }
                 }
             }
+            self.variables[assign.variable as usize].value = VarValue::Free;
+
+            // empty queue
+            self.unit_queue.clear();
+
             if assign.assignment_type == AssignmentType::Branching {
-                return Some(assign)
+                if self.set_variable(assign.variable, AssignmentType::Forced, -self.variables[assign.variable].value) {
+                    // goto unit propagation
+                    if self.unit_propagation() == false {
+                        return self.backtracking();
+                    }
+                }
+                return true
             }
         }
         // unsatisfied
-        None
+        false
     }
 
     fn find_unit_variable(&self, clause: &Clause) -> CNFVar {
@@ -327,7 +339,17 @@ impl DataStructures {
             .expect("The only left literal cound not be found!")
             .clone()
     }
-    
+
+    fn satisfaction_check(&mut self) -> bool {
+        let mut satisfied = true;
+        self.clauses.iter().for_each(|clause| {
+            if clause.satisfied == None {
+                satisfied = false;
+            }
+        });
+        satisfied
+    }
+
     #[allow(dead_code)]
     fn print_data_structures(&self) {
         for var in self.variables.iter() {
