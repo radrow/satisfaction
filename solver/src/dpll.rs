@@ -193,24 +193,16 @@ impl DataStructures {
 
         // repeat & choose literal b 
         while let Some(i) = branching.pick_branching_variable(&self.variables, &self.clauses) {
-            let mut conflict = false;
 
             // set value b
-            conflict = !self.set_variable(i, AssignmentType::Branching, VarValue::Pos);
-
-            // unit propagation
-            if !conflict {
-                conflict = !self.unit_propagation();
-            }
-
-            if !conflict {
-                conflict = !self.pure_literal_elimination();
-            }
-
-            if conflict == true {
-                if self.backtracking() == false {
-                    return Assignment::Unsatisfiable;
-                }
+            let conflict = !(self.set_variable(i, AssignmentType::Branching, VarValue::Pos)
+                // unit propagation
+                && self.unit_propagation()
+                && self.pure_literal_elimination());
+            
+            // If backtracking does not help, formula is unsat.
+            if conflict && !self.backtracking(){
+                return Assignment::Unsatisfiable;
             }
 
             if self.satisfaction_check() {
