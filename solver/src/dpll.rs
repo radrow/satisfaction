@@ -203,6 +203,10 @@ impl DataStructures {
                 conflict = !self.unit_propagation();
             }
 
+            if !conflict {
+                conflict = !self.pure_literal_elimination();
+            }
+
             if conflict == true {
                 if self.backtracking() == false {
                     return Assignment::Unsatisfiable;
@@ -277,18 +281,30 @@ impl DataStructures {
     }
 
     fn unit_propagation(&mut self) -> bool {
-        loop {
-            match self.unit_queue.pop_front() {
-                Some(var) => {
-                    if self.set_variable(var.id, AssignmentType::Forced, var.sign.into()) == false {
-                        return false;
-                    }
-                },
-                None => break
+        while let Some(var) = self.unit_queue.pop_front() {
+            if !self.set_variable(var.id, AssignmentType::Forced, var.sign.into()){
+                return false;
             }
         }
         true
     }
+
+    fn pure_literal_elimination(&mut self) -> bool {
+        let pure_literals = self.variables.iter()
+            .enumerate()
+            .filter_map(|(id, var)| {
+                if var.pos_occ.is_empty() {
+                    Some((id, VarValue::Neg))
+                } else if var.neg_occ.is_empty() {
+                    Some((id, VarValue::Pos))
+                } else {
+                    None
+                }
+            }).collect::<Vec<_>>();//
+        pure_literals.into_iter()
+            .all(|(id, sign)| self.set_variable(id, AssignmentType::Branching, sign))
+    }
+
 
     fn backtracking(&mut self) -> bool {
         while let Some(assign) = self.assignment_stack.pop() {
