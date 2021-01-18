@@ -1,7 +1,6 @@
-use crate::cnf::CNF;
+use crate::{CNF, Assignment};
 
-pub type Assignment = Vec<bool>;
 
 pub trait Solver {
-    fn solve(&self, formula: CNF, num_variables: usize) -> Option<Assignment>;
+    fn solve(&self, formula: CNF, num_variables: usize) -> Assignment;
 }

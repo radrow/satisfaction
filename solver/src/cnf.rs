@@ -9,22 +9,25 @@ use cadical;
 
 pub type VarId = usize;
 
+#[derive(Clone, Debug)]
 pub struct CNF {
     pub clauses : Vec<CNFClause>
 }
 
+#[derive(Clone, Debug)]
 pub struct CNFClause {
     pub vars : Vec<CNFVar>
 }
 
+#[derive(Clone, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub struct CNFVar {
-    id: VarId,
-    sign: bool,
+    pub id: VarId,
+    pub sign: bool,
 }
 
 impl CNF {
     pub fn empty() -> CNF {
-        CNF{clauses: vec![]}
+        CNF{clauses: Vec::new()}
     }
 
     pub fn single(clause : CNFClause) -> CNF {
@@ -43,8 +46,8 @@ impl CNF {
     pub fn to_dimacs(&self) -> String {
         let mut out : String = String::from("");
 
-        let distinct : HashSet<VarId> =
-            self.clauses.iter().flat_map(|clause| clause.vars.iter().map(|v| v.id()))
+        let distinct : HashSet<VarId> = self.clauses.iter()
+            .flat_map(|clause| clause.vars.iter().map(|v| v.id()))
             .collect();
 
         out.extend("p cnf ".chars());
@@ -153,15 +156,15 @@ impl IntoIterator for CNFClause {
 
 impl CNFVar {
     pub fn new(id: VarId, sign: bool) -> CNFVar {
-        CNFVar{id: id, sign: sign}
+        CNFVar{id, sign}
     }
 
     pub fn pos(id: VarId) -> CNFVar {
-        CNFVar{id: id, sign: true}
+        CNFVar{id, sign: true}
     }
 
     pub fn neg(id: VarId) -> CNFVar{
-        CNFVar{id: id, sign: false}
+        CNFVar{id, sign: false}
     }
 
     pub fn id(&self) -> VarId {
@@ -190,6 +193,7 @@ impl fmt::Display for CNF {
         write!(f, "")
     }
 }
+
 impl fmt::Display for CNFClause {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for c in &self.vars {
@@ -198,6 +202,7 @@ impl fmt::Display for CNFClause {
         write!(f, "")
     }
 }
+
 impl fmt::Display for CNFVar {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.to_i32())

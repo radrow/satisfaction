@@ -1,10 +1,11 @@
 pub mod cnf;
 pub mod sat_solver;
+mod cadical_solver;
+mod dpll;
+mod assignment;
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+pub use cnf::{CNFClause, CNFVar, CNF};
+pub use sat_solver::Solver;
+pub use cadical_solver::CadicalSolver;
+pub use dpll::{SatisfactionSolver, BranchingStrategy, NaiveBranching};
+pub use assignment::Assignment;
