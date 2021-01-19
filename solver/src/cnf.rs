@@ -11,12 +11,13 @@ pub type VarId = usize;
 
 #[derive(Clone, Debug)]
 pub struct CNF {
-    pub clauses : Vec<CNFClause>
+    pub clauses: Vec<CNFClause>,
+    pub num_variables: usize,
 }
 
 #[derive(Clone, Debug)]
 pub struct CNFClause {
-    pub vars : Vec<CNFVar>
+    pub vars: Vec<CNFVar>,
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd, Ord, Eq)]
@@ -27,19 +28,32 @@ pub struct CNFVar {
 
 impl CNF {
     pub fn empty() -> CNF {
-        CNF{clauses: Vec::new()}
+        CNF{
+            clauses: Vec::new(), 
+            num_variables: 0,
+        }
     }
 
     pub fn single(clause : CNFClause) -> CNF {
-        CNF{clauses: vec![clause]}
+        CNF {
+            num_variables: clause.max_variable_id(),
+            clauses: vec![clause],
+        }
     }
 
-    pub fn push(&mut self, c : CNFClause) {
-        self.clauses.push(c)
+    pub fn push(&mut self, c: CNFClause) {
+        self.num_variables = self.num_variables.max(c.max_variable_id());
+        self.clauses.push(c);
     }
 
-    pub fn extend(&mut self, c : CNF) {
-        self.clauses.extend(c.clauses)
+    pub fn extend(&mut self, c: CNF) {
+        if let Some(max_variable_id) = c.clauses
+            .iter()
+                .map(|clause| clause.max_variable_id())
+                .max() {
+            self.num_variables = self.num_variables.max(max_variable_id);
+            self.clauses.extend(c.clauses)
+        }
     }
 
     #[allow(dead_code)]
@@ -80,33 +94,58 @@ impl CNF {
         let inst = parse_dimacs(input);
 
         match inst {
-            Ok(dimacs::Instance::Cnf{clauses, ..}) =>
-                Ok(clauses.iter()
-                .map(|clause|
-                     clause.lits().iter()
-                     .map(|lit|
-                          CNFVar {
-                              id: lit.var().to_u64() as VarId,
-                              sign: lit.sign() == dimacs::Sign::Pos
-                          }
-                     ).collect()
-                ).collect()),
+            Ok(dimacs::Instance::Cnf{clauses, num_vars}) => {
+                let clauses = clauses.iter()
+                    .map(|clause| {
+                        clause.lits()
+                            .iter()
+                            .map(|lit| CNFVar {
+                                id: lit.var().to_u64() as VarId,
+                                sign: lit.sign() == dimacs::Sign::Pos,
+                            }).collect()
+                    }).collect();
+                Ok(CNF {
+                    clauses,
+                    num_variables: num_vars as usize,
+                })
+            },
+            // TODO: Better error handling
             Ok(_) => panic!("was zum kuh"),
             Err(e) => Err(e)
-
         }
     }
 }
 
 impl FromParallelIterator<CNFClause> for CNF {
     fn from_par_iter<I : IntoParallelIterator<Item=CNFClause>>(iter: I) -> Self {
-        CNF{clauses: iter.into_par_iter().collect()}
+        let clauses = iter.into_par_iter()
+                .collect::<Vec<CNFClause>>();
+        let num_variables = clauses.iter()
+            .map(|clause| clause.max_variable_id())
+            .max()
+            .unwrap_or(0);
+
+        CNF {
+            clauses,
+            num_variables,
+        }
     }
 }
 
 impl FromIterator<CNFClause> for CNF {
     fn from_iter<I: IntoIterator<Item=CNFClause>>(iter: I) -> Self {
-        CNF{clauses: iter.into_iter().collect()}
+        let clauses = iter.into_iter()
+                .collect::<Vec<CNFClause>>();
+
+        let num_variables = clauses.iter()
+            .map(|clause| clause.max_variable_id())
+            .max()
+            .unwrap_or(0);
+
+        CNF {
+            clauses,
+            num_variables,
+        }
     }
 }
 
@@ -131,6 +170,13 @@ impl CNFClause {
 
     pub fn push(&mut self, v : CNFVar) {
         self.vars.push(v)
+    }
+
+    pub fn max_variable_id(&self) -> usize {
+        self.vars.iter()
+            .map(|lit| lit.id)
+            .max()
+            .unwrap_or(0)
     }
 
     #[allow(dead_code)]

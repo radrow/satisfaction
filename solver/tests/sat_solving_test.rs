@@ -13,14 +13,14 @@ fn setup_custom_solver() -> SatisfactionSolver<NaiveBranching> {
     SatisfactionSolver::new(NaiveBranching)
 }
 
-fn execute_solvers(formula: CNF, num_variables: usize) -> (Assignment, Assignment) {
+fn execute_solvers(formula: CNF) -> (Assignment, Assignment) {
     println!("{:?}", &formula);
 
     let testing_solver = setup_custom_solver();
     let reference_solver = CadicalSolver;
 
-    let testing_solution = testing_solver.solve(formula.clone(), num_variables);
-    let reference_solution = reference_solver.solve(formula, num_variables);
+    let testing_solution = testing_solver.solve(formula.clone());
+    let reference_solution = reference_solver.solve(formula);
 
     (testing_solution, reference_solution)
 }
@@ -39,21 +39,24 @@ fn is_satisfied(mut formula: impl Iterator<Item=CNFClause>, assignment: Vec<bool
 
 #[test]
 fn failed_proptest_instance() {
-    let formula = CNF { clauses: vec![
-        CNFClause {
-            vars: vec![
-                CNFVar::new(37, false),
-                CNFVar::new(39, false),
-            ]
-        },
-        CNFClause {
-            vars: vec![
-                CNFVar::new(37, false),
-                CNFVar::new(39, true),
-            ]
-        },
-    ] };
-    let (custom, reference) = execute_solvers(formula, 39);
+    let formula = CNF { 
+        clauses: vec![
+            CNFClause {
+                vars: vec![
+                    CNFVar::new(37, false),
+                    CNFVar::new(39, false),
+                ]
+            },
+            CNFClause {
+                vars: vec![
+                    CNFVar::new(37, false),
+                    CNFVar::new(39, true),
+                ]
+            },
+        ],
+        num_variables: 39
+    };
+    let (custom, reference) = execute_solvers(formula);
 
     assert_eq!(custom, reference);
 }
@@ -61,12 +64,12 @@ fn failed_proptest_instance() {
     
 proptest! {
     #[test]
-    fn only_positive_unit_clauses(num_variables in 1..=MAX_NUM_VARIABLES ) {
+    fn only_positive_unit_clauses(num_variables in 1..=MAX_NUM_VARIABLES) {
         let formula = (1..=num_variables)
             .map(|variable| CNFClause::single(CNFVar{id: variable, sign: true}))
             .collect::<Vec<_>>();
 
-        let (custom, reference) = execute_solvers(CNF{clauses:formula}, num_variables);
+        let (custom, reference) = execute_solvers(CNF { clauses: formula, num_variables });
 
         prop_assert_eq!(custom, reference);
     }
@@ -77,7 +80,7 @@ proptest! {
             .map(|variable| CNFClause::single(CNFVar{id: variable, sign: false}))
             .collect::<Vec<_>>();
 
-        let (custom, reference) = execute_solvers(CNF{clauses:formula}, num_variables);
+        let (custom, reference) = execute_solvers(CNF { clauses: formula, num_variables });
 
         prop_assert_eq!(custom, reference);
     }
@@ -92,7 +95,7 @@ proptest! {
                 CNFClause::single(CNFVar{id: id+1, sign})
             }).collect::<Vec<_>>();
 
-        let (custom, reference) = execute_solvers(CNF{clauses:formula}, num_variables);
+        let (custom, reference) = execute_solvers(CNF { clauses: formula, num_variables });
         prop_assert_eq!(custom, reference);
     }
 
@@ -116,7 +119,7 @@ proptest! {
                     }).collect()
                 }).collect::<Vec<_>>();
 
-        let (custom, reference) = execute_solvers(CNF{clauses:formula.clone()}, num_variables);
+        let (custom, reference) = execute_solvers(CNF { clauses:formula.clone(), num_variables });
 
         // The result regarding satisfiability is correct.
         prop_assert_eq!(custom.is_unsat(), reference.is_unsat());
