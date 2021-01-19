@@ -1,36 +1,36 @@
-// pub struct Assignment(Option<Vec<bool>>);
+pub type Valuation = Vec<bool>;
 
 #[derive(PartialEq, Eq)]
-pub enum Assignment {
-    Satisfiable(Vec<bool>),
+pub enum SATSolution {
+    Satisfiable(Valuation),
     Unsatisfiable,
     Unknown,
 }
 
-impl std::iter::FromIterator<bool> for Assignment {
+impl std::iter::FromIterator<bool> for SATSolution {
     fn from_iter<T: IntoIterator<Item = bool>>(iter: T) -> Self {
-        Assignment::Satisfiable(iter.into_iter().collect())
+        SATSolution::Satisfiable(iter.into_iter().collect())
     }
 }
 
-impl Assignment {
+impl SATSolution {
     pub fn is_sat(&self) -> bool {
         match self {
-            Assignment::Satisfiable(_)  => true,
+            SATSolution::Satisfiable(_)  => true,
             _                           => false,
         }
     }
 
     pub fn is_unsat(&self) -> bool {
         match self {
-            Assignment::Unsatisfiable   => true,
+            SATSolution::Unsatisfiable   => true,
             _                           => false,
         }
     }
 
     pub fn is_unknown(&self) -> bool {
         match self {
-            Assignment::Unknown => true,
+            SATSolution::Unknown => true,
             _                   => false,
         }
     }
@@ -38,9 +38,9 @@ impl Assignment {
     pub fn to_dimacs(&self) -> String {
         format!("s {}\n",
             match self {
-                Assignment::Unsatisfiable => "UNSATISFIABLE".to_string(),
-                Assignment::Unknown => "UNKNOWN".to_string(),
-                Assignment::Satisfiable(variables) => {
+                SATSolution::Unsatisfiable => "UNSATISFIABLE".to_string(),
+                SATSolution::Unknown => "UNKNOWN".to_string(),
+                SATSolution::Satisfiable(variables) => {
                     format!("SATISFIABLE\nv {} 0",
                         variables.iter()
                             .enumerate()
@@ -56,7 +56,7 @@ impl Assignment {
     }
 }
 
-impl std::fmt::Debug for Assignment {
+impl std::fmt::Debug for SATSolution {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}", self.to_dimacs())
     }

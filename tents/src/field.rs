@@ -1,3 +1,4 @@
+use solver::sat_solver::Solver;
 use std::{collections::{HashMap}};
 use std::io;
 use std::path::Path;
@@ -8,13 +9,20 @@ use rayon::prelude::*;
 use rayon;
 
 use solver::cnf::{CNF, CNFClause, CNFVar, VarId};
+use solver::{SATSolution};
 
+/// Coordinate of a tent
 type TentPlace = (usize, usize);
+
+/// Coordignates of a tree
 type TreePlace = (usize, usize);
 
+/// Constraints on the number of tents at given axis
 type AxisSet = HashMap<usize, Vec<usize>>;
+/// Constraints on the neighbourhood of tents
 type NeiSet = Vec<(usize, usize)>;
 
+/// Datatype that describes the content of a single cell
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum CellType {
     Tent,
@@ -22,14 +30,17 @@ pub enum CellType {
     Meadow,
 }
 
+/// Representation of the whole puzzle
 pub struct Field {
     pub cells: Vec<Vec<CellType>>,
     pub row_counts: Vec<usize>,
     pub column_counts: Vec<usize>,
     pub height : usize,
     pub width : usize,
+    pub tent_tree_assgs: Option<Vec<(TreePlace, TentPlace)>>
 }
 
+/// Connection between a tree and assigned tent
 #[derive (PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 struct Assignment {
     tent : TentPlace,
@@ -37,23 +48,7 @@ struct Assignment {
 }
 
 impl Field {
-    #[allow(dead_code)]
-    pub fn create_empty(width: usize, height: usize) -> Field {
-        let prototype = vec![CellType::Meadow;width];
-        let cells = vec![prototype; height];
-
-        let column_counts = vec![0, width];
-        let row_counts = vec![0; height];
-
-        Field {
-            cells,
-            height: row_counts.len(),
-            width: column_counts.len(),
-            row_counts,
-            column_counts,
-        }
-    }
-
+    /// Loads a puzzle description from a file
     pub fn from_file(path: &Path) -> io::Result<Field> {
         let contents: String = fs::read_to_string(path)?;
         let mut split = contents.split(|c| c == '\n' || c == ' ' || c == '\r');
@@ -95,11 +90,13 @@ impl Field {
             column_counts,
             cells,
             height: height,
-            width: width
+            width: width,
+            tent_tree_assgs: None
         })
     }
 
-    pub fn tent_coordinates(&self) -> Vec<Vec<TentPlace>> {
+    /// Returns a vector of eligible places for a tent
+    pub fn tent_coordinates(&self) -> Vec<TentPlace> {
         let width = self.cells.len();
         let height = self.cells[0].len();
         let mut tents_by_trees = Vec::new();
@@ -111,33 +108,33 @@ impl Field {
                     let right = x + 1;
                     let top = y as isize - 1;
                     let bottom = y + 1;
-                    let mut potential_tents = Vec::with_capacity(4);
 
                     if left >= 0 && self.cells[left as usize][y] != CellType::Tree {
-                        potential_tents.push((left as usize, y));
+                        tents_by_trees.push((left as usize, y));
                     }
                     if right < width && self.cells[right][y] != CellType::Tree {
-                        potential_tents.push((right, y));
+                        tents_by_trees.push((right, y));
                     }
                     if top >= 0 && self.cells[x][top as usize] != CellType::Tree {
-                        potential_tents.push((x, top as usize));
+                        tents_by_trees.push((x, top as usize));
                     }
                     if bottom < height && self.cells[x][bottom] != CellType::Tree {
-                        potential_tents.push((x, bottom));
+                        tents_by_trees.push((x, bottom));
                     }
-                    tents_by_trees.push(potential_tents);
                 }
             }
         }
         tents_by_trees
     }
 
-    fn to_formula(&self) -> (CNF, HashMap<TentPlace, usize>, Vec<(Assignment, usize)>) {
+    /// Compiles the puzzle to CNF. On the latter positions returns mapings
+    /// from tent places to assiociated variables and list of tree-tent
+    /// assignments with assiociated variables.
+    fn to_formula(&self) -> (CNF, HashMap<TentPlace, VarId>, Vec<(Assignment, VarId)>) {
         let tents = self.tent_coordinates();
 
         // Id to coordinate
         let tent_mapping = tents.iter()
-            .flatten()
             .unique()
             .enumerate()
             .map(|(id, coord)| (id+1, *coord))
@@ -173,37 +170,33 @@ impl Field {
         (total, id_mapping, assg_mapping.clone().to_vec())
     }
 
-    pub fn solve(&mut self) -> Vec<((usize, usize), (usize, usize))> {
+    /// Solve the puzzle
+    pub fn solve(&mut self, solver: &dyn Solver) -> bool {
         let (formula, t_mapping, a_mapping) = self.to_formula();
-
-        let mut solver = formula.to_solver();
-        match solver.solve() {
-            None => panic!("was zur hölle"),
-            Some(satisfiable) => {
-                if satisfiable {
-                    for y in 0..self.height {
-                        for x in 0..self.width {
-                            match
-                                t_mapping.get(&(y, x))
-                                .and_then(|var_name| solver.value(*var_name as i32)) {
-                                    None => (),
-                                    Some(true) => self.cells[y][x] = CellType::Tent,
-                                    Some(false) => self.cells[y][x] = CellType::Meadow
-                                }
-                        }
+        let nvars = formula.num_vars();
+        match solver.solve(formula, nvars) {
+            SATSolution::Satisfiable(assignment) => {
+                for y in 0..self.height {
+                    for x in 0..self.width {
+                        match
+                            t_mapping.get(&(y, x))
+                            .map(|var_name| assignment[*var_name]) {
+                                None => (),
+                                Some(true) => self.cells[y][x] = CellType::Tent,
+                                Some(false) => self.cells[y][x] = CellType::Meadow
+                            }
+                        self.tent_tree_assgs =
+                            Some(a_mapping
+                                 .iter()
+                                 .filter(|(_, i)| *i > 0)
+                                 .map(|(a, _)| (a.tent, a.tree))
+                                 .collect());
                     }
-
-                    a_mapping
-                        .iter()
-                        .filter(|(_, i)| *i > 0)
-                        .map(|(a, _)| (a.tent, a.tree))
-                        .collect()
-                }
-                else {
-                    println!("No solution");
-                    vec![]
-                }
-            }
+                };
+                true
+            },
+            SATSolution::Unsatisfiable => false,
+            SATSolution::Unknown => unreachable!()
         }
     }
 

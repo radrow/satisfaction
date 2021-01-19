@@ -1,10 +1,10 @@
 use cadical;
-use crate::{Solver, Assignment, CNF};
+use crate::{Solver, SATSolution, CNF};
 
 pub struct CadicalSolver;
 
 impl Solver for CadicalSolver {
-    fn solve(&self, clauses: CNF) -> Assignment {
+    fn solve(&self, clauses: CNF) -> SATSolution {
         let mut solver: cadical::Solver = Default::default();
         
         let num_variables = clauses.num_variables;
@@ -14,8 +14,8 @@ impl Solver for CadicalSolver {
         });
 
         match solver.solve() {
-            None => Assignment::Unknown,
-            Some(false) => Assignment::Unsatisfiable,
+            None => SATSolution::Unknown,
+            Some(false) => SATSolution::Unsatisfiable,
             Some(true) => {
                 // TODO: Use more index independent formulation
                 (1..=num_variables)

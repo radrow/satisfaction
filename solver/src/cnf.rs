@@ -1,32 +1,41 @@
 use std::fmt;
 use std::iter::FromIterator;
 use std::collections::HashSet;
+use itertools::Itertools;
 
 use rayon::iter::*;
 use dimacs::parse_dimacs;
 
-use cadical;
-
+/// Type used for referencing logical variables
 pub type VarId = usize;
 
+/// Representation of logical formulae in CNF form
+/// (conjunction of clausees)>
 #[derive(Clone, Debug)]
 pub struct CNF {
-    pub clauses: Vec<CNFClause>,
+    /// Vector of inner clauses
+    pub clauses : Vec<CNFClause>,
     pub num_variables: usize,
 }
 
+/// Representation of a clause (disjunction of variables)
 #[derive(Clone, Debug)]
 pub struct CNFClause {
-    pub vars: Vec<CNFVar>,
+    /// Vector of inner variables
+    pub vars : Vec<CNFVar>
 }
 
+/// Logical variable
 #[derive(Clone, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub struct CNFVar {
+    /// Identifier of a variable
     pub id: VarId,
+    /// Variable is negated iff `sign == false`
     pub sign: bool,
 }
 
 impl CNF {
+    /// Creates an empty CNF formula
     pub fn empty() -> CNF {
         CNF{
             clauses: Vec::new(), 
@@ -34,6 +43,7 @@ impl CNF {
         }
     }
 
+    /// Creates a singleton CNF formula out of a single clause
     pub fn single(clause : CNFClause) -> CNF {
         CNF {
             num_variables: clause.max_variable_id(),
@@ -56,13 +66,30 @@ impl CNF {
         }
     }
 
-    #[allow(dead_code)]
+    /// Returns number of clauses in the formula
+    pub fn len(&self) -> usize {
+        self.clauses.len()
+    }
+
+    /// Collects all variable identifiers that appear in the formula
+    pub fn vars(&self) -> HashSet<VarId> {
+        self.clauses.iter()
+            .flat_map(|clause| clause.vars.iter().map(CNFVar::id))
+            .unique()
+            .collect()
+    }
+
+    /// Calculates the number of distinct variables (unifies negated and positive)
+    pub fn num_vars(&self) -> usize {
+        self.vars().iter()
+            .count()
+    }
+
+    /// Prints formula in DIMACS compatible form
     pub fn to_dimacs(&self) -> String {
         let mut out : String = String::from("");
 
-        let distinct : HashSet<VarId> = self.clauses.iter()
-            .flat_map(|clause| clause.vars.iter().map(|v| v.id()))
-            .collect();
+        let distinct = self.vars();
 
         out.extend("p cnf ".chars());
         out.extend(distinct.len().to_string().chars());
@@ -80,17 +107,8 @@ impl CNF {
         out
     }
 
-    pub fn to_solver(&self) -> cadical::Solver {
-        let mut sat: cadical::Solver = Default::default();
-
-        for clause in &self.clauses {
-            sat.add_clause(clause.vars.iter().map(|var| var.to_i32()));
-        }
-
-        sat
-    }
-
-    pub fn from_dimacs(input : &str) -> Result<CNF, dimacs::ParseError> {
+    /// Parse DIMACS string into CNF structure
+    pub fn from_dimacs(input : &str) -> Result<CNF, String> {
         let inst = parse_dimacs(input);
 
         match inst {
@@ -111,7 +129,7 @@ impl CNF {
             },
             // TODO: Better error handling
             Ok(_) => panic!("was zum kuh"),
-            Err(e) => Err(e)
+            Err(_) => Err("Parse error".to_string()),
         }
     }
 }
@@ -129,6 +147,15 @@ impl FromParallelIterator<CNFClause> for CNF {
             clauses,
             num_variables,
         }
+    }
+}
+
+impl IntoParallelIterator for CNF {
+    type Item = CNFClause;
+    type Iter = rayon::vec::IntoIter<CNFClause>;
+
+    fn into_par_iter(self) -> Self::Iter {
+        self.clauses.into_par_iter()
     }
 }
 
@@ -159,15 +186,17 @@ impl IntoIterator for CNF {
 }
 
 impl CNFClause {
+    /// Creates an empty CNF clause
     pub fn new() -> CNFClause {
         CNFClause{vars: vec![]}
     }
 
-    #[allow(dead_code)]
+    /// Creates a CNF clause containing a single variable
     pub fn single(var : CNFVar) -> CNFClause {
         CNFClause{vars: vec![var]}
     }
 
+    /// Adds a single variable into the clause
     pub fn push(&mut self, v : CNFVar) {
         self.vars.push(v)
     }
@@ -201,26 +230,35 @@ impl IntoIterator for CNFClause {
 }
 
 impl CNFVar {
+    /// Creates variable with given identifier and positivity
     pub fn new(id: VarId, sign: bool) -> CNFVar {
         CNFVar{id, sign}
     }
 
+    /// Creates a positive variable with given identifier
     pub fn pos(id: VarId) -> CNFVar {
         CNFVar{id, sign: true}
     }
 
+    /// Creates a negative variable with given identifier
     pub fn neg(id: VarId) -> CNFVar{
         CNFVar{id, sign: false}
     }
 
+    /// Gets the identifier of a variable
     pub fn id(&self) -> VarId {
         self.id
     }
 
+    /// Checks if the variable is positive
     pub fn sign(&self) -> bool {
         self.sign
     }
 
+    /// Converts to signed integer. The absolute value indicates
+    /// the identifier and sign states for positivity.
+    ///
+    /// **NOTE** it is not integer-overflow friendly.
     pub fn to_i32(&self) -> i32 {
         if self.sign {
             self.id as i32

@@ -5,7 +5,7 @@ use cnf::CNFClause;
 use cnf::CNFVar;
 use std::fmt;
 use std::collections::VecDeque;
-use crate::{Solver, Assignment};
+use crate::{Solver, SATSolution};
 
 pub trait BranchingStrategy: Clone {
     /// Funtion that picks the next variable to be chosen for branching.
@@ -41,7 +41,7 @@ impl<B: BranchingStrategy> SatisfactionSolver<B> {
 }
 
 impl<B: BranchingStrategy> Solver for SatisfactionSolver<B> {
-    fn solve(&self, formula: CNF) -> Assignment {
+    fn solve(&self, formula: CNF) -> SATSolution {
         let mut data = DataStructures::new(formula);
         data.dpll(self.strategy.clone())
     }
@@ -49,12 +49,12 @@ impl<B: BranchingStrategy> Solver for SatisfactionSolver<B> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AssignmentType {
-    Forced, Branching, Empty
+    Forced, Branching
 }
 
 
 /// Used to store assignments made in the past, for undoing them with backtracking
-struct PrevAssignment {
+struct PrevSATSolution {
     variable: usize,
     assignment_type: AssignmentType
 }
@@ -167,7 +167,7 @@ struct DataStructures {
     variables: Vec<Variable>,
     clauses: Vec<Clause>,
     unit_queue: VecDeque<CNFVar>,
-    assignment_stack: Vec<PrevAssignment>,
+    assignment_stack: Vec<PrevSATSolution>,
 }
 
 impl DataStructures {
@@ -185,10 +185,10 @@ impl DataStructures {
         }
     }
 
-    fn dpll(&mut self, mut branching: impl BranchingStrategy) -> Assignment {
+    fn dpll(&mut self, mut branching: impl BranchingStrategy) -> SATSolution {
         // unit propagation
         if !self.inital_unit_propagation() {
-            return Assignment::Unsatisfiable;
+            return SATSolution::Unsatisfiable;
         }
 
         // repeat & choose literal b 
@@ -205,7 +205,7 @@ impl DataStructures {
 
             if conflict == true {
                 if self.backtracking() == false {
-                    return Assignment::Unsatisfiable;
+                    return SATSolution::Unsatisfiable;
                 }
             }
 
@@ -240,7 +240,7 @@ impl DataStructures {
 
     fn set_variable(&mut self, i: usize, assign_type: AssignmentType, sign: VarValue) -> bool {
         self.variables[i].value = sign;
-        self.assignment_stack.push(PrevAssignment {variable: i, assignment_type: assign_type});
+        self.assignment_stack.push(PrevSATSolution {variable: i, assignment_type: assign_type});
 
         let mut pos_occ: &Vec<usize> = &self.variables[i].pos_occ;
         let mut neg_occ: &Vec<usize> = &self.variables[i].neg_occ;
@@ -256,11 +256,11 @@ impl DataStructures {
             }
         });
 
+        let mut no_conflict = true;
         for u in 0..neg_occ.len() {
             let n_occ = neg_occ[u];
+            self.clauses[n_occ].active_lits -= 1;
             if self.clauses[n_occ].satisfied == None {
-                self.clauses[n_occ].active_lits -= 1;
-
                 if self.clauses[n_occ].active_lits == 1 {
                     // unit literal detected
                     let unit_literal = self.find_unit_variable(&self.clauses[n_occ]);
@@ -269,11 +269,11 @@ impl DataStructures {
                     }
                 } else if self.clauses[n_occ].active_lits <= 0 {
                     // conflict
-                    return false;
+                    no_conflict =  false;
                 }
             }
         };
-        true
+        no_conflict
     }
 
     fn unit_propagation(&mut self) -> bool {
@@ -311,7 +311,6 @@ impl DataStructures {
                     }
                 }
             }
-            self.variables[assign.variable as usize].value = VarValue::Free;
 
             // empty queue
             self.unit_queue.clear();
@@ -325,6 +324,7 @@ impl DataStructures {
                 }
                 return true
             }
+            self.variables[assign.variable as usize].value = VarValue::Free;
         }
         // unsatisfied
         false

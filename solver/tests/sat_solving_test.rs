@@ -3,8 +3,8 @@ use proptest::{
     collection::vec,
     bool::weighted,
 };
-use solver::{CadicalSolver, Solver, CNFClause, CNFVar, Assignment, CNF, SatisfactionSolver, NaiveBranching};
 use std::path::{PathBuf, Path};
+use solver::{CadicalSolver, Solver, CNFClause, CNFVar, SATSolution, CNF, SatisfactionSolver, NaiveBranching};
 
 const MAX_NUM_VARIABLES: usize = 50;
 const MAX_NUM_LITERALS: usize = 10;
@@ -14,7 +14,7 @@ fn setup_custom_solver() -> SatisfactionSolver<NaiveBranching> {
     SatisfactionSolver::new(NaiveBranching)
 }
 
-fn execute_solvers(formula: CNF) -> (Assignment, Assignment) {
+fn execute_solvers(formula: CNF) -> (SATSolution, SATSolution) {
     println!("{:?}", &formula);
 
     let testing_solver = setup_custom_solver();
@@ -60,9 +60,9 @@ fn prescribed_instances() {
                 let formula = CNF::from_dimacs(&content).unwrap();
 
                 assert!(match solver.solve(formula) {
-                    Assignment::Satisfiable(_) => true,
-                    Assignment::Unsatisfiable => false,
-                    Assignment::Unknown => unreachable!(),
+                    SATSolution::Satisfiable(_) => true,
+                    SATSolution::Unsatisfiable => false,
+                    SATSolution::Unknown => unreachable!(),
                 } == satisfiable)
             })
     };
@@ -161,7 +161,7 @@ proptest! {
         prop_assert_eq!(custom.is_unknown(), reference.is_unknown());
 
         // The found assignment does indeed satisfies the formula.
-        if let Assignment::Satisfiable(assignment) = custom {
+        if let SATSolution::Satisfiable(assignment) = custom {
             println!("{:?}", assignment);
             prop_assert!(is_satisfied(formula.into_iter(), assignment));
         }
