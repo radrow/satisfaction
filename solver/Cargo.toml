@@ -18,8 +18,8 @@ time = "*"
 
 [dev-dependencies]
 proptest = "0.10.1"
-# criterion = "0.3.3"
+criterion = "0.3.3"
 
-# [[bench]]
-# name = "bruteforce"
-# harness = false
+[[bench]]
+name = "bruteforce"
+harness = false
