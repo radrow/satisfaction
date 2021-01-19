@@ -287,9 +287,9 @@ impl DataStructures {
             .filter_map(|(id, var)| {
                 match var.value {
                     VarValue::Free if var.pos_occ.is_empty() =>
-                        Some(CNFVar::new(id, true)),
-                    VarValue::Free if var.neg_occ.is_empty() => 
                         Some(CNFVar::new(id, false)),
+                    VarValue::Free if var.neg_occ.is_empty() => 
+                        Some(CNFVar::new(id, true)),
                     _ => None
                 }
             }).collect::<Vec<_>>();
