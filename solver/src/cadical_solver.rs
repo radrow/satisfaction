@@ -4,8 +4,10 @@ use crate::{Solver, SATSolution, CNF};
 pub struct CadicalSolver;
 
 impl Solver for CadicalSolver {
-    fn solve(&self, clauses: CNF, num_variables: usize) -> SATSolution {
+    fn solve(&self, clauses: CNF) -> SATSolution {
         let mut solver: cadical::Solver = Default::default();
+        
+        let num_variables = clauses.num_variables;
         clauses.clauses.into_iter().for_each(|clause| {
             solver.add_clause(clause.into_iter()
                 .map(|literal| literal.to_i32()));
@@ -20,7 +22,7 @@ impl Solver for CadicalSolver {
                     .map(|variable| {
                         solver.value(variable as i32)
                             // If None, the variable can be choosen arbitrarily and thus true. TODO: Discuss behaviour.
-                            .unwrap_or(true)
+                            .unwrap_or(false) 
                     }).collect()
             }
         }

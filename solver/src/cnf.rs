@@ -14,7 +14,8 @@ pub type VarId = usize;
 #[derive(Clone, Debug)]
 pub struct CNF {
     /// Vector of inner clauses
-    pub clauses : Vec<CNFClause>
+    pub clauses : Vec<CNFClause>,
+    pub num_variables: usize,
 }
 
 /// Representation of a clause (disjunction of variables)
@@ -36,22 +37,33 @@ pub struct CNFVar {
 impl CNF {
     /// Creates an empty CNF formula
     pub fn empty() -> CNF {
-        CNF{clauses: Vec::new()}
+        CNF{
+            clauses: Vec::new(), 
+            num_variables: 0,
+        }
     }
 
     /// Creates a singleton CNF formula out of a single clause
     pub fn single(clause : CNFClause) -> CNF {
-        CNF{clauses: vec![clause]}
+        CNF {
+            num_variables: clause.max_variable_id(),
+            clauses: vec![clause],
+        }
     }
 
-    /// Inserts a new clause into the formula
-    pub fn push(&mut self, c : CNFClause) {
-        self.clauses.push(c)
+    pub fn push(&mut self, c: CNFClause) {
+        self.num_variables = self.num_variables.max(c.max_variable_id());
+        self.clauses.push(c);
     }
 
-    /// Concatenates two formulae
-    pub fn extend(&mut self, c : CNF) {
-        self.clauses.extend(c.clauses)
+    pub fn extend(&mut self, c: CNF) {
+        if let Some(max_variable_id) = c.clauses
+            .iter()
+                .map(|clause| clause.max_variable_id())
+                .max() {
+            self.num_variables = self.num_variables.max(max_variable_id);
+            self.clauses.extend(c.clauses)
+        }
     }
 
     /// Returns number of clauses in the formula
@@ -100,26 +112,41 @@ impl CNF {
         let inst = parse_dimacs(input);
 
         match inst {
-            Ok(dimacs::Instance::Cnf{clauses, ..}) =>
-                Ok(clauses.iter()
-                .map(|clause|
-                     clause.lits().iter()
-                     .map(|lit|
-                          CNFVar {
-                              id: lit.var().to_u64() as VarId,
-                              sign: lit.sign() == dimacs::Sign::Pos
-                          }
-                     ).collect()
-                ).collect()),
-            Ok(_) => Err("Only CNF formulae are supported".to_string()),
-            Err(_) => Err("Parse error".to_string())
+            Ok(dimacs::Instance::Cnf{clauses, num_vars}) => {
+                let clauses = clauses.iter()
+                    .map(|clause| {
+                        clause.lits()
+                            .iter()
+                            .map(|lit| CNFVar {
+                                id: lit.var().to_u64() as VarId,
+                                sign: lit.sign() == dimacs::Sign::Pos,
+                            }).collect()
+                    }).collect();
+                Ok(CNF {
+                    clauses,
+                    num_variables: num_vars as usize,
+                })
+            },
+            // TODO: Better error handling
+            Ok(_) => panic!("was zum kuh"),
+            Err(_) => Err("Parse error".to_string()),
         }
     }
 }
 
 impl FromParallelIterator<CNFClause> for CNF {
     fn from_par_iter<I : IntoParallelIterator<Item=CNFClause>>(iter: I) -> Self {
-        CNF{clauses: iter.into_par_iter().collect()}
+        let clauses = iter.into_par_iter()
+                .collect::<Vec<CNFClause>>();
+        let num_variables = clauses.iter()
+            .map(|clause| clause.max_variable_id())
+            .max()
+            .unwrap_or(0);
+
+        CNF {
+            clauses,
+            num_variables,
+        }
     }
 }
 
@@ -134,7 +161,18 @@ impl IntoParallelIterator for CNF {
 
 impl FromIterator<CNFClause> for CNF {
     fn from_iter<I: IntoIterator<Item=CNFClause>>(iter: I) -> Self {
-        CNF{clauses: iter.into_iter().collect()}
+        let clauses = iter.into_iter()
+                .collect::<Vec<CNFClause>>();
+
+        let num_variables = clauses.iter()
+            .map(|clause| clause.max_variable_id())
+            .max()
+            .unwrap_or(0);
+
+        CNF {
+            clauses,
+            num_variables,
+        }
     }
 }
 
@@ -163,7 +201,14 @@ impl CNFClause {
         self.vars.push(v)
     }
 
-    /// Concatenates two clauses
+    pub fn max_variable_id(&self) -> usize {
+        self.vars.iter()
+            .map(|lit| lit.id)
+            .max()
+            .unwrap_or(0)
+    }
+
+    #[allow(dead_code)]
     pub fn extend(&mut self, c : CNFClause) {
         self.vars.extend(c.vars)
     }
