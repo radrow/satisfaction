@@ -67,15 +67,15 @@ impl From<bool> for VarValue {
 }
 
 pub struct Variable {
-    pub value: VarValue, 
+    pub value: VarValue,
     pub pos_occ: Vec<usize>,
     pub neg_occ: Vec<usize>,
 }
 
 pub struct Clause {
-    active_lits: usize,
-    satisfied: Option<usize>,
-    literals: Vec<CNFVar>,
+    pub active_lits: usize,
+    pub satisfied: Option<usize>,
+    pub literals: Vec<CNFVar>,
 }
 
 pub type Variables = Vec<Variable>;
@@ -171,14 +171,14 @@ impl DataStructures {
             return SATSolution::Unsatisfiable;
         }
 
-        // repeat & choose literal b 
+        // repeat & choose literal b
         while let Some(literal) = branching.pick_branching_variable(&self.variables, &self.clauses) {
             // set value b
             let conflict = !(self.set_variable(literal, AssignmentType::Branching)
                 // unit propagation
                 && self.unit_propagation()
                 && self.pure_literal_elimination());
-            
+
             // If backtracking does not help, formula is unsat.
             if conflict && !self.backtracking(){
                 return SATSolution::Unsatisfiable;
@@ -207,11 +207,8 @@ impl DataStructures {
                 }
             }
         }
-        
         self.unit_propagation()
     }
-
-    
 
     fn set_variable(&mut self, lit: CNFVar, assign_type: AssignmentType) -> bool {
         self.variables[lit.id].value = lit.sign.into();

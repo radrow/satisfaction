@@ -69,3 +69,55 @@ impl BranchingStrategy for DLCS {
         cnf_var
     }
 }
+
+
+#[derive(Clone)]
+pub struct MOM;
+impl BranchingStrategy for MOM {
+    fn pick_branching_variable(&self, variables: &Variables, clauses: &Clauses) -> Option<CNFVar> {
+        let min_clause_width =
+            clauses.iter().map(|c| (*c).literals.len()).min()?;
+        variables.iter()
+            .enumerate()
+            .max_by_key(
+                |(_, v)| {
+                    let hp =
+                        v.pos_occ.iter().
+                        filter(|c| clauses[**c].literals.len() == min_clause_width)
+                        .count();
+                    let hn =
+                        v.neg_occ.iter().
+                        filter(|c| clauses[**c].literals.len() == min_clause_width)
+                        .count();
+
+                    ((hp + hn) << 32) + hp * hn
+                }
+            ).map(|(i, _)| CNFVar::pos(i))
+    }
+}
+
+/// A variation of MOM where we measure width counting only active literals
+#[derive(Clone)]
+pub struct ActiveMOM;
+impl BranchingStrategy for ActiveMOM {
+    fn pick_branching_variable(&self, variables: &Variables, clauses: &Clauses) -> Option<CNFVar> {
+        let min_clause_width =
+            clauses.iter().map(|c| (*c).active_lits).min()?;
+        variables.iter()
+            .enumerate()
+            .max_by_key(
+                |(_, v)| {
+                    let hp =
+                        v.pos_occ.iter().
+                        filter(|c| clauses[**c].literals.len() == min_clause_width)
+                        .count();
+                    let hn =
+                        v.neg_occ.iter().
+                        filter(|c| clauses[**c].literals.len() == min_clause_width)
+                        .count();
+
+                    ((hp + hn) << 32) + hp * hn
+                }
+            ).map(|(i, _)| CNFVar::pos(i))
+    }
+}
