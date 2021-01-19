@@ -10,19 +10,19 @@ use crate::{Solver, SATSolution};
 pub trait BranchingStrategy: Clone {
     /// Funtion that picks the next variable to be chosen for branching.
     /// Returns the index of the next variable, or None if there is no Variable to be picked
-    fn pick_branching_variable(&mut self, variables: &Variables, clauses: &Clauses) -> Option<usize>;
+    fn pick_branching_variable(&mut self, variables: &Variables, clauses: &Clauses) -> Option<CNFVar>;
 }
 
 #[derive(Clone)]
 pub struct NaiveBranching;
 
 impl BranchingStrategy for NaiveBranching {
-    fn pick_branching_variable(&mut self, variables: &Variables, _clauses: &Clauses) -> Option<usize> {
+    fn pick_branching_variable(&mut self, variables: &Variables, _clauses: &Clauses) -> Option<CNFVar> {
         // TODO -> add heuristics to chose Variables
         variables.iter()
             .enumerate()
             .filter_map(|(i,v)| match v.value {
-                VarValue::Free  => Some(i),
+                VarValue::Free  => Some(CNFVar::new(i, true)),
                 _               => None,
             }).next()
     }
@@ -193,10 +193,8 @@ impl DataStructures {
 
         // repeat & choose literal b 
         while let Some(i) = branching.pick_branching_variable(&self.variables, &self.clauses) {
-            let mut conflict = false;
-
             // set value b
-            conflict = !self.set_variable(i, AssignmentType::Branching, VarValue::Pos);
+            let mut conflict = !self.set_variable(i.id, AssignmentType::Branching, i.sign.into());
 
             // unit propagation
             if !conflict {
@@ -226,7 +224,7 @@ impl DataStructures {
         // find all unit clauses and enqueue the variables in the queue
         for i in 0..self.clauses.len() {
             if self.clauses[i].active_lits == 1 {
-                let unit_literal = self.find_unit_variable(&self.clauses[i]);
+                let unit_literal = self.find_unit_variable(i);
                 if !self.unit_queue.contains(&unit_literal) {
                     self.unit_queue.push_back(unit_literal);
                 }
@@ -245,6 +243,7 @@ impl DataStructures {
         let mut pos_occ: &Vec<usize> = &self.variables[i].pos_occ;
         let mut neg_occ: &Vec<usize> = &self.variables[i].neg_occ;
         let clauses = &mut self.clauses;
+
         if self.variables[i].value == VarValue::Neg {
             neg_occ = &self.variables[i].pos_occ;
             pos_occ = &self.variables[i].neg_occ;
@@ -258,16 +257,16 @@ impl DataStructures {
 
         let mut no_conflict = true;
         for u in 0..neg_occ.len() {
-            let n_occ = neg_occ[u];
-            self.clauses[n_occ].active_lits -= 1;
-            if self.clauses[n_occ].satisfied == None {
-                if self.clauses[n_occ].active_lits == 1 {
+            let clause = &mut self.clauses[neg_occ[u]];
+            clause.active_lits -= 1;
+            if clause.satisfied.is_none() {
+                if clause.active_lits == 1 {
                     // unit literal detected
-                    let unit_literal = self.find_unit_variable(&self.clauses[n_occ]);
+                    let unit_literal = self.find_unit_variable(neg_occ[u]);
                     if !self.unit_queue.contains(&unit_literal) {
                         self.unit_queue.push_back(unit_literal);
                     }
-                } else if self.clauses[n_occ].active_lits <= 0 {
+                } else if clause.active_lits <= 0 {
                     // conflict
                     no_conflict =  false;
                 }
@@ -330,8 +329,8 @@ impl DataStructures {
         false
     }
 
-    fn find_unit_variable(&self, clause: &Clause) -> CNFVar {
-        clause.literals.iter()
+    fn find_unit_variable(&self, clause: usize) -> CNFVar {
+        self.clauses[clause].literals.iter()
             .filter(|lit| self.variables[lit.id].value == VarValue::Free)
             .next()
             .expect("The only left literal cound not be found!")

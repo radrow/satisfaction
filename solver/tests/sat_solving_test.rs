@@ -3,7 +3,7 @@ use proptest::{
     collection::vec,
     bool::weighted,
 };
-use std::path::{PathBuf, Path};
+use std::path::PathBuf;
 use solver::{CadicalSolver, Solver, CNFClause, CNFVar, SATSolution, CNF, SatisfactionSolver, NaiveBranching};
 
 const MAX_NUM_VARIABLES: usize = 50;

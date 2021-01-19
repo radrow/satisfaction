@@ -3,7 +3,7 @@ pub mod sat_solver;
 mod cadical_solver;
 mod dpll;
 mod sat_solution;
-pub mod brueforce;
+pub mod bruteforce;
 pub mod timed_solver;
 
 pub use cnf::{CNFClause, CNFVar, CNF};
