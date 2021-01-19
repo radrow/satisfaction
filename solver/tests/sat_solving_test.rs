@@ -4,6 +4,7 @@ use proptest::{
     bool::weighted,
 };
 use solver::{CadicalSolver, Solver, CNFClause, CNFVar, Assignment, CNF, SatisfactionSolver, NaiveBranching};
+use std::path::{PathBuf, Path};
 
 const MAX_NUM_VARIABLES: usize = 50;
 const MAX_NUM_LITERALS: usize = 10;
@@ -36,6 +37,40 @@ fn is_satisfied(mut formula: impl Iterator<Item=CNFClause>, assignment: Vec<bool
             )
         )
 }
+
+#[test]
+fn prescribed_instances() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/prescribed_instances");
+    
+    let solver = SatisfactionSolver::new(NaiveBranching);
+
+    let process = |files: PathBuf, satisfiable: bool| {
+        files.read_dir()
+            .unwrap()
+            .filter_map(|file| {
+                let path = file.ok()?
+                    .path();
+
+                if path.extension()? == "cnf" { Some(path) }
+                else { None }
+            }).for_each(|file| {
+                println!("{:?}", file.file_stem().unwrap());
+                let content = std::fs::read_to_string(file).unwrap();
+                let formula = CNF::from_dimacs(&content).unwrap();
+
+                assert!(match solver.solve(formula) {
+                    Assignment::Satisfiable(_) => true,
+                    Assignment::Unsatisfiable => false,
+                    Assignment::Unknown => unreachable!(),
+                } == satisfiable)
+            })
+    };
+
+    process(path.join("sat"), true);
+    process(path.join("unsat"), false);
+}
+
 
 #[test]
 fn failed_proptest_instance() {
