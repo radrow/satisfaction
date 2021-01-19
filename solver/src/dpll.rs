@@ -54,7 +54,7 @@ enum AssignmentType {
 
 
 /// Used to store assignments made in the past, for undoing them with backtracking
-struct PrevSATSolution {
+struct PrevAssignment {
     variable: usize,
     assignment_type: AssignmentType
 }
@@ -167,7 +167,7 @@ struct DataStructures {
     variables: Vec<Variable>,
     clauses: Vec<Clause>,
     unit_queue: VecDeque<CNFVar>,
-    assignment_stack: Vec<PrevSATSolution>,
+    assignment_stack: Vec<PrevAssignment>,
 }
 
 impl DataStructures {
@@ -238,7 +238,7 @@ impl DataStructures {
 
     fn set_variable(&mut self, i: usize, assign_type: AssignmentType, sign: VarValue) -> bool {
         self.variables[i].value = sign;
-        self.assignment_stack.push(PrevSATSolution {variable: i, assignment_type: assign_type});
+        self.assignment_stack.push(PrevAssignment {variable: i, assignment_type: assign_type});
 
         let mut pos_occ: &Vec<usize> = &self.variables[i].pos_occ;
         let mut neg_occ: &Vec<usize> = &self.variables[i].neg_occ;
