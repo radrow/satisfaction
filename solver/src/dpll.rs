@@ -28,6 +28,53 @@ impl BranchingStrategy for NaiveBranching {
     }
 }
 
+#[derive(Clone)]
+pub struct DLIS;
+
+impl BranchingStrategy for DLIS {
+    fn pick_branching_variable(&mut self, variables: &Variables, _clauses: &Clauses) -> Option<CNFVar> {
+        let mut max = 0;
+        let mut cnf_var: Option<CNFVar> = None;
+        for (i, v) in variables.iter().enumerate() {
+            if v.value == VarValue::Free {
+                let mut local_max = v.pos_occ.len();
+                let mut local_cnf_var = CNFVar {id: i, sign: true};
+                if v.pos_occ.len() < v.neg_occ.len() {
+                    local_max = v.neg_occ.len();
+                    local_cnf_var.sign = false;
+                }
+                if local_max > max {
+                    max = local_max;
+                    cnf_var = Some(local_cnf_var);
+                }
+            }
+        }
+        cnf_var
+    }
+}
+
+#[derive(Clone)]
+pub struct DLCS;
+
+impl BranchingStrategy for DLCS {
+    fn pick_branching_variable(&mut self, variables: &Variables, _clauses: &Clauses) -> Option<CNFVar> {
+        let mut max = 0;
+        let mut cnf_var: Option<CNFVar> = None;
+        for (i, v) in variables.iter().enumerate() {
+            if v.value == VarValue::Free {
+                let h = v.neg_occ.len() + v.pos_occ.len();
+                let local_cnf_var = CNFVar {id: i, sign: v.pos_occ.len() > v.neg_occ.len()};
+                if h > max {
+                    max = h;
+                    cnf_var = Some(local_cnf_var);
+                }
+            }
+        }
+        cnf_var
+    }
+}
+
+
 pub struct SatisfactionSolver<B: BranchingStrategy> {
     strategy: B,
 }
