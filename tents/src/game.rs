@@ -1,5 +1,6 @@
 extern crate iced;
 
+use solver::brueforce::Bruteforce::Bruteforce;
 use iced::{executor};
 use iced::{Length, Align};
 use iced::{Element, Row, Application, Svg, Text, Command, Subscription, HorizontalAlignment, VerticalAlignment, Container};
@@ -61,8 +62,9 @@ impl Application for Game {
             },
             Message::SolvePuzzle => {
                 let field = self.field.as_mut().unwrap();
-                self.field_widget.arrows = field.solve();
-                self.puzzle_solved = true;
+                if field.solve(&Bruteforce) {
+                    self.puzzle_solved = true;
+                }
             },
             Message::GridSizeInputChanged{width, height} => {
                 self.control_widget.field_creation_widget.update(width, height)
