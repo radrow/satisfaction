@@ -3,7 +3,7 @@ use proptest::{
     collection::vec,
     bool::weighted,
 };
-use solver::{CadicalSolver, Solver, CNFClause, CNFVar, Assignment, CNF, SatisfactionSolver, NaiveBranching};
+use solver::{CadicalSolver, Solver, CNFClause, CNFVar, SATSolution, CNF, SatisfactionSolver, NaiveBranching};
 
 const MAX_NUM_VARIABLES: usize = 50;
 const MAX_NUM_LITERALS: usize = 10;
@@ -13,7 +13,7 @@ fn setup_custom_solver() -> SatisfactionSolver<NaiveBranching> {
     SatisfactionSolver::new(NaiveBranching)
 }
 
-fn execute_solvers(formula: CNF, num_variables: usize) -> (Assignment, Assignment) {
+fn execute_solvers(formula: CNF, num_variables: usize) -> (SATSolution, SATSolution) {
     println!("{:?}", &formula);
 
     let testing_solver = setup_custom_solver();
@@ -123,7 +123,7 @@ proptest! {
         prop_assert_eq!(custom.is_unknown(), reference.is_unknown());
 
         // The found assignment does indeed satisfies the formula.
-        if let Assignment::Satisfiable(assignment) = custom {
+        if let SATSolution::Satisfiable(assignment) = custom {
             println!("{:?}", assignment);
             prop_assert!(is_satisfied(formula.into_iter(), assignment));
         }

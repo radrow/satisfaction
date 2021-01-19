@@ -5,7 +5,7 @@ use cnf::CNFClause;
 use cnf::CNFVar;
 use std::fmt;
 use std::collections::VecDeque;
-use crate::{Solver, Assignment};
+use crate::{Solver, SATSolution};
 
 pub trait BranchingStrategy: Clone {
     /// Funtion that picks the next variable to be chosen for branching.
@@ -41,7 +41,7 @@ impl<B: BranchingStrategy> SatisfactionSolver<B> {
 }
 
 impl<B: BranchingStrategy> Solver for SatisfactionSolver<B> {
-    fn solve(&self, formula: CNF, num_variables: usize) -> Assignment {
+    fn solve(&self, formula: CNF, num_variables: usize) -> SATSolution {
         let mut data = DataStructures::new(formula, num_variables);
         data.dpll(self.strategy.clone())
     }
@@ -54,7 +54,7 @@ enum AssignmentType {
 
 
 /// Used to store assignments made in the past, for undoing them with backtracking
-struct PrevAssignment {
+struct PrevSATSolution {
     variable: usize,
     assignment_type: AssignmentType
 }
@@ -167,7 +167,7 @@ struct DataStructures {
     variables: Vec<Variable>,
     clauses: Vec<Clause>,
     unit_queue: VecDeque<CNFVar>,
-    assignment_stack: Vec<PrevAssignment>,
+    assignment_stack: Vec<PrevSATSolution>,
 }
 
 impl DataStructures {
@@ -185,10 +185,10 @@ impl DataStructures {
         }
     }
 
-    fn dpll(&mut self, mut branching: impl BranchingStrategy) -> Assignment {
+    fn dpll(&mut self, mut branching: impl BranchingStrategy) -> SATSolution {
         // unit propagation
         if !self.inital_unit_propagation() {
-            return Assignment::Unsatisfiable;
+            return SATSolution::Unsatisfiable;
         }
 
         // repeat & choose literal b 
@@ -205,7 +205,7 @@ impl DataStructures {
 
             if conflict == true {
                 if self.backtracking() == false {
-                    return Assignment::Unsatisfiable;
+                    return SATSolution::Unsatisfiable;
                 }
             }
 
@@ -240,7 +240,7 @@ impl DataStructures {
 
     fn set_variable(&mut self, i: usize, assign_type: AssignmentType, sign: VarValue) -> bool {
         self.variables[i].value = sign;
-        self.assignment_stack.push(PrevAssignment {variable: i, assignment_type: assign_type});
+        self.assignment_stack.push(PrevSATSolution {variable: i, assignment_type: assign_type});
 
         let mut pos_occ: &Vec<usize> = &self.variables[i].pos_occ;
         let mut neg_occ: &Vec<usize> = &self.variables[i].neg_occ;
