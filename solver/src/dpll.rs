@@ -55,7 +55,7 @@ enum AssignmentType {
 
 /// Used to store assignments made in the past, for undoing them with backtracking
 struct PrevAssignment {
-    variable: usize,
+    literal: CNFVar,
     assignment_type: AssignmentType
 }
 
@@ -192,19 +192,16 @@ impl DataStructures {
         }
 
         // repeat & choose literal b 
-        while let Some(i) = branching.pick_branching_variable(&self.variables, &self.clauses) {
+        while let Some(literal) = branching.pick_branching_variable(&self.variables, &self.clauses) {
             // set value b
-            let mut conflict = !self.set_variable(i.id, AssignmentType::Branching, i.sign.into());
-
-            // unit propagation
-            if !conflict {
-                conflict = !self.unit_propagation();
-            }
-
-            if conflict == true {
-                if self.backtracking() == false {
-                    return SATSolution::Unsatisfiable;
-                }
+            let conflict = !(self.set_variable(literal, AssignmentType::Branching)
+                // unit propagation
+                && self.unit_propagation()
+                && self.pure_literal_elimination());
+            
+            // If backtracking does not help, formula is unsat.
+            if conflict && !self.backtracking(){
+                return SATSolution::Unsatisfiable;
             }
 
             if self.satisfaction_check() {
@@ -236,22 +233,22 @@ impl DataStructures {
 
     
 
-    fn set_variable(&mut self, i: usize, assign_type: AssignmentType, sign: VarValue) -> bool {
-        self.variables[i].value = sign;
-        self.assignment_stack.push(PrevAssignment {variable: i, assignment_type: assign_type});
+    fn set_variable(&mut self, lit: CNFVar, assign_type: AssignmentType) -> bool {
+        self.variables[lit.id].value = lit.sign.into();
+        self.assignment_stack.push(PrevAssignment { literal: lit, assignment_type: assign_type});
 
-        let mut pos_occ: &Vec<usize> = &self.variables[i].pos_occ;
-        let mut neg_occ: &Vec<usize> = &self.variables[i].neg_occ;
+        let mut pos_occ: &Vec<usize> = &self.variables[lit.id].pos_occ;
+        let mut neg_occ: &Vec<usize> = &self.variables[lit.id].neg_occ;
         let clauses = &mut self.clauses;
 
-        if self.variables[i].value == VarValue::Neg {
-            neg_occ = &self.variables[i].pos_occ;
-            pos_occ = &self.variables[i].neg_occ;
+        if self.variables[lit.id].value == VarValue::Neg {
+            neg_occ = &self.variables[lit.id].pos_occ;
+            pos_occ = &self.variables[lit.id].neg_occ;
         }
 
         pos_occ.iter().for_each(|p_occ| {
             if clauses[*p_occ].satisfied == None {
-                clauses[*p_occ].satisfied = Some(i)
+                clauses[*p_occ].satisfied = Some(lit.id)
             }
         });
 
@@ -276,26 +273,38 @@ impl DataStructures {
     }
 
     fn unit_propagation(&mut self) -> bool {
-        loop {
-            match self.unit_queue.pop_front() {
-                Some(var) => {
-                    if self.set_variable(var.id, AssignmentType::Forced, var.sign.into()) == false {
-                        return false;
-                    }
-                },
-                None => break
+        while let Some(var) = self.unit_queue.pop_front() {
+            if !self.set_variable(var, AssignmentType::Forced) {
+                return false;
             }
         }
         true
     }
 
+    fn pure_literal_elimination(&mut self) -> bool {
+        let pure_literals = self.variables.iter()
+            .enumerate()
+            .filter_map(|(id, var)| {
+                match var.value {
+                    VarValue::Free if var.pos_occ.is_empty() =>
+                        Some(CNFVar::new(id, false)),
+                    VarValue::Free if var.neg_occ.is_empty() => 
+                        Some(CNFVar::new(id, true)),
+                    _ => None
+                }
+            }).collect::<Vec<_>>();
+        pure_literals.into_iter()
+            .all(|literal| self.set_variable(literal, AssignmentType::Branching))
+    }
+
+
     fn backtracking(&mut self) -> bool {
         while let Some(assign) = self.assignment_stack.pop() {
-            let mut pos_occ: &Vec<usize> = &self.variables[assign.variable as usize].pos_occ;
-            let mut neg_occ: &Vec<usize> = &self.variables[assign.variable as usize].neg_occ;
-            if self.variables[assign.variable as usize].value == VarValue::Neg {
-                neg_occ = &self.variables[assign.variable as usize].pos_occ;
-                pos_occ = &self.variables[assign.variable as usize].neg_occ;
+            let mut pos_occ: &Vec<usize> = &self.variables[assign.literal.id].pos_occ;
+            let mut neg_occ: &Vec<usize> = &self.variables[assign.literal.id].neg_occ;
+            if self.variables[assign.literal.id].value == VarValue::Neg {
+                neg_occ = &self.variables[assign.literal.id].pos_occ;
+                pos_occ = &self.variables[assign.literal.id].neg_occ;
             }
 
             for i in 0..neg_occ.len() {
@@ -305,7 +314,7 @@ impl DataStructures {
             for i in 0..pos_occ.len() {
                 let p_occ = pos_occ[i];
                 if let Some(cl) = self.clauses[p_occ].satisfied {
-                    if cl == assign.variable {
+                    if cl == assign.literal.id {
                         self.clauses[p_occ].satisfied = None
                     }
                 }
@@ -315,7 +324,7 @@ impl DataStructures {
             self.unit_queue.clear();
 
             if assign.assignment_type == AssignmentType::Branching {
-                if self.set_variable(assign.variable, AssignmentType::Forced, -self.variables[assign.variable].value) {
+                if self.set_variable(-assign.literal, AssignmentType::Forced) {
                     // goto unit propagation
                     if self.unit_propagation() == false {
                         return self.backtracking();
@@ -323,7 +332,7 @@ impl DataStructures {
                 }
                 return true
             }
-            self.variables[assign.variable as usize].value = VarValue::Free;
+            self.variables[assign.literal.id].value = VarValue::Free;
         }
         // unsatisfied
         false

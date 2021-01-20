@@ -26,7 +26,7 @@ pub struct CNFClause {
 }
 
 /// Logical variable
-#[derive(Clone, Debug, PartialEq, PartialOrd, Ord, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
 pub struct CNFVar {
     /// Identifier of a variable
     pub id: VarId,
@@ -265,6 +265,14 @@ impl CNFVar {
         } else {
             -(self.id as i32)
         }
+    }
+}
+
+impl std::ops::Neg for CNFVar {
+    type Output = CNFVar;
+    fn neg(mut self) -> Self::Output {
+        self.sign = !self.sign;
+        self
     }
 }
 
