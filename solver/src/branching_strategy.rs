@@ -1,15 +1,14 @@
-
+use std::cmp::Ordering;
 use crate::{cnf, dpll};
 use cnf::CNFVar;
 use dpll::{Variables, Clauses, VarValue};
 
-pub trait BranchingStrategy: Clone {
+pub trait BranchingStrategy {
     /// Funtion that picks the next variable to be chosen for branching.
     /// Returns the index of the next variable, or None if there is no Variable to be picked
     fn pick_branching_variable(&self, variables: &Variables, clauses: &Clauses) -> Option<CNFVar>;
 }
 
-#[derive(Clone)]
 pub struct NaiveBranching;
 
 impl BranchingStrategy for NaiveBranching {
@@ -24,7 +23,6 @@ impl BranchingStrategy for NaiveBranching {
     }
 }
 
-#[derive(Clone)]
 pub struct DLIS;
 
 impl BranchingStrategy for DLIS {
@@ -49,7 +47,6 @@ impl BranchingStrategy for DLIS {
     }
 }
 
-#[derive(Clone)]
 pub struct DLCS;
 
 impl BranchingStrategy for DLCS {
@@ -67,5 +64,33 @@ impl BranchingStrategy for DLCS {
             }
         }
         cnf_var
+    }
+}
+
+pub struct JeroslawWang;
+
+impl BranchingStrategy for JeroslawWang {
+    fn pick_branching_variable(&self, variables: &Variables, clauses: &Clauses) -> Option<CNFVar> {
+        variables.iter()
+            .enumerate()
+            .filter(|(_, var)| var.value == VarValue::Free)
+            .map(|(id, var)| {
+                let pos: f32 = var.pos_occ.iter()
+                        .map(|clause| JeroslawWang::per_literal_measure(clauses[*clause].literals.len()))
+                        .sum();
+                let neg = var.neg_occ.iter()
+                        .map(|clause| JeroslawWang::per_literal_measure(clauses[*clause].literals.len()))
+                        .sum();
+                if pos < neg { (neg, false, id) }
+                else { (pos, true, id) }
+            }).max_by(|(v1, _, _), (v2, _, _)| v1.partial_cmp(v2).unwrap_or(Ordering::Equal))
+                .map(|(_, sign, id)| CNFVar::new(id, sign))
+    }
+}
+
+impl JeroslawWang {
+    #[inline]
+    fn per_literal_measure(w: usize) -> f32 {
+        2f32.powf(-(w as f32))
     }
 }

@@ -23,7 +23,7 @@ impl<B: BranchingStrategy> SatisfactionSolver<B> {
 impl<B: BranchingStrategy> Solver for SatisfactionSolver<B> {
     fn solve(&self, formula: CNF) -> SATSolution {
         let mut data = DataStructures::new(formula);
-        data.dpll(self.strategy.clone())
+        data.dpll(&self.strategy)
     }
 }
 
@@ -73,9 +73,9 @@ pub struct Variable {
 }
 
 pub struct Clause {
-    active_lits: usize,
-    satisfied: Option<usize>,
-    literals: Vec<CNFVar>,
+    pub active_lits: usize,
+    pub satisfied: Option<usize>,
+    pub literals: Vec<CNFVar>,
 }
 
 pub type Variables = Vec<Variable>;
@@ -165,7 +165,7 @@ impl DataStructures {
         }
     }
 
-    fn dpll(&mut self, mut branching: impl BranchingStrategy) -> SATSolution {
+    fn dpll(&mut self, branching: &impl BranchingStrategy) -> SATSolution {
         // unit propagation
         if !self.inital_unit_propagation() {
             return SATSolution::Unsatisfiable;
