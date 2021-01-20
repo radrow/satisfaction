@@ -75,12 +75,8 @@ impl BranchingStrategy for JeroslawWang {
             .enumerate()
             .filter(|(_, var)| var.value == VarValue::Free)
             .map(|(id, var)| {
-                let pos: f32 = var.pos_occ.iter()
-                        .map(|clause| JeroslawWang::per_literal_measure(clauses[*clause].literals.len()))
-                        .sum();
-                let neg = var.neg_occ.iter()
-                        .map(|clause| JeroslawWang::per_literal_measure(clauses[*clause].literals.len()))
-                        .sum();
+                let pos = JeroslawWang::compute(&var.pos_occ, clauses);
+                let neg = JeroslawWang::compute(&var.neg_occ, clauses);
                 if pos < neg { (neg, false, id) }
                 else { (pos, true, id) }
             }).max_by(|(v1, _, _), (v2, _, _)| v1.partial_cmp(v2).unwrap_or(Ordering::Equal))
@@ -90,8 +86,23 @@ impl BranchingStrategy for JeroslawWang {
 
 impl JeroslawWang {
     #[inline]
-    fn per_literal_measure(w: usize) -> f32 {
+    fn literal_measure(w: usize) -> f32 {
         2f32.powf(-(w as f32))
+    }
+
+    #[inline]
+    fn compute(occ: &Vec<usize>, clauses: &Clauses) -> f32 {
+        occ.iter()
+            /*.map(|clause_index| {
+                JeroslawWang::literal_measure(clauses[*clause_index].literals.len())*/
+            .filter_map(|clause_index| {
+                let clause = &clauses[*clause_index];
+                if clause.satisfied.is_none() {
+                    Some(JeroslawWang::literal_measure(clause.active_lits))
+                } else {
+                    None
+                }
+            }).sum()
     }
 }
 
