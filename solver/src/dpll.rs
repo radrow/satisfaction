@@ -6,27 +6,7 @@ use cnf::CNFVar;
 use std::fmt;
 use std::collections::VecDeque;
 use crate::{Solver, SATSolution};
-
-pub trait BranchingStrategy: Clone {
-    /// Funtion that picks the next variable to be chosen for branching.
-    /// Returns the index of the next variable, or None if there is no Variable to be picked
-    fn pick_branching_variable(&mut self, variables: &Variables, clauses: &Clauses) -> Option<CNFVar>;
-}
-
-#[derive(Clone)]
-pub struct NaiveBranching;
-
-impl BranchingStrategy for NaiveBranching {
-    fn pick_branching_variable(&mut self, variables: &Variables, _clauses: &Clauses) -> Option<CNFVar> {
-        // TODO -> add heuristics to chose Variables
-        variables.iter()
-            .enumerate()
-            .filter_map(|(i,v)| match v.value {
-                VarValue::Free  => Some(CNFVar::new(i, true)),
-                _               => None,
-            }).next()
-    }
-}
+use crate::{BranchingStrategy};
 
 pub struct SatisfactionSolver<B: BranchingStrategy> {
     strategy: B,
@@ -61,7 +41,7 @@ struct PrevAssignment {
 
 
 #[derive(Clone, Debug, PartialEq, Eq, Copy)]
-enum VarValue {
+pub enum VarValue {
     Pos, Neg, Free
 }
 
@@ -87,9 +67,9 @@ impl From<bool> for VarValue {
 }
 
 pub struct Variable {
-    value: VarValue, 
-    pos_occ: Vec<usize>,
-    neg_occ: Vec<usize>,
+    pub value: VarValue, 
+    pub pos_occ: Vec<usize>,
+    pub neg_occ: Vec<usize>,
 }
 
 pub struct Clause {
