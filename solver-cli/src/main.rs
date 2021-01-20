@@ -2,12 +2,18 @@ mod config;
 
 use clap::{App, Arg};
 use config::Config;
-use solver::brueforce::*;
+use solver::bruteforce::*;
 use solver::timed_solver::*;
+use solver::time_limited_solver::*;
 use std::io;
 use std::io::prelude::*;
 use std::fs::File;
-use solver::{sat_solver::Solver, cnf::CNF, SATSolution};
+use solver::{
+    Solver,
+    CNF,
+    SATSolution,
+    CadicalSolver,
+};
 
 fn make_config<'a>() -> Config {
     let matches = App::new("satisfaction")
@@ -38,9 +44,9 @@ fn make_config<'a>() -> Config {
              .takes_value(false))
         .get_matches();
 
-    let solver = match matches.value_of("algorithm").unwrap() {
-        "bruteforce" => &Bruteforce::Bruteforce,
-        "cadical" => panic!("Not supported"),
+    let solver: Box<dyn Solver> = match matches.value_of("algorithm").unwrap() {
+        "bruteforce" => Box::new(Bruteforce::Bruteforce),
+        "cadical" => Box::new(CadicalSolver),
         "satisfaction" => panic!("Not supported"),
         _ => panic!("Unknown algorithm")
     };
@@ -61,17 +67,20 @@ fn get_input(handle: &mut dyn Read) -> io::Result<String> {
     Ok(buffer)
 }
 
-fn solve_formula(solver: Box<dyn Solver>, formula: CNF, num_vars: usize) {
-    match solver.solve(formula, num_vars) {
+fn solve_formula(solver: Box<dyn Solver>, formula: CNF) {
+    println!("{}", solver.solve(formula).to_dimacs());
+    /*
+    match solver.solve(formula) {
         SATSolution::Unsatisfiable => println!("nah"),
         SATSolution::Satisfiable(solution) => println!("Solved!\n{:?}", solution),
         SATSolution::Unknown => unreachable!()
-    }
+    }*/
 }
 
-fn solve_plot_formula(solver: Box<dyn Solver>, formula: CNF, num_vars: usize) {
-    let solver_t = TimedSolver::new(solver);
-    let (_duration, _solution) = solver_t.solve_timed(formula, num_vars);
+fn solve_plot_formula(solver: Box<dyn Solver>, formula: CNF) {
+    let solver = TimedSolver::new(solver);
+    let solver = TimeLimitedSolver::new(solver, std::time::Duration::from_secs(60));
+    let (_duration, _solution) = solver.solve_timed(formula);
 }
 
 fn main() {
@@ -83,11 +92,10 @@ fn main() {
     }.unwrap_or_else(|e| panic!(e));
 
     let formula = CNF::from_dimacs(&input).expect("Parse error");
-    let num_vars = formula.num_vars();
 
     if config.plot {
-        solve_plot_formula(config.solver, formula, num_vars)
+        solve_plot_formula(config.solver, formula)
     } else {
-    solve_formula(config.solver, formula, num_vars)
+        solve_formula(config.solver, formula)
     }
 }
