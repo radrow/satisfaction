@@ -28,7 +28,7 @@ impl BranchingStrategy for NaiveBranching {
 pub struct DLIS;
 
 impl BranchingStrategy for DLIS {
-    fn pick_branching_variable(&mut self, variables: &Variables, _clauses: &Clauses) -> Option<CNFVar> {
+    fn pick_branching_variable(&self, variables: &Variables, _clauses: &Clauses) -> Option<CNFVar> {
         let mut max = 0;
         let mut cnf_var: Option<CNFVar> = None;
         for (i, v) in variables.iter().enumerate() {
