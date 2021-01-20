@@ -91,7 +91,7 @@ fn run_tests(formulae: Vec<(String, CNF)>, solvers: Vec<(String, Box<dyn Solver>
              -> Vec<(String, Vec<(String, Option<Duration>)>)> {
     let mut out = Vec::new();
     out.reserve(solvers.len());
-    for (name, solver) in &solvers {
+    for (name, solver) in solvers {
         let mut results = Vec::new();
         results.reserve(formulae.len());
         for (test_name, formula) in &formulae {
