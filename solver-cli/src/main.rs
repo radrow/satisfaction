@@ -4,6 +4,7 @@ use clap::{App, Arg};
 use config::Config;
 use solver::bruteforce::*;
 use solver::timed_solver::*;
+use solver::time_limited_solver::*;
 use std::io;
 use std::io::prelude::*;
 use std::fs::File;
@@ -70,8 +71,9 @@ fn solve_formula(solver: Box<dyn Solver>, formula: CNF) {
 }
 
 fn solve_plot_formula(solver: Box<dyn Solver>, formula: CNF) {
-    let solver_t = TimedSolver::new(solver);
-    let (_duration, _solution) = solver_t.solve_timed(formula);
+    let solver = TimedSolver::new(solver);
+    let solver = TimeLimitedSolver::new(solver, std::time::Duration::from_secs(60));
+    let (_duration, _solution) = solver.solve_timed(formula);
 }
 
 fn main() {
