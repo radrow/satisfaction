@@ -128,47 +128,27 @@ impl JeroslawWang {
 }
 
 pub struct MOM;
+
 impl BranchingStrategy for MOM {
     fn pick_branching_variable(&self, variables: &Variables, clauses: &Clauses) -> Option<CNFVar> {
-        let min_clause_width =
-            clauses.iter().map(|c| (*c).literals.len()).min()?;
+        let min_clause_width = usize::max(2,
+            clauses.iter()
+            .map(|c| c.active_lits)
+            .min()?);
+
         variables.iter()
             .enumerate()
+            .filter(|(_, var)| var.value == VarValue::Free)
             .max_by_key(
                 |(_, v)| {
                     let hp =
-                        v.pos_occ.iter().
-                        filter(|c| clauses[**c].literals.len() == min_clause_width)
-                        .count();
+                        v.pos_occ.iter()
+                            .filter(|c| clauses[**c].active_lits == min_clause_width)
+                            .count();
                     let hn =
-                        v.neg_occ.iter().
-                        filter(|c| clauses[**c].literals.len() == min_clause_width)
-                        .count();
-
-                    ((hp + hn) << 32) + hp * hn
-                }
-            ).map(|(i, _)| CNFVar::pos(i))
-    }
-}
-
-/// A variation of MOM where we measure width counting only active literals
-pub struct ActiveMOM;
-impl BranchingStrategy for ActiveMOM {
-    fn pick_branching_variable(&self, variables: &Variables, clauses: &Clauses) -> Option<CNFVar> {
-        let min_clause_width =
-            clauses.iter().map(|c| (*c).active_lits).min()?;
-        variables.iter()
-            .enumerate()
-            .max_by_key(
-                |(_, v)| {
-                    let hp =
-                        v.pos_occ.iter().
-                        filter(|c| clauses[**c].literals.len() == min_clause_width)
-                        .count();
-                    let hn =
-                        v.neg_occ.iter().
-                        filter(|c| clauses[**c].literals.len() == min_clause_width)
-                        .count();
+                        v.neg_occ.iter()
+                            .filter(|c| clauses[**c].active_lits == min_clause_width)
+                            .count();
 
                     ((hp + hn) << 32) + hp * hn
                 }

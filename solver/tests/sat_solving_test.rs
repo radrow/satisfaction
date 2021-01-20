@@ -4,7 +4,7 @@ use proptest::{
     bool::weighted,
 };
 use std::path::PathBuf;
-use solver::{CadicalSolver, Solver, CNFClause, CNFVar, SATSolution, CNF, SatisfactionSolver, NaiveBranching, JeroslawWang, DLCS, DLIS};
+use solver::{CadicalSolver, Solver, CNFClause, CNFVar, SATSolution, CNF, SatisfactionSolver, NaiveBranching, JeroslawWang, DLCS, DLIS, MOM};
 
 const MAX_NUM_VARIABLES: usize = 50;
 const MAX_NUM_LITERALS: usize = 10;
@@ -43,7 +43,9 @@ fn prescribed_instances() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/prescribed_instances");
     
-    let solver = SatisfactionSolver::new(DLIS);
+    let solver = SatisfactionSolver::new(MOM);
+    //let solver = SatisfactionSolver::new(DLIS);
+    //let solver = SatisfactionSolver::new(DLCS);
 
     let process = |files: PathBuf, satisfiable: bool| {
         files.read_dir()

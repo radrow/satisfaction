@@ -48,15 +48,15 @@ fn criterion_benchmark(c: &mut Criterion) {
     // Change input directory
     let sat_dir = path.join("sat");
     // Append branching strategy
-    //create_group_for_solver(c, "MOM", SatisfactionSolver::new(MOM), &sat_dir);
+    create_group_for_solver(c, "MOM", SatisfactionSolver::new(MOM), &sat_dir);
+    create_group_for_solver(c, "DLIS", SatisfactionSolver::new(DLIS), &sat_dir);
     create_group_for_solver(c, "Jeroslaw Wang", SatisfactionSolver::new(JeroslawWang), &sat_dir);
     create_group_for_solver(c, "DLCS", SatisfactionSolver::new(DLCS), &sat_dir);
-    create_group_for_solver(c, "DLIS", SatisfactionSolver::new(DLIS), &sat_dir);
 }
 
 criterion_group!{
     name = benches;
-    config = Criterion::default();
+    config = Criterion::default().sample_size(10);
     targets = criterion_benchmark
 }
 criterion_main!(benches);
