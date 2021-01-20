@@ -8,7 +8,12 @@ use solver::time_limited_solver::*;
 use std::io;
 use std::io::prelude::*;
 use std::fs::File;
-use solver::{sat_solver::Solver, cnf::CNF, SATSolution};
+use solver::{
+    Solver,
+    CNF,
+    SATSolution,
+    CadicalSolver,
+};
 
 fn make_config<'a>() -> Config {
     let matches = App::new("satisfaction")
@@ -39,9 +44,9 @@ fn make_config<'a>() -> Config {
              .takes_value(false))
         .get_matches();
 
-    let solver = match matches.value_of("algorithm").unwrap() {
-        "bruteforce" => Bruteforce::Bruteforce,
-        "cadical" => panic!("Not supported"),
+    let solver: Box<dyn Solver> = match matches.value_of("algorithm").unwrap() {
+        "bruteforce" => Box::new(Bruteforce::Bruteforce),
+        "cadical" => Box::new(CadicalSolver),
         "satisfaction" => panic!("Not supported"),
         _ => panic!("Unknown algorithm")
     };
@@ -63,11 +68,13 @@ fn get_input(handle: &mut dyn Read) -> io::Result<String> {
 }
 
 fn solve_formula(solver: Box<dyn Solver>, formula: CNF) {
+    println!("{}", solver.solve(formula).to_dimacs());
+    /*
     match solver.solve(formula) {
         SATSolution::Unsatisfiable => println!("nah"),
         SATSolution::Satisfiable(solution) => println!("Solved!\n{:?}", solution),
         SATSolution::Unknown => unreachable!()
-    }
+    }*/
 }
 
 fn solve_plot_formula(solver: Box<dyn Solver>, formula: CNF) {
