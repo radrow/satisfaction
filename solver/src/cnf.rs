@@ -79,12 +79,6 @@ impl CNF {
             .collect()
     }
 
-    /// Calculates the number of distinct variables (unifies negated and positive)
-    pub fn num_vars(&self) -> usize {
-        self.vars().iter()
-            .count()
-    }
-
     /// Prints formula in DIMACS compatible form
     pub fn to_dimacs(&self) -> String {
         let mut out : String = String::from("");

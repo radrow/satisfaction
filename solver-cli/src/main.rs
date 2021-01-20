@@ -11,7 +11,6 @@ use std::fs::File;
 use solver::{
     Solver,
     CNF,
-    SATSolution,
     CadicalSolver,
 };
 
@@ -69,12 +68,6 @@ fn get_input(handle: &mut dyn Read) -> io::Result<String> {
 
 fn solve_formula(solver: Box<dyn Solver>, formula: CNF) {
     println!("{}", solver.solve(formula).to_dimacs());
-    /*
-    match solver.solve(formula) {
-        SATSolution::Unsatisfiable => println!("nah"),
-        SATSolution::Satisfiable(solution) => println!("Solved!\n{:?}", solution),
-        SATSolution::Unknown => unreachable!()
-    }*/
 }
 
 fn solve_plot_formula(solver: Box<dyn Solver>, formula: CNF) {
