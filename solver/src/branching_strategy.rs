@@ -26,12 +26,12 @@ impl BranchingStrategy for NaiveBranching {
 pub struct DLIS;
 
 impl BranchingStrategy for DLIS {
-    fn pick_branching_variable(&self, variables: &Variables, _clauses: &Clauses) -> Option<CNFVar> {
+    fn pick_branching_variable(&self, variables: &Variables, clauses: &Clauses) -> Option<CNFVar> {
         let mut max = 0;
         let mut cnf_var: Option<CNFVar> = None;
         for (i, v) in variables.iter().enumerate() {
             if v.value == VarValue::Free {
-                let mut local_max = v.pos_occ.len();
+                /*let mut local_max = v.pos_occ.len();
                 let mut local_cnf_var = CNFVar {id: i, sign: true};
                 if v.pos_occ.len() < v.neg_occ.len() {
                     local_max = v.neg_occ.len();
@@ -40,6 +40,13 @@ impl BranchingStrategy for DLIS {
                 if local_max > max {
                     max = local_max;
                     cnf_var = Some(local_cnf_var);
+                }*/
+                let pos = v.pos_occ.iter().filter(|clause| clauses[**clause].satisfied.is_none()).count();
+                let neg = v.neg_occ.iter().filter(|clause| clauses[**clause].satisfied.is_none()).count();
+                let (sign, local_max) = if pos > neg { (true, pos) } else { (false, neg) };
+                if local_max > max {
+                    max = local_max;
+                    cnf_var = Some(CNFVar::new(i, sign));
                 }
             }
         }
