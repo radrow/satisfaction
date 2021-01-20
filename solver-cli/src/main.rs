@@ -2,7 +2,7 @@ mod config;
 
 use clap::{App, Arg};
 use config::Config;
-use solver::brueforce::*;
+use solver::bruteforce::*;
 use solver::timed_solver::*;
 use std::io;
 use std::io::prelude::*;
@@ -39,7 +39,7 @@ fn make_config<'a>() -> Config {
         .get_matches();
 
     let solver = match matches.value_of("algorithm").unwrap() {
-        "bruteforce" => &Bruteforce::Bruteforce,
+        "bruteforce" => Bruteforce::Bruteforce,
         "cadical" => panic!("Not supported"),
         "satisfaction" => panic!("Not supported"),
         _ => panic!("Unknown algorithm")
@@ -61,17 +61,17 @@ fn get_input(handle: &mut dyn Read) -> io::Result<String> {
     Ok(buffer)
 }
 
-fn solve_formula(solver: Box<dyn Solver>, formula: CNF, num_vars: usize) {
-    match solver.solve(formula, num_vars) {
+fn solve_formula(solver: Box<dyn Solver>, formula: CNF) {
+    match solver.solve(formula) {
         SATSolution::Unsatisfiable => println!("nah"),
         SATSolution::Satisfiable(solution) => println!("Solved!\n{:?}", solution),
         SATSolution::Unknown => unreachable!()
     }
 }
 
-fn solve_plot_formula(solver: Box<dyn Solver>, formula: CNF, num_vars: usize) {
+fn solve_plot_formula(solver: Box<dyn Solver>, formula: CNF) {
     let solver_t = TimedSolver::new(solver);
-    let (_duration, _solution) = solver_t.solve_timed(formula, num_vars);
+    let (_duration, _solution) = solver_t.solve_timed(formula);
 }
 
 fn main() {
@@ -83,11 +83,10 @@ fn main() {
     }.unwrap_or_else(|e| panic!(e));
 
     let formula = CNF::from_dimacs(&input).expect("Parse error");
-    let num_vars = formula.num_vars();
 
     if config.plot {
-        solve_plot_formula(config.solver, formula, num_vars)
+        solve_plot_formula(config.solver, formula)
     } else {
-    solve_formula(config.solver, formula, num_vars)
+        solve_formula(config.solver, formula)
     }
 }
