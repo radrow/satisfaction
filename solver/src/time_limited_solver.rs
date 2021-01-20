@@ -1,6 +1,6 @@
 use std::{
     time::Duration,
-    sync::{mpsc::channel,Arc,Mutex},
+    sync::{mpsc::channel,Arc},
     thread::spawn,
 };
 use crate::{CNF, Solver, SATSolution, TimedSolver};
