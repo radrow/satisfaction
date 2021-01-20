@@ -91,14 +91,14 @@ fn run_tests(formulae: Vec<(String, CNF)>, solvers: Vec<(String, Box<dyn Solver>
              -> Vec<(String, Vec<(String, Option<Duration>)>)> {
     let mut out = Vec::new();
     out.reserve(solvers.len());
-    for (name, solver) in solvers {
+    for (name, solver) in &solvers {
         let mut results = Vec::new();
         results.reserve(formulae.len());
         for (test_name, formula) in &formulae {
             let (duration, solution) = solve_formula(solver, &formula);
             match solution {
-                solver::SATSolution::Unknown => results.push((test_name, None)),
-                _ => results.push((test_name, Some(duration)))
+                solver::SATSolution::Unknown => results.push((test_name.clone(), None)),
+                _ => results.push((test_name.clone(), Some(duration)))
             }
         }
         out.push((name, results))
