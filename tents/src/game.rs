@@ -1,6 +1,6 @@
 extern crate iced;
 
-use solver::brueforce::Bruteforce::Bruteforce;
+use solver::bruteforce::Bruteforce::Bruteforce;
 use iced::{executor};
 use iced::{Length, Align};
 use iced::{Element, Row, Application, Svg, Text, Command, Subscription, HorizontalAlignment, VerticalAlignment, Container};

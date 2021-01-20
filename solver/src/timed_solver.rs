@@ -6,19 +6,19 @@ use time::{Instant, Duration};
 
 /// A wrapper for another solver which exposes time performance
 /// measurement
-pub struct TimedSolver {
-    solver: Box<dyn Solver>,
+pub struct TimedSolver<S: Solver> {
+    solver: S,
 }
 
-impl Solver for TimedSolver {
+impl<S: Solver> Solver for TimedSolver<S> {
     fn solve(&self, formula: CNF) -> SATSolution {
         self.solver.solve(formula)
     }
 }
 
-impl TimedSolver {
+impl<S: Solver> TimedSolver<S> {
     /// Wraps a boxed solver in a `TimedSolver`
-    pub fn new(solver: Box<dyn Solver>) -> TimedSolver {
+    pub fn new(solver: S) -> Self {
         TimedSolver{solver}
     }
 
