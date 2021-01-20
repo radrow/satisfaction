@@ -11,7 +11,7 @@ pub struct TimedSolver<S: Solver> {
 }
 
 impl<S: Solver> Solver for TimedSolver<S> {
-    fn solve(&self, formula: CNF) -> SATSolution {
+    fn solve(&self, formula: &CNF) -> SATSolution {
         self.solver.solve(formula)
     }
 }
@@ -25,7 +25,7 @@ impl<S: Solver> TimedSolver<S> {
     /// Runs the solver and returns the duration of the computation along with
     /// the actual result
     pub fn solve_timed(
-        &self, formula: CNF) -> (Duration, SATSolution) {
+        &self, formula: &CNF) -> (Duration, SATSolution) {
         let start = Instant::now();
         let solution = self.solve(formula);
         let end = Instant::now();

@@ -3,7 +3,7 @@ use crate::{cnf, dpll};
 use cnf::CNFVar;
 use dpll::{Variables, Clauses, VarValue};
 
-pub trait BranchingStrategy: Clone {
+pub trait BranchingStrategy: Clone + Sized {
     /// Funtion that picks the next variable to be chosen for branching.
     /// Returns the index of the next variable, or None if there is no Variable to be picked
     fn pick_branching_variable(&self, variables: &Variables, clauses: &Clauses) -> Option<CNFVar>;
@@ -73,6 +73,7 @@ impl BranchingStrategy for DLCS {
 
 #[derive(Clone)]
 pub struct MOM;
+
 impl BranchingStrategy for MOM {
     fn pick_branching_variable(&self, variables: &Variables, clauses: &Clauses) -> Option<CNFVar> {
         let min_clause_width =
@@ -99,6 +100,7 @@ impl BranchingStrategy for MOM {
 /// A variation of MOM where we measure width counting only active literals
 #[derive(Clone)]
 pub struct ActiveMOM;
+
 impl BranchingStrategy for ActiveMOM {
     fn pick_branching_variable(&self, variables: &Variables, clauses: &Clauses) -> Option<CNFVar> {
         let min_clause_width =

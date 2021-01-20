@@ -21,7 +21,7 @@ impl<B: BranchingStrategy> SatisfactionSolver<B> {
 }
 
 impl<B: BranchingStrategy> Solver for SatisfactionSolver<B> {
-    fn solve(&self, formula: CNF) -> SATSolution {
+    fn solve(&self, formula: &CNF) -> SATSolution {
         let mut data = DataStructures::new(formula);
         data.dpll(&self.strategy)
     }
@@ -151,7 +151,7 @@ struct DataStructures {
 }
 
 impl DataStructures {
-    fn new(cnf: CNF) -> DataStructures {
+    fn new(cnf: &CNF) -> DataStructures {
         let clauses: Vec<Clause> = cnf.clauses.iter().map(|cnf_clause| Clause::new(&cnf_clause)).collect();
         let variables = (1..=cnf.num_variables).map(|i| Variable::new(&cnf, i)).collect();
         let unit_queue = VecDeque::with_capacity(cnf.num_variables);

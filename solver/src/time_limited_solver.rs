@@ -17,11 +17,12 @@ pub struct TimeLimitedSolver<S: Solver> {
 }
 
 impl<S: Solver + 'static> Solver for TimeLimitedSolver<S> {
-    fn solve(&self, formula: CNF) -> SATSolution {
+    fn solve(&self, formula: &CNF) -> SATSolution {
         let (sender, recv) = channel();
         let solver = self.solver.clone();
+        let cloned = formula.clone();
         spawn(move || {
-            let solution = solver.0.solve(formula);
+            let solution = solver.0.solve(&cloned);
             let _ = sender.send(solution).unwrap();
         });
         recv.recv_timeout(self.max_duration)
@@ -39,7 +40,7 @@ impl<S: Solver> TimeLimitedSolver<S> {
 }
 
 impl<S: Solver> TimeLimitedSolver<TimedSolver<S>> {
-    pub fn solve_timed(&self, formula: CNF) -> (time::Duration, SATSolution) {
+    pub fn solve_timed(&self, formula: &CNF) -> (time::Duration, SATSolution) {
         self.solver.0.solve_timed(formula)
     }
 }

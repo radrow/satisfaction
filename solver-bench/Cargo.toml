@@ -1,0 +1,14 @@
+[package]
+name = "solver-bench"
+version = "0.1.0"
+authors = [
+    "Radoslaw Rowicki <radrowicki@gmail.com>",
+    "Alexander Lankheit <a.lankheit@campus.lmu.de>",
+    "Korbinian Federholzner <k.federholzner@campus.lmu.de>",
+]
+edition = "2018"
+
+[dependencies]
+solver = {path = "../solver"}
+clap = "2.33.3"
+time = "*"

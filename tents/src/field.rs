@@ -173,7 +173,7 @@ impl Field {
     /// Solve the puzzle
     pub fn solve(&mut self, solver: &dyn Solver) -> bool {
         let (formula, t_mapping, a_mapping) = self.to_formula();
-        match solver.solve(formula) {
+        match solver.solve(&formula) {
             SATSolution::Satisfiable(assignment) => {
                 for y in 0..self.height {
                     for x in 0..self.width {

@@ -3,7 +3,7 @@ use rayon::prelude::*;
 
 
 pub trait Solver {
-    fn solve(&self, formula: CNF) -> SATSolution;
+    fn solve(&self, formula: &CNF) -> SATSolution;
 }
 
 pub fn check_valuation(formula: &CNF, val: &Vec<bool>) -> bool {
@@ -12,7 +12,7 @@ pub fn check_valuation(formula: &CNF, val: &Vec<bool>) -> bool {
 }
 
 impl<S: Solver + ?Sized> Solver for Box<S> {
-    fn solve(&self, formula: CNF) -> SATSolution {
+    fn solve(&self, formula: &CNF) -> SATSolution {
         self.as_ref().solve(formula)
     }
 }
