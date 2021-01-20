@@ -1,4 +1,5 @@
 mod config;
+mod plotting;
 
 use clap::{App, Arg};
 use config::Config;
@@ -14,6 +15,7 @@ use solver::{
     SATSolution,
     CadicalSolver,
 };
+use plotting::plot_runtimes;
 
 fn make_config<'a>() -> Config {
     let matches = App::new("satisfaction")
