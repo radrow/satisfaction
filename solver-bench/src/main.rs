@@ -99,6 +99,18 @@ fn run_tests<S: TimeLimitedSolver>(formulae: &Vec<CNF>, solver: TimedSolver<S>, 
         }).collect()
 }
 
+fn count_in_minute(durations: &Vec<Duration>) -> usize {
+    let mut total = Duration::from_secs(0);
+    let mut count: usize = 0;
+
+    while total < Duration::from_secs(60) && count < durations.len() {
+        total += durations[count];
+        count += 1;
+    }
+
+    count
+}
+
 /// Returns a vector of test results; for each solver duration on each test
 fn run_benchmark(formulae: Vec<CNF>, solvers: Vec<(String, Box<dyn TimeLimitedSolver>)>, max_duration: Duration) -> HashMap<String, Vec<Duration>> {
     solvers.into_iter()
@@ -107,6 +119,7 @@ fn run_benchmark(formulae: Vec<CNF>, solvers: Vec<(String, Box<dyn TimeLimitedSo
             println!("Started {}", &name);
             let result = run_tests(&formulae, solver, max_duration);
             println!("Finished {}", &name);
+            println!("Performed {} tests in a minute", count_in_minute(&result));
             (name, result)
         }).collect()
 }
