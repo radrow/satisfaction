@@ -84,8 +84,10 @@ fn main() {
     let config = make_config();
 
     let input = match config.input {
-        None =>
-            get_input(&mut io::stdin()),
+        None => {
+            println!("No input file specified. Reading from standard input...");
+            get_input(&mut io::stdin())
+        },
         Some(file) =>
             get_input(&mut File::open(&file)
                       .expect(&("Couldn't open file ".to_string() + &file)))
