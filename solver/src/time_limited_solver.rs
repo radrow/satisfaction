@@ -39,8 +39,16 @@ impl<S: Solver> TimeLimitedSolver<S> {
     }
 }
 
-impl<S: Solver> TimeLimitedSolver<TimedSolver<S>> {
-    pub fn solve_timed(&self, formula: &CNF) -> (time::Duration, SATSolution) {
-        self.solver.0.solve_timed(formula)
+impl<S: Solver+'static> TimeLimitedSolver<TimedSolver<S>> {
+    pub fn solve_timed(&self, formula: &CNF) -> (Duration, SATSolution) {
+        let (sender, recv) = channel();
+        let solver = self.solver.clone();
+        let cloned = formula.clone();
+        spawn(move || {
+            let solution = solver.0.solve_timed(&cloned);
+            let _ = sender.send(solution).unwrap();
+        });
+        recv.recv_timeout(self.max_duration)
+            .unwrap_or((self.max_duration, SATSolution::Unknown))
     }
 }
