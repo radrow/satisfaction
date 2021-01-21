@@ -32,7 +32,7 @@ fn make_config<'a>() -> Config {
              .takes_value(true)
              .possible_values(&["bruteforce", "cadical", "satisfaction"])
              .default_value("satisfaction"))
-        .arg(Arg::with_name("branching")
+        .arg(Arg::with_name("branch")
              .long("branch")
              .help("DPLL branching strategy")
              .requires_if("algorithm", "satisfaction")
