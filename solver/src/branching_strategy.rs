@@ -92,12 +92,20 @@ pub struct JeroslawWang;
 
 impl BranchingStrategy for JeroslawWang {
     fn pick_branching_variable(&self, variables: &Variables, clauses: &Clauses) -> Option<CNFVar> {
+        let values: Vec<_> = clauses.iter()
+            .map(|clause| if clause.satisfied.is_none() {
+                Some(JeroslawWang::literal_measure(clause.active_lits))
+            } else {
+                None
+            })
+            .collect();
+
         variables.iter()
             .enumerate()
             .filter(|(_, var)| var.value == VarValue::Free)
             .map(|(id, var)| {
-                let pos = JeroslawWang::compute(&var.pos_occ, clauses);
-                let neg = JeroslawWang::compute(&var.neg_occ, clauses);
+                let pos = JeroslawWang::compute(&var.pos_occ, &values);
+                let neg = JeroslawWang::compute(&var.neg_occ, &values);
                 if pos < neg { (neg, false, id) }
                 else { (pos, true, id) }
             }).max_by(|(v1, _, _), (v2, _, _)| v1.partial_cmp(v2).unwrap_or(Ordering::Equal))
@@ -112,17 +120,10 @@ impl JeroslawWang {
     }
 
     #[inline]
-    fn compute(occ: &Vec<usize>, clauses: &Clauses) -> f32 {
+    fn compute(occ: &Vec<usize>, values: &[Option<f32>]) -> f32 {
         occ.iter()
-            /*.map(|clause_index| {
-                JeroslawWang::literal_measure(clauses[*clause_index].literals.len())*/
             .filter_map(|clause_index| {
-                let clause = &clauses[*clause_index];
-                if clause.satisfied.is_none() {
-                    Some(JeroslawWang::literal_measure(clause.active_lits))
-                } else {
-                    None
-                }
+                unsafe { *values.get_unchecked(*clause_index) }
             }).sum()
     }
 }
@@ -150,7 +151,7 @@ impl BranchingStrategy for MOM {
                             .filter(|c| clauses[**c].active_lits == min_clause_width)
                             .count();
 
-                    ((hp + hn) << 32) + hp * hn
+                    (hp + hn) * clauses.len()^2 + hp * hn
                 }
             ).map(|(i, _)| CNFVar::pos(i))
     }
