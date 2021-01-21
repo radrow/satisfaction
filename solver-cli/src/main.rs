@@ -1,6 +1,6 @@
 mod config;
 
-use solver::SATSolution::Satisfiable;
+use solver::SATSolution::{Satisfiable, Unknown};
 use std::process::exit;
 use clap::{App, Arg};
 use config::Config;
@@ -104,6 +104,11 @@ fn main() {
     if config.return_code {
         match solution {
             Satisfiable(_) => exit(1),
+            _ => ()
+        }
+    } else {
+        match solution {
+            Unknown => exit(2),
             _ => ()
         }
     }
