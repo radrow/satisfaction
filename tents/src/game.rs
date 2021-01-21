@@ -1,6 +1,6 @@
 extern crate iced;
 
-use solver::bruteforce::Bruteforce::Bruteforce;
+use solver::CadicalSolver;
 use iced::{executor};
 use iced::{Length, Align};
 use iced::{Element, Row, Application, Svg, Text, Command, Subscription, HorizontalAlignment, VerticalAlignment, Container};
@@ -62,7 +62,7 @@ impl Application for Game {
             },
             Message::SolvePuzzle => {
                 let field = self.field.as_mut().unwrap();
-                if field.solve(&Bruteforce) {
+                if field.solve(&CadicalSolver) {
                     self.puzzle_solved = true;
                 }
             },
