@@ -1,7 +1,7 @@
 extern crate solver;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BatchSize};
-use solver::{SatisfactionSolver, CadicalSolver, NaiveBranching, CNF, Solver};
+use criterion::{criterion_group, criterion_main, Criterion, BatchSize};
+use solver::{SatisfactionSolver, CadicalSolver, CNF, Solver, JeroslawWang, DLCS, DLIS, MOM};
 use std::path::{PathBuf, Path};
 
 
@@ -47,13 +47,15 @@ fn criterion_benchmark(c: &mut Criterion) {
     // Change input directory
     let sat_dir = path.join("sat");
     // Append branching strategy
-    create_group_for_solver(c, "Naive Branching", SatisfactionSolver::new(NaiveBranching), &sat_dir);
-    create_group_for_solver(c, "Cadical", CadicalSolver, &sat_dir);
+    create_group_for_solver(c, "MOM", SatisfactionSolver::new(MOM), &sat_dir);
+    create_group_for_solver(c, "DLIS", SatisfactionSolver::new(DLIS), &sat_dir);
+    create_group_for_solver(c, "Jeroslaw Wang", SatisfactionSolver::new(JeroslawWang), &sat_dir);
+    create_group_for_solver(c, "DLCS", SatisfactionSolver::new(DLCS), &sat_dir);
 }
 
 criterion_group!{
     name = benches;
-    config = Criterion::default();
+    config = Criterion::default().sample_size(10);
     targets = criterion_benchmark
 }
 criterion_main!(benches);

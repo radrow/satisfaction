@@ -17,7 +17,6 @@ use solver::{
     TimeLimitedSolver,
     SATSolution,
     CNF,
-    Bruteforce,
     SatisfactionSolver,
 };
 
@@ -55,14 +54,10 @@ fn make_config<'a>() -> Config {
     let solvers : Vec<(String, Box<dyn TimeLimitedSolver>)> =
         vec![
             // Brute to expensive
-            // ("brute".to_string()  ,    Box::new(Bruteforce::Bruteforce)),
-            // ("cadical".to_string(),    Box::new(CadicalSolver)),
-            // ("dpll-naive".to_string(), Box::new(SatisfactionSolver::new(solver::NaiveBranching))),
-            ("dpll-dlis".to_string(),  Box::new(SatisfactionSolver::new(solver::DLIS))),
-            ("dpll-dlcs".to_string(),  Box::new(SatisfactionSolver::new(solver::DLCS))),
-            // Not working
-            //("dpll-mom".to_string(),   Box::new(SatisfactionSolver::new(solver::MOM))),
-            //("dpll-amom".to_string(),  Box::new(SatisfactionSolver::new(solver::ActiveMOM))),
+            ("DLIS".to_string(),  Box::new(SatisfactionSolver::new(solver::DLIS))),
+            ("DLCS".to_string(),  Box::new(SatisfactionSolver::new(solver::DLCS))),
+            ("MOM".to_string(),  Box::new(SatisfactionSolver::new(solver::MOM))),
+            ("Jeroslaw-Wang".to_string(),  Box::new(SatisfactionSolver::new(solver::JeroslawWang))),
         ];
 
     Config{
