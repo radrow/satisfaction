@@ -16,9 +16,7 @@ use solver::{
     TimedSolver,
     TimeLimitedSolver,
     SATSolution,
-    Solver,
     CNF,
-    CadicalSolver,
     Bruteforce,
     SatisfactionSolver,
 };
@@ -47,11 +45,11 @@ fn make_config<'a>() -> Config {
              .takes_value(false))
         .get_matches();
 
-    let solvers : Vec<(String, Box<dyn Solver>)> =
+    let solvers : Vec<(String, Box<dyn TimeLimitedSolver>)> =
         vec![
             // Brute to expensive
             // ("brute".to_string()  ,    Box::new(Bruteforce::Bruteforce)),
-            ("cadical".to_string(),    Box::new(CadicalSolver)),
+            // ("cadical".to_string(),    Box::new(CadicalSolver)),
             // ("dpll-naive".to_string(), Box::new(SatisfactionSolver::new(solver::NaiveBranching))),
             ("dpll-dlis".to_string(),  Box::new(SatisfactionSolver::new(solver::DLIS))),
             ("dpll-dlcs".to_string(),  Box::new(SatisfactionSolver::new(solver::DLCS))),
@@ -87,10 +85,10 @@ fn load_files(dir: &Path) -> io::Result<Vec<CNF>> {
     Ok(out)
 }
 
-fn run_tests<S: Solver+'static>(formulae: &Vec<CNF>, solver: TimeLimitedSolver<TimedSolver<S>>) -> Vec<Duration> {
+fn run_tests<S: TimeLimitedSolver>(formulae: &Vec<CNF>, solver: TimedSolver<S>, max_duration: Duration) -> Vec<Duration> {
     formulae.iter()
         .filter_map(|formula| {
-            let (duration, solution) = solver.solve_timed(formula);
+            let (duration, solution) = solver.solve_timed(formula, max_duration);
             match solution {
                 SATSolution::Unknown    => None,
                 _                       => Some(duration),
@@ -99,13 +97,12 @@ fn run_tests<S: Solver+'static>(formulae: &Vec<CNF>, solver: TimeLimitedSolver<T
 }
 
 /// Returns a vector of test results; for each solver duration on each test
-fn run_benchmark(formulae: Vec<CNF>, solvers: Vec<(String, Box<dyn Solver>)>, max_duration: Duration) -> HashMap<String, Vec<Duration>> {
+fn run_benchmark(formulae: Vec<CNF>, solvers: Vec<(String, Box<dyn TimeLimitedSolver>)>, max_duration: Duration) -> HashMap<String, Vec<Duration>> {
     solvers.into_iter()
         .map(|(name, solver)| {
             let solver = TimedSolver::new(solver);
-            let solver = TimeLimitedSolver::new(solver, max_duration);
             println!("Started {}", &name);
-            let result = run_tests(&formulae, solver);
+            let result = run_tests(&formulae, solver, max_duration);
             println!("Finished {}", &name);
             (name, result)
         }).collect()
