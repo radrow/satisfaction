@@ -1,9 +1,8 @@
 extern crate solver;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BatchSize};
-use solver::{SATSolution, SatisfactionSolver, CadicalSolver, NaiveBranching, CNF, Solver, BranchingStrategy};
+use solver::{SatisfactionSolver, CadicalSolver, NaiveBranching, CNF, Solver};
 use std::path::{PathBuf, Path};
-use std::time::Duration;
 
 
 fn load_formulae(directory: impl AsRef<Path>) -> impl Iterator<Item=(String, CNF)> {
@@ -34,7 +33,7 @@ fn create_group_for_solver(c: &mut Criterion, name: &str, strategy: impl Solver,
     for (name, formula) in load_formulae(path) {
         let solver = solver.clone();
         group.bench_function(name, move |b| {
-            b.iter_batched(|| formula.clone(),|formula| solver.solve(formula), BatchSize::SmallInput)
+            b.iter_batched(|| formula.clone(),|formula| solver.solve(&formula), BatchSize::SmallInput)
         });
     }
 
