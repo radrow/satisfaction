@@ -16,3 +16,4 @@ pub use dpll::SatisfactionSolver;
 pub use branching_strategy::{BranchingStrategy, NaiveBranching, DLIS, DLCS, MOM, ActiveMOM};
 pub use sat_solution::{SATSolution, Valuation};
 pub use timed_solver::TimedSolver;
+pub use time_limited_solver::TimeLimitedSolver;

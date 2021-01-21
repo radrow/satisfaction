@@ -1,17 +1,21 @@
 mod config;
+mod plotting;
 
-use std::path::Path;
-use std::time::Duration;
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+    io,
+    io::prelude::*,
+    collections::HashMap,
+    fs::File,
+};
 use clap::{App, Arg};
 use config::Config;
-use solver::timed_solver::*;
-use solver::time_limited_solver::*;
-use std::io;
-use std::io::prelude::*;
-use std::fs::File;
-use std::collections::HashMap;
+use plotting::plot_runtimes;
 use solver::{
-    SATSolution
+    TimedSolver,
+    TimeLimitedSolver,
+    SATSolution,
     Solver,
     CNF,
     CadicalSolver,
@@ -30,6 +34,12 @@ fn make_config<'a>() -> Config {
              .takes_value(true)
              .required(true)
              .help("Directory of testing cases"))
+        .arg(Arg::with_name("output")
+            .short("o")
+            .long("output")
+            .takes_value(true)
+            .required(false)
+            .help("Output file for plot"))
         .arg(Arg::with_name("return_code")
              .long("return-code")
              .short("r")
@@ -42,16 +52,18 @@ fn make_config<'a>() -> Config {
             // Brute to expensive
             // ("brute".to_string()  ,    Box::new(Bruteforce::Bruteforce)),
             ("cadical".to_string(),    Box::new(CadicalSolver)),
-            ("dpll-naive".to_string(), Box::new(SatisfactionSolver::new(solver::NaiveBranching))),
+            // ("dpll-naive".to_string(), Box::new(SatisfactionSolver::new(solver::NaiveBranching))),
             ("dpll-dlis".to_string(),  Box::new(SatisfactionSolver::new(solver::DLIS))),
             ("dpll-dlcs".to_string(),  Box::new(SatisfactionSolver::new(solver::DLCS))),
-            ("dpll-mom".to_string(),   Box::new(SatisfactionSolver::new(solver::MOM))),
-            ("dpll-amom".to_string(),  Box::new(SatisfactionSolver::new(solver::ActiveMOM))),
+            // Not working
+            //("dpll-mom".to_string(),   Box::new(SatisfactionSolver::new(solver::MOM))),
+            //("dpll-amom".to_string(),  Box::new(SatisfactionSolver::new(solver::ActiveMOM))),
         ];
 
     Config{
         input: matches.value_of("input").map(String::from).unwrap(),
         plot: matches.is_present("plot"),
+        output: PathBuf::from(matches.value_of("output").unwrap_or("out.svg")),
         solvers,
     }
 }
@@ -63,16 +75,11 @@ fn load_files(dir: &Path) -> io::Result<Vec<CNF>> {
         for entry in dir_stream {
             let entry = entry?;
             let path = entry.path();
-            let filename = entry.file_name();
-            if !path.is_file() {
+            if path.is_file() {
                 let mut buffer = String::new();
                 let mut handle = File::open(path)?;
                 handle.read_to_string(&mut buffer)?;
                 let formula = CNF::from_dimacs(&buffer).expect("Parse error");
-                let testfile = match filename.to_str() {
-                    None => "???",
-                    Some(n) => n
-                };
                 out.push(formula)
             }
         }
@@ -80,7 +87,7 @@ fn load_files(dir: &Path) -> io::Result<Vec<CNF>> {
     Ok(out)
 }
 
-fn run_tests<S: Solver>(formulae: &Vec<CNF>, solver: TimeLimitedSolver<TimedSolver<S>>) -> Vec<Duration> {
+fn run_tests<S: Solver+'static>(formulae: &Vec<CNF>, solver: TimeLimitedSolver<TimedSolver<S>>) -> Vec<Duration> {
     formulae.iter()
         .filter_map(|formula| {
             let (duration, solution) = solver.solve_timed(formula);
@@ -97,16 +104,20 @@ fn run_benchmark(formulae: Vec<CNF>, solvers: Vec<(String, Box<dyn Solver>)>, ma
         .map(|(name, solver)| {
             let solver = TimedSolver::new(solver);
             let solver = TimeLimitedSolver::new(solver, max_duration);
-            (name, run_tests(&formulae, solver))
+            println!("Started {}", &name);
+            let result = run_tests(&formulae, solver);
+            println!("Finished {}", &name);
+            (name, result)
         }).collect()
 }
 
 fn main() {
     let config = make_config();
-    let max_duration = Duration::from_secs(60);
+    let max_duration = Duration::from_secs(2);
 
     let test_formulae =
         load_files(Path::new(&config.input)).unwrap_or_else(|e| panic!(e));
 
     let benchmarks = run_benchmark(test_formulae, config.solvers, max_duration);
+    plot_runtimes(benchmarks, "test.svg", (600, 480)).unwrap();
 }
