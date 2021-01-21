@@ -1,17 +1,19 @@
 mod config;
 
+use solver::SATSolution::{Satisfiable, Unknown};
+use std::process::exit;
 use clap::{App, Arg};
 use config::Config;
-use solver::bruteforce::*;
-use solver::timed_solver::*;
-use solver::time_limited_solver::*;
 use std::io;
+use std::path::PathBuf;
 use std::io::prelude::*;
 use std::fs::File;
 use solver::{
     Solver,
     CNF,
     CadicalSolver,
+    Bruteforce,
+    SatisfactionSolver,
 };
 
 fn make_config<'a>() -> Config {
@@ -31,11 +33,17 @@ fn make_config<'a>() -> Config {
              .takes_value(true)
              .possible_values(&["bruteforce", "cadical", "satisfaction"])
              .default_value("satisfaction"))
-        .arg(Arg::with_name("plot")
-             .long("plot")
-             .short("p")
-             .help("Plot performance benchmark")
-             .takes_value(false))
+        .arg(Arg::with_name("branch")
+             .long("branch")
+             .help("DPLL branching strategy")
+             .requires_if("algorithm", "satisfaction")
+             .possible_values(&["naive", "DLIS", "DLCS", "MOM", "Jeroslaw-Wang"])
+             .default_value("DLCS"))
+        .arg(Arg::with_name("output")
+            .short("o")
+            .long("output")
+            .takes_value(true)
+            .help("File name for output in DIMACS format"))
         .arg(Arg::with_name("return_code")
              .long("return-code")
              .short("r")
@@ -43,52 +51,65 @@ fn make_config<'a>() -> Config {
              .takes_value(false))
         .get_matches();
 
-    let solver: Box<dyn Solver> = match matches.value_of("algorithm").unwrap() {
-        "bruteforce" => Box::new(Bruteforce::Bruteforce),
-        "cadical" => Box::new(CadicalSolver),
-        "satisfaction" => panic!("Not supported"),
-        _ => panic!("Unknown algorithm")
+    let solver: Box<dyn Solver> = match matches.value_of("algorithm") {
+        Some("bruteforce") => Box::new(Bruteforce::Bruteforce),
+        Some("cadical") => Box::new(CadicalSolver),
+        Some("satisfaction") =>
+            match matches.value_of("branch") {
+                Some("naive") => Box::new(SatisfactionSolver::new(solver::NaiveBranching)),
+                Some("DLIS") => Box::new(SatisfactionSolver::new(solver::DLIS)),
+                Some("DLCS") => Box::new(SatisfactionSolver::new(solver::DLCS)),
+                Some("AMOM") => Box::new(SatisfactionSolver::new(solver::MOM)),
+                Some("Jeroslaw-Wang") => Box::new(SatisfactionSolver::new(solver::JeroslawWang)),
+                _ => unreachable!() // already handled by clap
+            },
+        _ => unreachable!() // already handled by clap
     };
-
-
 
     Config{
         input: matches.value_of("input").map(String::from),
         return_code: matches.is_present("return_code"),
-        plot: matches.is_present("plot"),
-        solver: Box::new(solver)
+        solver,
+        output: matches.value_of("output").map(|file| PathBuf::from(file)),
     }
 }
 
-fn get_input(handle: &mut dyn Read) -> io::Result<String> {
+fn get_input(handle: &mut impl Read) -> io::Result<String> {
     let mut buffer = String::new();
     handle.read_to_string(&mut buffer)?;
     Ok(buffer)
-}
-
-fn solve_formula(solver: Box<dyn Solver>, formula: CNF) {
-    println!("{}", solver.solve(formula).to_dimacs());
-}
-
-fn solve_plot_formula(solver: Box<dyn Solver>, formula: CNF) {
-    let solver = TimedSolver::new(solver);
-    let solver = TimeLimitedSolver::new(solver, std::time::Duration::from_secs(60));
-    let (_duration, _solution) = solver.solve_timed(formula);
 }
 
 fn main() {
     let config = make_config();
 
     let input = match config.input {
-        None => get_input(&mut io::stdin()),
-        Some(file) => get_input(&mut File::open(&file).expect(&("Couldn't open file ".to_string() + &file)))
+        None => {
+            println!("No input file specified. Reading from standard input...");
+            get_input(&mut io::stdin())
+        },
+        Some(file) =>
+            get_input(&mut File::open(&file)
+                      .expect(&("Couldn't open file ".to_string() + &file)))
     }.unwrap_or_else(|e| panic!(e));
 
     let formula = CNF::from_dimacs(&input).expect("Parse error");
+    let solution = config.solver.solve(&formula);
 
-    if config.plot {
-        solve_plot_formula(config.solver, formula)
+    match config.output {
+        Some(path) => std::fs::write(path, solution.to_dimacs()).expect("There was an error save the DIMACS file"),
+        None => println!("{}", solution.to_dimacs()),
+    }
+
+    if config.return_code {
+        match solution {
+            Satisfiable(_) => exit(1),
+            _ => ()
+        }
     } else {
-        solve_formula(config.solver, formula)
+        match solution {
+            Unknown => exit(2),
+            _ => ()
+        }
     }
 }

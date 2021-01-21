@@ -8,7 +8,7 @@ pub enum Bruteforce {
 }
 
 impl Solver for Bruteforce {
-    fn solve(&self, formula: CNF) -> SATSolution {
+    fn solve(&self, formula: &CNF) -> SATSolution {
         // initial valuation sets all to false
         let mut valuation = Vec::new();
         for _ in 0..formula.num_variables {

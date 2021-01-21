@@ -5,7 +5,8 @@ use cnf::CNFClause;
 use cnf::CNFVar;
 use std::fmt;
 use std::collections::VecDeque;
-use crate::{Solver, SATSolution};
+use std::time::{Duration, Instant};
+use crate::{Solver, SATSolution, TimeLimitedSolver};
 use crate::{BranchingStrategy};
 
 pub struct SatisfactionSolver<B: BranchingStrategy> {
@@ -20,8 +21,15 @@ impl<B: BranchingStrategy> SatisfactionSolver<B> {
     }
 }
 
+impl<B: BranchingStrategy> TimeLimitedSolver for SatisfactionSolver<B> {
+    fn solve(&self, formula: &CNF, max_duration: Duration) -> SATSolution {
+        let mut data = DataStructures::new(formula);
+        data.time_limited_dpll(&self.strategy, max_duration)
+    }
+}
+
 impl<B: BranchingStrategy> Solver for SatisfactionSolver<B> {
-    fn solve(&self, formula: CNF) -> SATSolution {
+    fn solve(&self, formula: &CNF) -> SATSolution {
         let mut data = DataStructures::new(formula);
         data.dpll(&self.strategy)
     }
@@ -151,7 +159,7 @@ struct DataStructures {
 }
 
 impl DataStructures {
-    fn new(cnf: CNF) -> DataStructures {
+    fn new(cnf: &CNF) -> DataStructures {
         let clauses: Vec<Clause> = cnf.clauses.iter().map(|cnf_clause| Clause::new(&cnf_clause)).collect();
         let variables = (1..=cnf.num_variables).map(|i| Variable::new(&cnf, i)).collect();
         let unit_queue = VecDeque::with_capacity(cnf.num_variables);
@@ -163,6 +171,43 @@ impl DataStructures {
             unit_queue,
             assignment_stack,
         }
+    }
+
+    fn time_limited_dpll(&mut self, branching: &impl BranchingStrategy, max_duration: Duration) -> SATSolution {
+        let timer = Instant::now();
+        // unit propagation
+        if !self.inital_unit_propagation() {
+            return SATSolution::Unsatisfiable;
+        }
+
+        // repeat & choose literal b
+        while let Some(literal) = branching.pick_branching_variable(&self.variables, &self.clauses) {
+            // set value b
+            let conflict = !(self.set_variable(literal, AssignmentType::Branching)
+                // unit propagation
+                && self.unit_propagation()
+                && self.pure_literal_elimination());
+
+            // If backtracking does not help, formula is unsat.
+            if conflict && !self.backtracking(){
+                return SATSolution::Unsatisfiable;
+            }
+
+            if self.satisfaction_check() {
+                break;
+            }
+
+            if timer.elapsed() > max_duration {
+                return SATSolution::Unknown;
+            }
+        }
+
+        // output assignment
+        self.variables.iter().map(|x| match x.value {
+            VarValue::Pos => true,
+            VarValue::Neg => false,
+            _ => false
+        }).collect()
     }
 
     fn dpll(&mut self, branching: &impl BranchingStrategy) -> SATSolution {
