@@ -36,7 +36,7 @@ fn make_config<'a>() -> Config {
              .long("branch")
              .help("DPLL branching strategy")
              .requires_if("algorithm", "satisfaction")
-             .possible_values(&["naive", "DLIS", "DLCS", "MOM", "AMOM", "Jeroslaw-Wang"])
+             .possible_values(&["naive", "DLIS", "DLCS", "MOM", "Jeroslaw-Wang"])
              .default_value("DLCS"))
         .arg(Arg::with_name("return_code")
              .long("return-code")
@@ -53,9 +53,8 @@ fn make_config<'a>() -> Config {
                 Some("naive") => Box::new(SatisfactionSolver::new(solver::NaiveBranching)),
                 Some("DLIS") => Box::new(SatisfactionSolver::new(solver::DLIS)),
                 Some("DLCS") => Box::new(SatisfactionSolver::new(solver::DLCS)),
-                Some("MOM") => Box::new(SatisfactionSolver::new(solver::MOM)),
-                Some("AMOM") => Box::new(SatisfactionSolver::new(solver::ActiveMOM)),
-                Some("Jeroslaw-Wang") => unimplemented!(),
+                Some("AMOM") => Box::new(SatisfactionSolver::new(solver::MOM)),
+                Some("Jeroslaw-Wang") => Box::new(SatisfactionSolver::new(solver::JeroslawWang)),
                 _ => unreachable!() // already handled by clap
             },
         _ => unreachable!() // already handled by clap
