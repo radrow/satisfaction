@@ -1,8 +1,6 @@
 use crate::sat_solver::*;
 use crate::{CNF, SATSolution};
-
-extern crate time;
-use time::{Instant, Duration};
+use std::time::{Instant, Duration};
 
 /// A wrapper for another solver which exposes time performance
 /// measurement

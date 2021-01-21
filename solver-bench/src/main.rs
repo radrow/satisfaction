@@ -1,9 +1,7 @@
 mod config;
 
-extern crate time;
-
 use std::path::Path;
-use time::Duration;
+use std::time::Duration;
 use clap::{App, Arg};
 use config::Config;
 use solver::timed_solver::*;
@@ -11,7 +9,9 @@ use solver::time_limited_solver::*;
 use std::io;
 use std::io::prelude::*;
 use std::fs::File;
+use std::collections::HashMap;
 use solver::{
+    SATSolution
     Solver,
     CNF,
     CadicalSolver,
@@ -39,7 +39,8 @@ fn make_config<'a>() -> Config {
 
     let solvers : Vec<(String, Box<dyn Solver>)> =
         vec![
-            ("brute".to_string()  ,    Box::new(Bruteforce::Bruteforce)),
+            // Brute to expensive
+            // ("brute".to_string()  ,    Box::new(Bruteforce::Bruteforce)),
             ("cadical".to_string(),    Box::new(CadicalSolver)),
             ("dpll-naive".to_string(), Box::new(SatisfactionSolver::new(solver::NaiveBranching))),
             ("dpll-dlis".to_string(),  Box::new(SatisfactionSolver::new(solver::DLIS))),
@@ -51,11 +52,11 @@ fn make_config<'a>() -> Config {
     Config{
         input: matches.value_of("input").map(String::from).unwrap(),
         plot: matches.is_present("plot"),
-        solvers: solvers
+        solvers,
     }
 }
 
-fn load_files(dir: &Path) -> io::Result<Vec<(String, CNF)>> {
+fn load_files(dir: &Path) -> io::Result<Vec<CNF>> {
     let mut out = Vec::new();
     if dir.is_dir() {
         let dir_stream = std::fs::read_dir(dir)?;
@@ -72,44 +73,40 @@ fn load_files(dir: &Path) -> io::Result<Vec<(String, CNF)>> {
                     None => "???",
                     Some(n) => n
                 };
-                out.push((String::from(testfile), formula))
+                out.push(formula)
             }
         }
     }
     Ok(out)
 }
 
-
-fn solve_formula(solver: Box<dyn Solver>, formula: &CNF) -> (Duration, solver::SATSolution) {
-    let solver = TimeLimitedSolver::new(solver, std::time::Duration::from_secs(60));
-    let solver = TimedSolver::new(solver);
-    solver.solve_timed(formula)
+fn run_tests<S: Solver>(formulae: &Vec<CNF>, solver: TimeLimitedSolver<TimedSolver<S>>) -> Vec<Duration> {
+    formulae.iter()
+        .filter_map(|formula| {
+            let (duration, solution) = solver.solve_timed(formula);
+            match solution {
+                SATSolution::Unknown    => None,
+                _                       => Some(duration),
+            }
+        }).collect()
 }
 
 /// Returns a vector of test results; for each solver duration on each test
-fn run_tests(formulae: Vec<(String, CNF)>, solvers: Vec<(String, Box<dyn Solver>)>)
-             -> Vec<(String, Vec<(String, Option<Duration>)>)> {
-    let mut out = Vec::new();
-    out.reserve(solvers.len());
-    for (name, solver) in solvers {
-        let mut results = Vec::new();
-        results.reserve(formulae.len());
-        for (test_name, formula) in &formulae {
-            let (duration, solution) = solve_formula(solver, &formula);
-            match solution {
-                solver::SATSolution::Unknown => results.push((test_name.clone(), None)),
-                _ => results.push((test_name.clone(), Some(duration)))
-            }
-        }
-        out.push((name, results))
-    }
-    out
+fn run_benchmark(formulae: Vec<CNF>, solvers: Vec<(String, Box<dyn Solver>)>, max_duration: Duration) -> HashMap<String, Vec<Duration>> {
+    solvers.into_iter()
+        .map(|(name, solver)| {
+            let solver = TimedSolver::new(solver);
+            let solver = TimeLimitedSolver::new(solver, max_duration);
+            (name, run_tests(&formulae, solver))
+        }).collect()
 }
 
 fn main() {
     let config = make_config();
+    let max_duration = Duration::from_secs(60);
 
     let test_formulae =
         load_files(Path::new(&config.input)).unwrap_or_else(|e| panic!(e));
 
+    let benchmarks = run_benchmark(test_formulae, config.solvers, max_duration);
 }
