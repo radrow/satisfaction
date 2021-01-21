@@ -9,7 +9,7 @@ The project consists of three parts:
     A binary executing the solver via command line.
 
 * __tents__:
-    A binary that uses SAT-solving to solve _Tents_-puzzles.
+    A binary that uses SAT-solving to solve [Tents puzzles](https://brainbashers.com/tents.asp).
 
 # Executables
 
@@ -32,7 +32,7 @@ Supported arguments:
   
   * `--algorithm=VALUE` – chooses the algorithm. Following options are available:
     - `bruteforce` – plain bruteforce "try, check, backtrack"
-    - `cadical` – references to the cadical implementation
+    - `cadical` – references to the [cadical implementation](http://fmv.jku.at/cadical/)
     - `satisfaction` – our prioprietary DPLL implementation. Can be adjusted with
     `--branch` option to choose heuristics
     
@@ -54,7 +54,7 @@ Supported arguments:
 ### Return value
 
 Normally the solver returns `0` if the formula was processed successfully and `2` on
-execution error. If the `-r` or `--return-code` flag is set, this behaviour is changed [accordingly to the documentation](###Usage).
+execution error. If the `-r` or `--return-code` flag is set, this behaviour is changed [accordingly to the documentation](#Usage).
 
 
 ## `solver-bench`
@@ -76,7 +76,7 @@ Supported arguments:
 
 ## `tents`
 
-An example GUI application that solves the famous "tents" puzzle.
+An example GUI application that solves the famous [tents puzzle](https://brainbashers.com/tents.asp).
 
 Execution:
 ```
