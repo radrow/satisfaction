@@ -35,7 +35,19 @@ pub fn plot_runtimes(measurement: HashMap<String, Vec<Duration>>, path: impl AsR
         .y_desc("CPU-Time")
         .draw()?;
 
+    let mut colors = vec![
+        (255,   0,   0),
+        (  0, 255,   0),
+        (  0, 255, 255),
+        (  0,   0, 255),
+        (255,   0, 255),
+    ].into_iter().cycle();
     for (name, times) in measurement.iter() {
+        //let line_color = HSLColor(color, 0.7, 0.5);
+        let (r,g,b) = colors.next().unwrap();
+        let line_color = RGBColor(r,g,b);
+        let point_color = RGBColor(r,g,b);
+
         let y = times.iter()
             .map(|dur| dur.as_millis())
             .sorted()
@@ -44,16 +56,17 @@ pub fn plot_runtimes(measurement: HashMap<String, Vec<Duration>>, path: impl AsR
         let points = PointSeries::of_element(
             y.iter().cloned().enumerate(),
             5,
-            &BLUE,
+            &point_color,
             &|c, s, st| {
                 Circle::new(c, s, st)
             });
-        chart.draw_series(points)?
-            .label(name);
+        chart.draw_series(points)?;
 
-        let lines = LineSeries::new(y.into_iter().enumerate(), &RED);
-        chart.draw_series(lines)?;
 
+        let lines = LineSeries::new(y.into_iter().enumerate(), &line_color);
+        chart.draw_series(lines)?
+            .label(name)
+            .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &line_color));
     }
     chart.configure_series_labels()
         .draw()?;
