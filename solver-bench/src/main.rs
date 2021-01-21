@@ -38,6 +38,13 @@ fn make_config<'a>() -> Config {
             .takes_value(true)
             .required(false)
             .help("Output file for plot"))
+        .arg(Arg::with_name("time")
+            .short("t")
+            .long("time")
+            .takes_value(true)
+            .required(false)
+            .default_value("60")
+            .help("Timeout for a single instance in seconds"))
         .arg(Arg::with_name("return_code")
              .long("return-code")
              .short("r")
@@ -63,6 +70,7 @@ fn make_config<'a>() -> Config {
         plot: matches.is_present("plot"),
         output: PathBuf::from(matches.value_of("output").unwrap_or("out.svg")),
         solvers,
+        max_duration: matches.value_of("time").map(|t| t.parse::<u64>().expect("Time must be a number")).unwrap_or(60),
     }
 }
 
@@ -110,11 +118,9 @@ fn run_benchmark(formulae: Vec<CNF>, solvers: Vec<(String, Box<dyn TimeLimitedSo
 
 fn main() {
     let config = make_config();
-    let max_duration = Duration::from_secs(2);
-
     let test_formulae =
         load_files(Path::new(&config.input)).unwrap_or_else(|e| panic!(e));
 
-    let benchmarks = run_benchmark(test_formulae, config.solvers, max_duration);
-    plot_runtimes(benchmarks, "test.svg", (600, 480)).unwrap();
+    let benchmarks = run_benchmark(test_formulae, config.solvers, Duration::from_secs(config.max_duration));
+    plot_runtimes(benchmarks, config.output, (600, 480)).unwrap();
 }
