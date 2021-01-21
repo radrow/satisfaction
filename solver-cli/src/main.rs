@@ -1,4 +1,5 @@
 mod config;
+mod plotting;
 
 use solver::SATSolution::Satisfiable;
 use std::process::exit;
@@ -14,6 +15,7 @@ use solver::{
     Bruteforce,
     SatisfactionSolver,
 };
+use plotting::plot_runtimes;
 
 fn make_config<'a>() -> Config {
     let matches = App::new("satisfaction")
