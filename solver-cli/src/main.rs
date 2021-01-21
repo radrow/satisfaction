@@ -5,6 +5,7 @@ use std::process::exit;
 use clap::{App, Arg};
 use config::Config;
 use std::io;
+use std::path::PathBuf;
 use std::io::prelude::*;
 use std::fs::File;
 use solver::{
@@ -38,6 +39,11 @@ fn make_config<'a>() -> Config {
              .requires_if("algorithm", "satisfaction")
              .possible_values(&["naive", "DLIS", "DLCS", "MOM", "Jeroslaw-Wang"])
              .default_value("DLCS"))
+        .arg(Arg::with_name("output")
+            .short("o")
+            .long("output")
+            .takes_value(true)
+            .help("File name for output in DIMACS format"))
         .arg(Arg::with_name("return_code")
              .long("return-code")
              .short("r")
@@ -63,20 +69,15 @@ fn make_config<'a>() -> Config {
     Config{
         input: matches.value_of("input").map(String::from),
         return_code: matches.is_present("return_code"),
-        solver: Box::new(solver)
+        solver,
+        output: matches.value_of("output").map(|file| PathBuf::from(file)),
     }
 }
 
-fn get_input(handle: &mut dyn Read) -> io::Result<String> {
+fn get_input(handle: &mut impl Read) -> io::Result<String> {
     let mut buffer = String::new();
     handle.read_to_string(&mut buffer)?;
     Ok(buffer)
-}
-
-fn solve_formula(solver: Box<dyn Solver>, formula: &CNF) -> solver::SATSolution {
-    let solution = solver.solve(&formula);
-    println!("{}", solution.to_dimacs());
-    solution
 }
 
 fn main() {
@@ -93,8 +94,12 @@ fn main() {
     }.unwrap_or_else(|e| panic!(e));
 
     let formula = CNF::from_dimacs(&input).expect("Parse error");
+    let solution = config.solver.solve(&formula);
 
-    let solution = solve_formula(config.solver, &formula);
+    match config.output {
+        Some(path) => std::fs::write(path, solution.to_dimacs()).expect("There was an error save the DIMACS file"),
+        None => println!("{}", solution.to_dimacs()),
+    }
 
     if config.return_code {
         match solution {
