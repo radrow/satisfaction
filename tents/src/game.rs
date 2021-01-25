@@ -1,5 +1,7 @@
 extern crate iced;
 
+use solver::CadicalSolver;
+use iced::{executor};
 use iced::{Length, Align};
 use iced::{Element, Row, Application, Text, Command, Subscription, HorizontalAlignment, VerticalAlignment, Container};
 use iced_native::window::Event;
@@ -67,8 +69,9 @@ impl Application for Game {
             Message::FieldLoaded(field) => self.set_field(field),
             Message::SolvePuzzle => {
                 let field = self.field.as_mut().unwrap();
-                self.field_widget.arrows = field.solve();
-                self.puzzle_solved = true;
+                if field.solve(&CadicalSolver) {
+                    self.puzzle_solved = true;
+                }
             },
             Message::GridSizeInputChanged{width, height} => {
                 self.control_widget.field_creation_widget.update(width, height)

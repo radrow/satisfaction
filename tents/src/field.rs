@@ -1,16 +1,26 @@
 use std::collections::HashMap;
+use solver::sat_solver::Solver;
+use std::io;
 use std::path::Path;
 use std::error::Error;
 
 use tokio::fs::read_to_string;
 use itertools::Itertools;
+use rayon::prelude::*;
+use rayon;
 
-use crate::cnf::{CNF, CNFClause, CNFVar};
+use solver::cnf::{CNF, CNFClause, CNFVar, VarId};
+use solver::{SATSolution};
 
+/// Coordinate of a tent
 type TentPlace = (usize, usize);
+
+/// Coordignates of a tree
 type TreePlace = (usize, usize);
 
+/// Constraints on the number of tents at given axis
 type AxisSet = HashMap<usize, Vec<usize>>;
+/// Constraints on the neighbourhood of tents
 type NeiSet = Vec<(usize, usize)>;
 
 
@@ -41,6 +51,7 @@ impl std::fmt::Display for FieldParserError {
 
 impl Error for FieldParserError {}
 
+/// Datatype that describes the content of a single cell
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum CellType {
     Tent,
@@ -49,14 +60,17 @@ pub enum CellType {
 }
 
 #[derive(Debug,Clone)] // TODO: Write a appropriate debug printing
+/// Representation of the whole puzzle
 pub struct Field {
     pub cells: Vec<Vec<CellType>>,
     pub row_counts: Vec<usize>,
     pub column_counts: Vec<usize>,
     pub height : usize,
     pub width : usize,
+    pub tent_tree_assgs: Option<Vec<(TreePlace, TentPlace)>>
 }
 
+/// Connection between a tree and assigned tent
 #[derive (PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 struct Assignment {
     tent : TentPlace,
@@ -78,6 +92,7 @@ impl Field {
             width: column_counts.len(),
             row_counts,
             column_counts,
+            tent_tree_assgs: None,
         }
     }
 
@@ -115,7 +130,8 @@ impl Field {
             column_counts,
             cells,
             height: height,
-            width: width
+            width: width,
+            tent_tree_assgs: None
         })
     }
 
@@ -180,7 +196,8 @@ impl Field {
             
     }
 
-    pub fn tent_coordinates(&self) -> Vec<Vec<TentPlace>> {
+    /// Returns a vector of eligible places for a tent
+    pub fn tent_coordinates(&self) -> Vec<TentPlace> {
         let width = self.cells.len();
         let height = self.cells[0].len();
         let mut tents_by_trees = Vec::new();
@@ -192,33 +209,33 @@ impl Field {
                     let right = x + 1;
                     let top = y as isize - 1;
                     let bottom = y + 1;
-                    let mut potential_tents = Vec::with_capacity(4);
 
                     if left >= 0 && self.cells[left as usize][y] != CellType::Tree {
-                        potential_tents.push((left as usize, y));
+                        tents_by_trees.push((left as usize, y));
                     }
                     if right < width && self.cells[right][y] != CellType::Tree {
-                        potential_tents.push((right, y));
+                        tents_by_trees.push((right, y));
                     }
                     if top >= 0 && self.cells[x][top as usize] != CellType::Tree {
-                        potential_tents.push((x, top as usize));
+                        tents_by_trees.push((x, top as usize));
                     }
                     if bottom < height && self.cells[x][bottom] != CellType::Tree {
-                        potential_tents.push((x, bottom));
+                        tents_by_trees.push((x, bottom));
                     }
-                    tents_by_trees.push(potential_tents);
                 }
             }
         }
         tents_by_trees
     }
 
-    fn to_formula(&self) -> (CNF, HashMap<TentPlace, usize>, Vec<(Assignment, usize)>) {
+    /// Compiles the puzzle to CNF. On the latter positions returns mapings
+    /// from tent places to assiociated variables and list of tree-tent
+    /// assignments with assiociated variables.
+    fn to_formula(&self) -> (CNF, HashMap<TentPlace, VarId>, Vec<(Assignment, VarId)>) {
         let tents = self.tent_coordinates();
 
         // Id to coordinate
         let tent_mapping = tents.iter()
-            .flatten()
             .unique()
             .enumerate()
             .map(|(id, coord)| (id+1, *coord))
@@ -237,46 +254,49 @@ impl Field {
         );
         let neighbour_set: NeiSet = Field::make_neighbour_set(&tent_mapping, &id_mapping);
 
-        let mut total = CNF::new();
-        total.extend(Field::make_count_constraints(&self.column_counts, &col_set));
-        total.extend(Field::make_count_constraints(&self.row_counts, &row_set));
-        total.extend(Field::make_neighbour_constraints(&neighbour_set));
-        let (neistr, assg_mapping) = Field::make_correspondence_constraints(&self, &id_mapping);
-        total.extend(neistr);
+        let mut total = CNF::empty();
+        let ((count_col_form, count_row_form), (neigs_form, (corr_form, assg_mapping))) =
+            rayon::join(
+                | | rayon::join(| | Field::make_count_constraints(&self.column_counts, &col_set),
+                                | | Field::make_count_constraints(&self.row_counts, &row_set)
+                ),
+                | | rayon::join(| | Field::make_neighbour_constraints(&neighbour_set),
+                                | | Field::make_correspondence_constraints(&self, &id_mapping)
+                )
+            );
+        total.extend(count_col_form);
+        total.extend(count_row_form);
+        total.extend(neigs_form);
+        total.extend(corr_form);
         (total, id_mapping, assg_mapping.clone().to_vec())
     }
 
-    pub fn solve(&mut self) -> Vec<((usize, usize), (usize, usize))> {
+    /// Solve the puzzle
+    pub fn solve(&mut self, solver: &dyn Solver) -> bool {
         let (formula, t_mapping, a_mapping) = self.to_formula();
-
-        let mut solver = formula.to_solver();
-        match solver.solve() {
-            None => panic!("was zur hölle"),
-            Some(satisfiable) => {
-                if satisfiable {
-                    for y in 0..self.height {
-                        for x in 0..self.width {
-                            match
-                                t_mapping.get(&(y, x))
-                                .and_then(|var_name| solver.value(*var_name as i32)) {
-                                    None => (),
-                                    Some(true) => self.cells[y][x] = CellType::Tent,
-                                    Some(false) => self.cells[y][x] = CellType::Meadow
-                                }
-                        }
+        match solver.solve(&formula) {
+            SATSolution::Satisfiable(assignment) => {
+                for y in 0..self.height {
+                    for x in 0..self.width {
+                        match
+                            t_mapping.get(&(y, x))
+                            .map(|var_name| assignment[*var_name]) {
+                                None => (),
+                                Some(true) => self.cells[y][x] = CellType::Tent,
+                                Some(false) => self.cells[y][x] = CellType::Meadow
+                            }
+                        self.tent_tree_assgs =
+                            Some(a_mapping
+                                 .iter()
+                                 .filter(|(_, i)| *i > 0)
+                                 .map(|(a, _)| (a.tent, a.tree))
+                                 .collect());
                     }
-
-                    a_mapping
-                        .iter()
-                        .filter(|(_, i)| *i > 0)
-                        .map(|(a, _)| (a.tent, a.tree))
-                        .collect()
-                }
-                else {
-                    println!("No solution");
-                    vec![]
-                }
-            }
+                };
+                true
+            },
+            SATSolution::Unsatisfiable => false,
+            SATSolution::Unknown => unreachable!()
         }
     }
 
@@ -323,7 +343,7 @@ impl Field {
     }
 
     fn make_count_constraints(counts : &Vec<usize>, axes : &AxisSet) -> CNF {
-        let mut clauses = CNF::new();
+        let mut clauses = CNF::empty();
 
         // Conjunction of constranits per each axis
         for (axis, tents) in axes {
@@ -342,7 +362,7 @@ impl Field {
         neigh
             .iter()
             .map(|(x,y)|{
-                CNFClause{vars: vec![CNFVar::Neg(*x as u32), CNFVar::Neg(*y as u32)]}
+                CNFClause{vars: vec![CNFVar::neg(*x as VarId), CNFVar::neg(*y as VarId)]}
             }).collect()
     }
 
@@ -459,7 +479,7 @@ impl Field {
             assg_id_mapping : &HashMap<Assignment, usize>,
             pack : &Vec<Assignment>,
             cond : Option<TentPlace>
-        ) -> CNF {
+        ) -> Vec<CNFClause> {
             let ids : Vec<&usize> = pack
                 .iter()
                 .map(|assg| assg_id_mapping
@@ -467,19 +487,19 @@ impl Field {
                      .unwrap()
                      ).collect();
             let mut any_of =
-                CNF::single(
+                vec![
                     match cond {
                         Some(x) => {
-                            let mut c = ids.iter().map(|i| CNFVar::Pos(**i as u32)).collect::<CNFClause>();
-                            c.push(CNFVar::Neg(*id_mapping.get(&x).unwrap() as u32));
+                            let mut c = ids.iter().map(|i| CNFVar::pos(**i as VarId)).collect::<CNFClause>();
+                            c.push(CNFVar::neg(*id_mapping.get(&x).unwrap() as VarId));
                             c
                         },
-                        None => ids.iter().map(|i| CNFVar::Pos(**i as u32)).collect::<CNFClause>()
+                        None => ids.iter().map(|i| CNFVar::pos(**i as VarId)).collect::<CNFClause>()
                     }
-                );
+                ];
 
             let no_two = {
-                let mut out = CNF::new();
+                let mut out = vec![];
                 for i in &ids {
                     for j in &ids {
                         if i < j {
@@ -487,15 +507,15 @@ impl Field {
                                 match cond {
                                     Some(x) => {
                                         let mut c = CNFClause::new();
-                                        c.push(CNFVar::Neg(**i as u32));
-                                        c.push(CNFVar::Neg(**j as u32));
-                                        c.push(CNFVar::Neg(*id_mapping.get(&x).unwrap() as u32));
+                                        c.push(CNFVar::neg(**i as VarId));
+                                        c.push(CNFVar::neg(**j as VarId));
+                                        c.push(CNFVar::neg(*id_mapping.get(&x).unwrap() as VarId));
                                         c
                                     },
                                     None => {
                                         let mut c = CNFClause::new();
-                                        c.push(CNFVar::Neg(**i as u32));
-                                        c.push(CNFVar::Neg(**j as u32));
+                                        c.push(CNFVar::neg(**i as VarId));
+                                        c.push(CNFVar::neg(**j as VarId));
                                         c
                                     }
                                 });
@@ -510,22 +530,22 @@ impl Field {
 
         let pack_formula =
             oneof_packs
-            .iter()
+            .par_iter()
             .flat_map(|p| makeoneof(&id_mapping, &assg_id_mapping, p, None));
 
         let cond_pack_formula =
             cond_oneof_packs
-            .iter()
+            .par_iter()
             .flat_map(|(cond, p)| makeoneof(&id_mapping, &assg_id_mapping, p, Some(*cond)));
 
         let tent_exists_formula =
             assignments
-            .iter()
+            .par_iter()
             .map(|a|
                  CNFClause{
                      vars: vec![
-                         CNFVar::Neg(*assg_id_mapping.get(a).unwrap() as u32),
-                         CNFVar::Pos(*id_mapping.get(&a.tent).unwrap() as u32)
+                         CNFVar::neg(*assg_id_mapping.get(a).unwrap() as VarId),
+                         CNFVar::pos(*id_mapping.get(&a.tent).unwrap() as VarId)
                      ]
                  });
 
@@ -540,14 +560,14 @@ impl Field {
         let lower_bound_clauses =
             variables.iter()
             .map(|v| *v as u32)
-            .combinations(variables.len() - count + 1)
-            .map(|vs| vs.iter().map(|v| CNFVar::Pos(*v)).collect::<CNFClause>());
+            .combinations(variables.len() - count + 1).par_bridge()
+            .map(|vs| vs.iter().map(|v| CNFVar::pos(*v as VarId)).collect::<CNFClause>());
 
         let upper_bound_clauses =
             variables.iter()
             .map(|v| *v as u32)
-            .combinations(count+1)
-            .map(|vs| vs.iter().map(|v| CNFVar::Neg(*v)).collect::<CNFClause>());
+            .combinations(count+1).par_bridge()
+            .map(|vs| vs.iter().map(|v| CNFVar::neg(*v as VarId)).collect::<CNFClause>());
 
         lower_bound_clauses.chain(upper_bound_clauses)
             .collect::<CNF>()

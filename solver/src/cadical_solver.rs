@@ -1,27 +1,33 @@
 use cadical;
-use crate::{CNFClause, Solver, Assignment};
+use crate::{Solver, SATSolution, CNF};
 
 pub struct CadicalSolver;
 
 impl Solver for CadicalSolver {
-    fn solve(&self, clauses: impl Iterator<Item=CNFClause>, num_variables: u32) -> Option<Assignment> {
+    fn solve(&self, formula: &CNF) -> SATSolution {
         let mut solver: cadical::Solver = Default::default();
-        
-        clauses.for_each(|clause| {
-            solver.add_clause(clause.into_iter()
-                .map(|literal| literal.to_i32()));
-        });
+
+        let num_variables = formula.num_variables;
+        for clause in &formula.clauses {
+            let mut lits = Vec::new();
+            lits.reserve(clause.vars.len());
+            for var in &clause.vars {
+                lits.push(var.to_i32())
+            }
+            solver.add_clause(lits.into_iter());
+        }
 
         match solver.solve() {
-            None | Some(false) => None,
+            None => SATSolution::Unknown,
+            Some(false) => SATSolution::Unsatisfiable,
             Some(true) => {
                 // TODO: Use more index independent formulation
-                Some((1..num_variables)
+                (1..=num_variables)
                     .map(|variable| {
                         solver.value(variable as i32)
                             // If None, the variable can be choosen arbitrarily and thus true. TODO: Discuss behaviour.
-                            .unwrap_or(true) 
-                    }).collect())
+                            .unwrap_or(false)
+                    }).collect()
             }
         }
     }

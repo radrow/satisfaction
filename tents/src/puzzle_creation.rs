@@ -15,7 +15,8 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
             row_counts: vec![0; height],
             column_counts: vec![0; width],
             width: width,
-            height: height
+            height: height,
+            tent_tree_assgs: None
         }
     }
 

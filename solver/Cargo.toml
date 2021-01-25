@@ -2,15 +2,23 @@
 name = "solver"
 version = "0.1.0"
 authors = [
-    "Radoslaw Rowicki <radrowicki@gmail.com>",
+    "Radosław Rowicki <radrow@students.mimuw.edu.pl>",
     "Alexander Lankheit <a.lankheit@campus.lmu.de>",
     "Korbinian Federholzner <k.federholzner@campus.lmu.de>",
 ]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
+rand = "0.7"
 cadical = "0.1.13"
+itertools = "0.9.0"
+rayon = "1.5.0"
+dimacs = "0.2.0"
 
 [dev-dependencies]
 proptest = "0.10.1"
+criterion = "0.3.3"
+
+[[bench]]
+name = "bench"
+harness = false
