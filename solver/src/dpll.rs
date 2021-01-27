@@ -9,6 +9,17 @@ use std::time::{Duration, Instant};
 use crate::{Solver, SATSolution, TimeLimitedSolver};
 use crate::{BranchingStrategy};
 
+/// A DPLL based SAT-Solver, that solves a given SAT Problem. 
+/// It needs a branching strategy for picking variables, the strategy has to be passed by calling 
+/// the new method and specifying a datatype that implements the `trait BranchingStrategy`
+/// 
+/// # Example
+/// ```
+/// use solver::{SatisfactionSolver, NaiveBranching};
+/// 
+/// let solver = SatisfactionSolver::new(NaiveBranching);
+/// let result = solver.solve(formula);
+/// ```
 pub struct SatisfactionSolver<B: BranchingStrategy> {
     strategy: B,
 }
@@ -35,19 +46,27 @@ impl<B: BranchingStrategy> Solver for SatisfactionSolver<B> {
     }
 }
 
+/// Datatype for PrevAssignment.
+/// Forced if variable was set during Unit-Propagation.
+/// Branching if variable was set while picking a new Variable for branching.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AssignmentType {
     Forced, Branching
 }
 
 
-/// Used to store assignments made in the past, for undoing them with backtracking
+/// Datatype for assignment stack. 
+/// Used to store assignments made in the past, to potentially undo them later with backtracking
 struct PrevAssignment {
     literal: CNFVar,
     assignment_type: AssignmentType
 }
 
 
+/// The value of a variable, if the Variable is:
+/// Pos, Postive value equal true
+/// Neg, Negative value equal false
+/// Free, Variable has not been set yet
 #[derive(Clone, Debug, PartialEq, Eq, Copy)]
 pub enum VarValue {
     Pos, Neg, Free
@@ -74,20 +93,32 @@ impl From<bool> for VarValue {
     }
 }
 
+/// Variable Datatype, to store a variable.
+/// Each variable has a value, which sets all occurrences of that variable to either true or 
+/// false depending on the sign of variable in the clause.
+/// pos_occ, describes the positive occurrences of a variable in a clause. The clause is referenced with index given in the vector.
+/// neg_occ, same as pos_occ, but for negated variables
 pub struct Variable {
     pub value: VarValue,
     pub pos_occ: Vec<usize>,
     pub neg_occ: Vec<usize>,
 }
 
+/// Clause Datatype, to store a clause.
+/// active_lit, describes the count of literals that haven't been set yet.
+/// satisfied, is set if the clause has been satisfied by a variable, than with the index of the variable in the Variables Object, else it's None. 
+/// literals, are all the variables that are in the clause as CNFVar.
 pub struct Clause {
     pub active_lits: usize,
     pub satisfied: Option<usize>,
     pub literals: Vec<CNFVar>,
 }
 
+/// Datatype for all Variables, from a formula
 pub type Variables = Vec<Variable>;
+/// Datatype for all Clauses, from a formula
 pub type Clauses = Vec<Clause>;
+
 
 impl Variable {
     fn new(cnf: &CNF, var_num: usize) -> Variable {
@@ -151,6 +182,11 @@ impl Clause {
     }
 }
 
+/// Datatype for storing all internal objects used for the DPLL calculation
+/// variables, all variables that the formula has
+/// clauses, all clauses the forumla has
+/// unit_queue, stores all unit-variables that have been found
+/// assignment_stack, all assignment that have been made so far
 struct DataStructures {
     variables: Vec<Variable>,
     clauses: Vec<Clause>,
@@ -173,6 +209,7 @@ impl DataStructures {
         }
     }
 
+    /// time limited dpll for, for solving in specific time
     fn time_limited_dpll(&mut self, branching: &impl BranchingStrategy, max_duration: Duration) -> SATSolution {
         let timer = Instant::now();
         // unit propagation
@@ -210,6 +247,7 @@ impl DataStructures {
         }).collect()
     }
 
+    /// regular solving of a forumla
     fn dpll(&mut self, branching: &impl BranchingStrategy) -> SATSolution {
         // unit propagation
         if !self.inital_unit_propagation() {
@@ -242,6 +280,7 @@ impl DataStructures {
         }).collect()
     }
 
+    /// the unit propagation that happens initally before a variable is picked for branching.
     fn inital_unit_propagation(&mut self) -> bool {
         // find all unit clauses and enqueue the variables in the queue
         for i in 0..self.clauses.len() {
@@ -263,11 +302,13 @@ impl DataStructures {
         let mut neg_occ: &Vec<usize> = &self.variables[lit.id].neg_occ;
         let clauses = &mut self.clauses;
 
+        // if the sign of the variable is negative, invert pos and neg occurrences
         if self.variables[lit.id].value == VarValue::Neg {
             neg_occ = &self.variables[lit.id].pos_occ;
             pos_occ = &self.variables[lit.id].neg_occ;
         }
 
+        // set all pos_occ to satisfied
         pos_occ.iter().for_each(|p_occ| {
             if clauses[*p_occ].satisfied == None {
                 clauses[*p_occ].satisfied = Some(lit.id)
@@ -320,6 +361,8 @@ impl DataStructures {
     }
 
 
+    /// Method if a conflict occurred, undos the last assignments from unit propagation until the last
+    /// time it was branched, and takes the other branch.
     fn backtracking(&mut self) -> bool {
         while let Some(assign) = self.assignment_stack.pop() {
             let mut pos_occ: &Vec<usize> = &self.variables[assign.literal.id].pos_occ;
@@ -345,6 +388,7 @@ impl DataStructures {
             // empty queue
             self.unit_queue.clear();
 
+            // take other branch if assignment was branching
             if assign.assignment_type == AssignmentType::Branching {
                 if self.set_variable(-assign.literal, AssignmentType::Forced) {
                     // goto unit propagation
@@ -360,6 +404,7 @@ impl DataStructures {
         false
     }
 
+    /// finds the unit variable that is in the given clauses
     fn find_unit_variable(&self, clause: usize) -> CNFVar {
         self.clauses[clause].literals.iter()
             .filter(|lit| self.variables[lit.id].value == VarValue::Free)
