@@ -88,8 +88,9 @@ impl Application for Game {
             },
 
             Message::FieldLoaded(field) => match self.state {
-                GameState::Loading => {
-                    self.state = GameState::Playable {
+                GameState::Loading
+                    | GameState::Creating => {
+                        self.state = GameState::Playable {
                         inital_field: field.clone(),
                         field,
                         field_widget: self.config.into(),
