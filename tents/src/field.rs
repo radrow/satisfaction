@@ -137,7 +137,7 @@ impl Field {
         let tent_mapping = tents.iter()
             .unique()
             .enumerate()
-            .map(|(id, coord)| (id+1, *coord))
+            .map(|(id, coord)| (id + 1, *coord))
             .collect::<HashMap<usize,TentPlace>>();
 
         // Coordinate to id
@@ -179,7 +179,7 @@ impl Field {
                     for x in 0..self.width {
                         match
                             t_mapping.get(&(y, x))
-                            .map(|var_name| assignment[*var_name]) {
+                            .map(|var_name| assignment[*var_name - 1]) {
                                 None => (),
                                 Some(true) => self.cells[y][x] = CellType::Tent,
                                 Some(false) => self.cells[y][x] = CellType::Meadow
@@ -218,11 +218,12 @@ impl Field {
         let mut out : NeiSet = Vec::new();
 
         for (id, tent) in id_to_coord {
-            let mut neighbours = vec![];
+            let mut neighbours = Vec::new();
+            let mut candidates = Vec::new();
 
-            let mut candidates = vec![];
             candidates.push((tent.0 + 1, tent.1));
             candidates.push((tent.0, tent.1 + 1));
+
             if tent.1 > 0 {
                 candidates.push((tent.0 + 1, tent.1 - 1))
             }
