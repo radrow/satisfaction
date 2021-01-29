@@ -7,36 +7,41 @@ use crate::{
 };
 
 lazy_static!{
-    static ref TENT_SVG_SOURCE: Svg   = Svg::new(Handle::from_memory(include_bytes!("../images/tent.svg").to_vec()));
-    static ref TREE_SVG_SOURCE: Svg   = Svg::new(Handle::from_memory(include_bytes!("../images/tree.svg").to_vec()));
-    static ref MEADOW_SVG_SOURCE: Svg = Svg::new(Handle::from_memory(include_bytes!("../images/meadow.svg").to_vec()));
+    static ref TENT_SVG: Svg   = Svg::new(Handle::from_memory(include_bytes!("../images/tent.svg").to_vec()));
+    static ref TREE_SVG: Svg   = Svg::new(Handle::from_memory(include_bytes!("../images/tree.svg").to_vec()));
+    static ref MEADOW_SVG: Svg = Svg::new(Handle::from_memory(include_bytes!("../images/meadow.svg").to_vec()));
+}
+
+#[derive(Clone, Copy)]
+pub struct FieldWidgetConfig {
+    rect_size: Length,
+    vertical_spacing: u16,
+    horizontal_spacing: u16,
+}
+
+impl FieldWidgetConfig {
+    pub fn new(rect_size: u16, vertical_spacing: u16, horizontal_spacing: u16) -> FieldWidgetConfig {
+        FieldWidgetConfig {
+            rect_size: Length::Units(rect_size),
+            vertical_spacing,
+            horizontal_spacing,
+        }
+    }
 }
 
 pub struct FieldWidget {
     rect_size: Length,
     vertical_spacing: u16,
     horizontal_spacing: u16,
-
-    pub arrows: Vec<((usize, usize), (usize, usize))>,
 }
 
+
 impl FieldWidget {
-    pub fn new(rect_size: u16, vertical_spacing: u16, horizontal_spacing: u16) -> FieldWidget {
-        FieldWidget {
-            rect_size: Length::Units(rect_size),
-
-            vertical_spacing,
-            horizontal_spacing,
-
-            arrows: Vec::new(),
-        }
-    }
-
     fn draw_cell(&self, cell: &CellType) -> Element<Message> {
         match cell {
-            CellType::Tent => TENT_SVG_SOURCE.clone(),
-            CellType::Tree => TREE_SVG_SOURCE.clone(),
-            CellType::Meadow => MEADOW_SVG_SOURCE.clone(),
+            CellType::Tent => TENT_SVG.clone(),
+            CellType::Tree => TREE_SVG.clone(),
+            CellType::Meadow => MEADOW_SVG.clone(),
         }.width(self.rect_size)
             .height(self.rect_size)
             .into()
@@ -71,5 +76,15 @@ impl FieldWidget {
             ).spacing(self.horizontal_spacing)
         ).spacing(self.horizontal_spacing)
             .into()
+    }
+}
+
+impl From<FieldWidgetConfig> for FieldWidget {
+    fn from(config: FieldWidgetConfig) -> Self {
+        FieldWidget {
+            rect_size: config.rect_size,
+            vertical_spacing: config.vertical_spacing,
+            horizontal_spacing: config.horizontal_spacing,
+        }
     }
 }

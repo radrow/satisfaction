@@ -7,6 +7,7 @@ pub enum Message {
 
     CreateRandomPuzzle{width: usize, height: usize},
     SolvePuzzle,
+    SolutionFound(Field),
 
     GridSizeInputChanged{width: usize, height: usize},
 

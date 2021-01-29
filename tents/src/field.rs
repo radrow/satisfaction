@@ -272,7 +272,7 @@ impl Field {
     }
 
     /// Solve the puzzle
-    pub fn solve(&mut self, solver: &dyn Solver) -> bool {
+    pub fn solve(&mut self, solver: &impl Solver) -> bool {
         let (formula, t_mapping, a_mapping) = self.to_formula();
         match solver.solve(&formula) {
             SATSolution::Satisfiable(assignment) => {
@@ -283,7 +283,7 @@ impl Field {
                             .map(|var_name| assignment[*var_name]) {
                                 None => (),
                                 Some(true) => self.cells[y][x] = CellType::Tent,
-                                Some(false) => self.cells[y][x] = CellType::Meadow
+                                Some(false) => self.cells[y][x] = CellType::Meadow,
                             }
                         self.tent_tree_assgs =
                             Some(a_mapping
