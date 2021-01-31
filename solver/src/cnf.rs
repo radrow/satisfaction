@@ -38,7 +38,7 @@ impl CNF {
     /// Creates an empty CNF formula
     pub fn empty() -> CNF {
         CNF{
-            clauses: Vec::new(), 
+            clauses: Vec::new(),
             num_variables: 0,
         }
     }
@@ -51,6 +51,7 @@ impl CNF {
         }
     }
 
+    /// Adds a new clause to the formula
     pub fn push(&mut self, c: CNFClause) {
         self.num_variables = self.num_variables.max(c.max_variable_id());
         self.clauses.push(c);
@@ -121,8 +122,7 @@ impl CNF {
                     num_variables: num_vars as usize,
                 })
             },
-            // TODO: Better error handling
-            Ok(_) => panic!("was zum kuh"),
+            Ok(_) => Err("Only CNF formulae are supported".to_string()),
             Err(_) => Err("Parse error".to_string()),
         }
     }
@@ -195,6 +195,7 @@ impl CNFClause {
         self.vars.push(v)
     }
 
+    /// Returns the greatest variablie identifier used in the clause
     pub fn max_variable_id(&self) -> usize {
         self.vars.iter()
             .map(|lit| lit.id)
@@ -202,7 +203,7 @@ impl CNFClause {
             .unwrap_or(0)
     }
 
-    #[allow(dead_code)]
+    /// Concatenates clauses
     pub fn extend(&mut self, c : CNFClause) {
         self.vars.extend(c.vars)
     }
