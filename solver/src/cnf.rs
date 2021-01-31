@@ -36,6 +36,7 @@ pub struct CNFVar {
 
 impl CNF {
     /// Creates an empty CNF formula
+    #[inline]
     pub fn empty() -> CNF {
         CNF{
             clauses: Vec::new(),
@@ -44,6 +45,7 @@ impl CNF {
     }
 
     /// Creates a singleton CNF formula out of a single clause
+    #[inline]
     pub fn single(clause : CNFClause) -> CNF {
         CNF {
             num_variables: clause.max_variable_id(),
@@ -52,6 +54,7 @@ impl CNF {
     }
 
     /// Adds a new clause to the formula
+    #[inline]
     pub fn push(&mut self, c: CNFClause) {
         self.num_variables = self.num_variables.max(c.max_variable_id());
         self.clauses.push(c);
@@ -68,11 +71,13 @@ impl CNF {
     }
 
     /// Returns number of clauses in the formula
+    #[inline]
     pub fn len(&self) -> usize {
         self.clauses.len()
     }
 
     /// Collects all variable identifiers that appear in the formula
+    #[inline]
     pub fn vars(&self) -> HashSet<VarId> {
         self.clauses.iter()
             .flat_map(|clause| clause.vars.iter().map(CNFVar::id))
@@ -181,21 +186,28 @@ impl IntoIterator for CNF {
 
 impl CNFClause {
     /// Creates an empty CNF clause
+    #[inline]
     pub fn new() -> CNFClause {
         CNFClause{vars: vec![]}
     }
 
     /// Creates a CNF clause containing a single variable
+    #[inline]
     pub fn single(var : CNFVar) -> CNFClause {
         CNFClause{vars: vec![var]}
     }
 
     /// Adds a single variable into the clause
+    #[inline]
     pub fn push(&mut self, v : CNFVar) {
-        self.vars.push(v)
+        match self.vars.binary_search(&v) {
+            Ok(_) => {}  // we could check for contradiction here
+            Err(pos) => self.vars.insert(pos, v),
+        }
     }
 
     /// Returns the greatest variablie identifier used in the clause
+    #[inline]
     pub fn max_variable_id(&self) -> usize {
         self.vars.iter()
             .map(|lit| lit.id)
@@ -204,8 +216,18 @@ impl CNFClause {
     }
 
     /// Concatenates clauses
+    #[inline]
     pub fn extend(&mut self, c : CNFClause) {
-        self.vars.extend(c.vars)
+        self.vars.reserve(self.len() + c.len());
+        for v in c {
+            self.push(v)
+        }
+    }
+
+    /// Calculates number of literals in clause
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.vars.len()
     }
 }
 
@@ -226,26 +248,31 @@ impl IntoIterator for CNFClause {
 
 impl CNFVar {
     /// Creates variable with given identifier and positivity
+    #[inline]
     pub fn new(id: VarId, sign: bool) -> CNFVar {
         CNFVar{id, sign}
     }
 
     /// Creates a positive variable with given identifier
+    #[inline]
     pub fn pos(id: VarId) -> CNFVar {
         CNFVar{id, sign: true}
     }
 
     /// Creates a negative variable with given identifier
+    #[inline]
     pub fn neg(id: VarId) -> CNFVar{
         CNFVar{id, sign: false}
     }
 
     /// Gets the identifier of a variable
+    #[inline]
     pub fn id(&self) -> VarId {
         self.id
     }
 
     /// Checks if the variable is positive
+    #[inline]
     pub fn sign(&self) -> bool {
         self.sign
     }
