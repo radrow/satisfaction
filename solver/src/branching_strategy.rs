@@ -3,26 +3,43 @@ use crate::{cnf, dpll};
 use cnf::CNFVar;
 use dpll::{Variables, Clauses, VarValue};
 
+/// A trait to choose the next variable to set during DPLL algorithm.
+/// Often a variable must have a specific boolean value
+/// because otherwise the whole formula would be unsatisfied.
+/// If this not the case anymore,
+/// i.e. all variables can be choosen arbitrarily,
+/// one have to decide which literal should be set true next.
+/// To do so, one can consider several heuristics deciding w.r.t. the current state of the algorithm
+/// in order to achieve a fast convergence and thus improve runtime significantly.
+/// This traits abstracts these branching heuristics by allowing them to have a look at the
+/// current variables to suggest a promising literal to be set true.
+/// If all variables are set the heuristics is supposed to return None.
 pub trait BranchingStrategy {
     /// Funtion that picks the next variable to be chosen for branching.
     /// Returns the index of the next variable, or None if there is no Variable to be picked
     fn pick_branching_variable(&self, variables: &Variables, clauses: &Clauses) -> Option<CNFVar>;
 }
 
+/// A branching heuristic that chooses just the next unset variable 
+/// according to the order in `variables`.
+/// This is probably the slowest heuristic,
+/// as no information about clauses are taken into account.
 pub struct NaiveBranching;
 
 impl BranchingStrategy for NaiveBranching {
     fn pick_branching_variable(&self, variables: &Variables, _clauses: &Clauses) -> Option<CNFVar> {
-        // TODO -> add heuristics to chose Variables
         variables.iter()
             .enumerate()
+            // Only consider unset variables
             .filter_map(|(i,v)| match v.value {
                 VarValue::Free  => Some(CNFVar::new(i, true)),
                 _               => None,
-            }).next()
+            }).next() // Take the first one
     }
 }
 
+/// A small convenience function counting the number of clauses that are mentioned in occ and not
+/// satisfied at the moment.
 #[inline]
 fn count_number_of_clauses(occ: &Vec<usize>, clauses: &Clauses) -> usize {
     occ.iter()
@@ -30,6 +47,8 @@ fn count_number_of_clauses(occ: &Vec<usize>, clauses: &Clauses) -> usize {
         .count()
 }
 
+/// Dynamic Largest Individual Sum (DLIS) is a branching heuristics that chooses the literal
+/// appearing most in satisfied clauses, thus reducing the clauses to be considered.
 pub struct DLIS;
 
 impl BranchingStrategy for DLIS {
@@ -61,6 +80,9 @@ impl BranchingStrategy for DLIS {
     }
 }
 
+/// Dynamic Largest Combined Sum (DLIS) is a branching heuristics that chooses the variable
+/// appearing most in satisfied clauses, and then decides if it is set to true or false depending
+/// of the number of occurences.
 pub struct DLCS;
 
 impl BranchingStrategy for DLCS {
@@ -88,6 +110,8 @@ impl BranchingStrategy for DLCS {
     }
 }
 
+/// A branching heuristics that chooses the literal appearing most in the formula prefering (i.e.
+/// weighting) short clauses.
 pub struct JeroslawWang;
 
 impl BranchingStrategy for JeroslawWang {
@@ -128,6 +152,8 @@ impl JeroslawWang {
     }
 }
 
+/// Maximum number of Occurrences in the Minimum length clauses (MOM)
+/// is a branching heuristic that chooses the literal that appears most in the shortest clauses.
 pub struct MOM;
 
 impl BranchingStrategy for MOM {
