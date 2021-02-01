@@ -1,6 +1,6 @@
 use crate::{CNF, SATSolution, Solver};
 use async_trait::async_trait;
-use async_std::task::block_on;
+use futures::executor::block_on;
 use auto_impl::auto_impl;
 
 /// A solver that can be interrupted at fixed location

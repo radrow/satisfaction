@@ -8,7 +8,7 @@ use std::collections::VecDeque;
 use crate::{Solver, SATSolution, BranchingStrategy};
 use crate::solvers::InterruptibleSolver;
 use async_trait::async_trait;
-use async_std::task::yield_now;
+use tokio::task::yield_now;
 
 /// A DPLL based SAT-Solver, that solves a given SAT Problem. 
 /// It needs a branching strategy for picking variables, the strategy has to be passed by calling 
