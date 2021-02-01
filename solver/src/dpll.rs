@@ -258,11 +258,22 @@ impl DataStructures {
         }
     }
 
+    /// Dpll-Algorithm for solving SAT-Problems in CNF form,
+    /// that is additionally interruptible,
+    /// i.e. it transfers execution control each time it branches.
+    /// Semantically it is the same as `DataStructures::dpll`
+    /// 
+    /// # Arguments
+    /// 
+    /// * `branching` - The Branching strategy for picking variables
+    /// 
     async fn interruptible_dpll(&mut self, branching: &impl BranchingStrategy) -> SATSolution {
         // unit propagation
         if !self.inital_unit_propagation() {
             return SATSolution::Unsatisfiable;
         }
+
+        yield_now().await;
 
         // repeat & choose literal b
         while let Some(literal) = branching.pick_branching_variable(&self.variables, &self.clauses) {

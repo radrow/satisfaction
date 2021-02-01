@@ -112,8 +112,8 @@ impl BranchingStrategy for DLCS {
     }
 }
 
-/// A branching heuristics that chooses the literal appearing most in the formula prefering (i.e.
-/// weighting) short clauses.
+/// A branching heuristics that chooses the literal appearing most in the formula
+/// prefering (i.e. weighting) short clauses.
 pub struct JeroslawWang;
 
 impl BranchingStrategy for JeroslawWang {

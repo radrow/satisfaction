@@ -4,7 +4,7 @@ use auto_impl::auto_impl;
 
 
 /// Abstraction over a SAT-Solver:
-/// Each solver is expected to receive a formula with all variable IDs being greater than 0
+/// Each solver is expected to receive a `CNF` `formula` with all variable IDs being greater than 0
 /// and output a SATSolution.
 /// If the formula was satisfied it returns a Vec of booleans representing 
 /// a contiguous range from variable with ID 1 (index 0) to the variable with the maximal ID).
