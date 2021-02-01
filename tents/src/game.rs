@@ -13,15 +13,18 @@ use crate::{
     field::*, 
     log::Log,
     control_widget::*, 
-    field_widget::{FieldWidget, FieldWidgetConfig},
+    field_widget::FieldWidget,
     puzzle_creation,
 };
 
+pub enum FieldState {
+    Playable(Field),
+    Solving,
+    Solved,
+}
 
 enum GameState {
-    Playable{field: Field, inital_field: Field, field_widget: FieldWidget},
-    Solving{field: Field, field_widget: FieldWidget},
-    Solved{field: Field, field_widget: FieldWidget},
+    FieldAvailable{field: Field, state: FieldState},
     Loading,
     Creating,
     Empty,
@@ -29,16 +32,16 @@ enum GameState {
 
 pub struct Game {
     state: GameState,
-    config: FieldWidgetConfig,
     log: Log,
 
+    field_widget: FieldWidget,
     control_widget: ControlWidget,
 }
 
 impl Game {
     fn is_solvable(&self) -> bool {
         match self.state {
-            GameState::Playable{..} => true,
+            GameState::FieldAvailable{state: FieldState::Playable(_), ..} => true,
             _                       => false,
         }
     }
@@ -50,14 +53,14 @@ impl Application for Game {
     type Flags = ();
 
     fn new(_flags: ()) -> (Self, Command<Self::Message>) {
-        let config = FieldWidgetConfig::new(15, 2, 2);
+        let field_widget = FieldWidget::new(15, 2, 2);
         let control_widget = ControlWidget::new(180);
 
         let game = Game {
             state: GameState::Empty,
             log: Log::new(),
 
-            config,
+            field_widget,
             control_widget,
         };
         (game, Command::none())
@@ -73,8 +76,8 @@ impl Application for Game {
         match message {
             Message::FileDropped(path) => match self.state {
                 GameState::Empty 
-                    | GameState::Playable{..}
-                    | GameState::Solved{..} => {
+                    | GameState::FieldAvailable{state: FieldState::Playable(_), ..}
+                    | GameState::FieldAvailable{state: FieldState::Solved, ..} => {
                         self.state = GameState::Loading;
                         return Command::perform(
                             Field::from_file(path),
@@ -90,12 +93,12 @@ impl Application for Game {
             Message::FieldLoaded(field) => match self.state {
                 GameState::Loading
                     | GameState::Creating => {
-                        self.state = GameState::Playable {
-                        inital_field: field.clone(),
-                        field,
-                        field_widget: self.config.into(),
-                    };
-                },
+                        let old_field = field.clone();
+                        self.state = GameState::FieldAvailable {
+                            state: FieldState::Playable(old_field),
+                            field,
+                        };
+                    },
                 _ => unreachable!(),
             },
 
@@ -105,10 +108,18 @@ impl Application for Game {
                     let (state, hole) = scope.take(&mut self.state);
 
                     match state {
-                        GameState::Playable{inital_field, field, field_widget} => {
-                            hole.fill(GameState::Solving{field, field_widget});
+                        GameState::FieldAvailable {
+                            state: FieldState::Playable(old_field),
+                            field,
+                        } => {
+                            hole.fill(
+                                GameState::FieldAvailable {
+                                    field,
+                                    state: FieldState::Solving,
+                                }
+                            );
 
-                            let mut field = inital_field;
+                            let mut field = old_field;
                             let fun = lazy(move |_| {
                                 if field.solve(&CadicalSolver) {
                                     Message::SolutionFound(field)
@@ -131,8 +142,8 @@ impl Application for Game {
 
             Message::CreateRandomPuzzle{width , height} => match self.state {
                 GameState::Empty 
-                    | GameState::Playable{..}
-                    | GameState::Solved{..} => {
+                    | GameState::FieldAvailable{state: FieldState::Playable(_), ..}
+                    | GameState::FieldAvailable{state: FieldState::Solved, ..} => {
                         self.state = GameState::Creating;
                         let lazy = lazy(move |_| {
                             match puzzle_creation::create_random_puzzle(height, width) {
@@ -150,7 +161,10 @@ impl Application for Game {
             },
             
             Message::SolutionFound(field) => {
-                self.state = GameState::Solved{field, field_widget: self.config.into()};
+                self.state = GameState::FieldAvailable {
+                    field, 
+                    state: FieldState::Solved,
+                }
             }
         };
         Command::none()
@@ -177,9 +191,7 @@ impl Application for Game {
                         .horizontal_alignment(HorizontalAlignment::Center)
                         .vertical_alignment(VerticalAlignment::Center)
                 ),
-                GameState::Playable{field, field_widget, ..} 
-                    | GameState::Solving{field, field_widget}
-                    | GameState::Solved{field, field_widget} => field_widget.view(&field),
+                GameState::FieldAvailable{field, ..} => self.field_widget.view(&field),
             }).center_x()
                 .center_y()
                 .width(Length::Fill)

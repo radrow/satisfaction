@@ -12,27 +12,20 @@ lazy_static!{
     static ref MEADOW_SVG: Svg = Svg::new(Handle::from_memory(include_bytes!("../images/meadow.svg").to_vec()));
 }
 
-#[derive(Clone, Copy)]
-pub struct FieldWidgetConfig {
+pub struct FieldWidget {
     rect_size: Length,
     vertical_spacing: u16,
     horizontal_spacing: u16,
 }
 
-impl FieldWidgetConfig {
-    pub fn new(rect_size: u16, vertical_spacing: u16, horizontal_spacing: u16) -> FieldWidgetConfig {
-        FieldWidgetConfig {
+impl FieldWidget {
+    pub fn new(rect_size: u16, vertical_spacing: u16, horizontal_spacing: u16) -> FieldWidget {
+        FieldWidget {
             rect_size: Length::Units(rect_size),
             vertical_spacing,
             horizontal_spacing,
         }
     }
-}
-
-pub struct FieldWidget {
-    rect_size: Length,
-    vertical_spacing: u16,
-    horizontal_spacing: u16,
 }
 
 
@@ -76,15 +69,5 @@ impl FieldWidget {
             ).spacing(self.horizontal_spacing)
         ).spacing(self.horizontal_spacing)
             .into()
-    }
-}
-
-impl From<FieldWidgetConfig> for FieldWidget {
-    fn from(config: FieldWidgetConfig) -> Self {
-        FieldWidget {
-            rect_size: config.rect_size,
-            vertical_spacing: config.vertical_spacing,
-            horizontal_spacing: config.horizontal_spacing,
-        }
     }
 }
