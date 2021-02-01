@@ -46,9 +46,13 @@ impl<B: BranchingStrategy> Solver for SatisfactionSolver<B> {
     }
 }
 
-/// Datatype for PrevAssignment.
-/// Forced if variable was set during Unit-Propagation.
-/// Branching if variable was set while picking a new Variable for branching.
+/// Datatype for PrevAssignment, to store information if it was branching or unit propagation that
+/// did the assignment.
+/// 
+/// # Values
+/// 
+/// * `Forced` - If variable was set during Unit-Propagation.
+/// * `Branching` -  If variable was set while picking a new Variable for branching.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AssignmentType {
     Forced, Branching
@@ -57,16 +61,24 @@ enum AssignmentType {
 
 /// Datatype for assignment stack. 
 /// Used to store assignments made in the past, to potentially undo them later with backtracking
+/// 
+/// # Attributes 
+/// 
+/// * `literal` - a literal as `CNFVar` that was assigned a value.
+/// * `assignment_type` - the `AssignmentType` under which the variable was set.
 struct PrevAssignment {
     literal: CNFVar,
     assignment_type: AssignmentType
 }
 
 
-/// The value of a variable, if the Variable is:
-/// Pos, Postive value equal true
-/// Neg, Negative value equal false
-/// Free, Variable has not been set yet
+/// The value of a variable
+/// 
+/// # Values
+/// 
+/// * `Pos` - Postive value equal true
+/// * `Neg` - Negative value equal false
+/// * `Free` - Variable has not been set yet
 #[derive(Clone, Debug, PartialEq, Eq, Copy)]
 pub enum VarValue {
     Pos, Neg, Free
@@ -96,8 +108,12 @@ impl From<bool> for VarValue {
 /// Variable Datatype, to store a variable.
 /// Each variable has a value, which sets all occurrences of that variable to either true or 
 /// false depending on the sign of variable in the clause.
-/// pos_occ, describes the positive occurrences of a variable in a clause. The clause is referenced with index given in the vector.
-/// neg_occ, same as pos_occ, but for negated variables
+/// 
+/// # Attributes
+/// 
+/// * `value` - The value of the variable as `VarValue`
+/// * `pos_occ` - describes the positive occurrences of a variable in a clause. The clause is referenced with index given in the vector.
+/// * `neg_occ` - same as pos_occ, but for negated variables
 pub struct Variable {
     pub value: VarValue,
     pub pos_occ: Vec<usize>,
@@ -105,9 +121,12 @@ pub struct Variable {
 }
 
 /// Clause Datatype, to store a clause.
-/// active_lit, describes the count of literals that haven't been set yet.
-/// satisfied, is set if the clause has been satisfied by a variable, than with the index of the variable in the Variables Object, else it's None. 
-/// literals, are all the variables that are in the clause as CNFVar.
+/// 
+/// # Attributes
+/// 
+/// * `active_lit` - Describes the count of literals that haven't been set yet.
+/// * `satisfied` - Is set if the clause has been satisfied by a variable, than with the index of the variable in the Variables Object, else it's None. 
+/// * `literals` - Are all the variables that are in the clause as CNFVar.
 pub struct Clause {
     pub active_lits: usize,
     pub satisfied: Option<usize>,
@@ -121,6 +140,22 @@ pub type Clauses = Vec<Clause>;
 
 
 impl Variable {
+    /// Method to create a new Variable-Object.
+    /// Takes a CNF-Object that contains a CNF-Forumla and a the variable number of that 
+    /// CNF-Formula. 
+    /// 
+    /// #Attributes
+    /// 
+    /// * `cnf` - A CNF-Object, which contains a CNF-Forumla
+    /// * `var_num` - The variable number in the CNF-Object
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// // The formula `X and Y` would be converted into the integers `1 2`.
+    /// let variable_1: Variable = Variable::new(cnf, 1);
+    /// let variable_2: Variable = Variable::new(cnf, 2);
+    /// ```
     fn new(cnf: &CNF, var_num: usize) -> Variable {
         let mut v = Variable {
             value: VarValue::Free,
@@ -166,6 +201,12 @@ impl fmt::Display for Variable {
 }
 
 impl Clause {
+    /// Method to create a new Clause-Object. 
+    /// 
+    /// # Arguments
+    /// 
+    /// * `cnf_clause` - A `CNFClause` that contains one clause of a formula for example
+    /// from the CNF-Formula `(X and A) or (Y and Z)`, a clause would be `(X and A)`.
     fn new(cnf_clause: &CNFClause) -> Clause {
         // remove douplicated variables for active_lit, because they count as only 1 active literal
         let mut cnf_variables = cnf_clause.vars.clone();
@@ -183,10 +224,11 @@ impl Clause {
 }
 
 /// Datatype for storing all internal objects used for the DPLL calculation
-/// variables, all variables that the formula has
-/// clauses, all clauses the forumla has
-/// unit_queue, stores all unit-variables that have been found
-/// assignment_stack, all assignment that have been made so far
+/// variables, all variables that the formula has.
+/// # Attributes
+/// * `clauses` - All clauses the forumla has
+/// * `unit_queue` - Stores all unit-variables that have been found
+/// * `assignment_stack` - All assignment that have been made so far
 struct DataStructures {
     variables: Vec<Variable>,
     clauses: Vec<Clause>,
@@ -195,6 +237,11 @@ struct DataStructures {
 }
 
 impl DataStructures {
+    /// The method to create a new DataStructure
+    /// 
+    /// #Attributes
+    /// 
+    /// * `cnf` - A CNF-Forumla
     fn new(cnf: &CNF) -> DataStructures {
         let clauses: Vec<Clause> = cnf.clauses.iter().map(|cnf_clause| Clause::new(&cnf_clause)).collect();
         let variables = (1..=cnf.num_variables).map(|i| Variable::new(&cnf, i)).collect();
@@ -209,7 +256,7 @@ impl DataStructures {
         }
     }
 
-    /// time limited dpll for, for solving in specific time
+    /// Time limited dpll for, for solving in specific time
     fn time_limited_dpll(&mut self, branching: &impl BranchingStrategy, max_duration: Duration) -> SATSolution {
         let timer = Instant::now();
         // unit propagation
@@ -247,7 +294,19 @@ impl DataStructures {
         }).collect()
     }
 
-    /// regular solving of a forumla
+    /// Dpll-Algorithm for solving SAT-Problems in CNF form.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `branching` - The Branching strategy for picking variables
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// // Forumla is a CNF-Datatype containing a SAT-Problem in CNF form
+    /// let mut data = DataStructures::new(formula);
+    /// let sat_solution = data.dpll(NaiveBranching);
+    /// ```
     fn dpll(&mut self, branching: &impl BranchingStrategy) -> SATSolution {
         // unit propagation
         if !self.inital_unit_propagation() {
@@ -280,7 +339,8 @@ impl DataStructures {
         }).collect()
     }
 
-    /// the unit propagation that happens initally before a variable is picked for branching.
+    /// The unit propagation that happens initally before a variable is picked for branching.
+    /// Returns a boolean, depending on if a conflict was found in `unit_propagation()`.
     fn inital_unit_propagation(&mut self) -> bool {
         // find all unit clauses and enqueue the variables in the queue
         for i in 0..self.clauses.len() {
@@ -294,6 +354,26 @@ impl DataStructures {
         self.unit_propagation()
     }
 
+    /// Method for setting a variable. 
+    /// After setting a variable this method marks clauses as satisfied or 
+    /// decrements the active literal count, depending on if the set variable was 
+    /// positive or negative. Returns a boolean depending on if everything was ok 
+    /// or a conflict was detected. Conflicts occurre in this function, if a variable 
+    /// should be set but there are no more active variables left to be set.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `lit` - a `CNFVar` that is going to be set.
+    /// * `assign_type` - The assignment type the variable in which the variable is going to be set. 
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// // sets the variable 1 to true while branching
+    /// if !self.set_variable(CNFVar {id: 1, sign: true}, AssignmentType::Branching) {
+    ///     // handle conflict
+    /// }
+    /// ```
     fn set_variable(&mut self, lit: CNFVar, assign_type: AssignmentType) -> bool {
         self.variables[lit.id].value = lit.sign.into();
         self.assignment_stack.push(PrevAssignment { literal: lit, assignment_type: assign_type});
@@ -328,13 +408,21 @@ impl DataStructures {
                     }
                 } else if clause.active_lits <= 0 {
                     // conflict
-                    no_conflict =  false;
+                    no_conflict = false;
                 }
             }
         };
         no_conflict
     }
 
+    /// Method for unit propagation. Works through a unit_queue that contains all the currently found
+    /// unit-variables and sets them depending on their current sign. A unit-variable is a variable,
+    /// that is the last unset variable in a clause and has to become true depending on its sign to
+    /// satisfy its clause. For example in `!A or (B and C)` the clause `!A` is a unit-clause 
+    /// and A has to be set to false or else the first clause would be false.
+    /// This Method sets variables with `AssignmentType::Forced`.
+    /// Returns a boolean-value depending if a conflict was found while using the Method
+    /// `set_variable()`.
     fn unit_propagation(&mut self) -> bool {
         while let Some(var) = self.unit_queue.pop_front() {
             if !self.set_variable(var, AssignmentType::Forced) {
@@ -344,6 +432,8 @@ impl DataStructures {
         true
     }
 
+    // Method to eliminate literals that only exist as positive value in the formula.
+    // Retuns true if successful and no conflict was detected.
     fn pure_literal_elimination(&mut self) -> bool {
         let pure_literals = self.variables.iter()
             .enumerate()
@@ -362,7 +452,9 @@ impl DataStructures {
 
 
     /// Method if a conflict occurred, undos the last assignments from unit propagation until the last
-    /// time it was branched, and takes the other branch.
+    /// time it was branched, and takes the other branch. Returns true if backtracking was successful and
+    /// the clauses and variables could be restored, false if backtracking was not possible and the 
+    /// SAT-Problem is not satisfiable.
     fn backtracking(&mut self) -> bool {
         while let Some(assign) = self.assignment_stack.pop() {
             let mut pos_occ: &Vec<usize> = &self.variables[assign.literal.id].pos_occ;
@@ -404,7 +496,12 @@ impl DataStructures {
         false
     }
 
-    /// finds the unit variable that is in the given clauses
+    /// Finds the unit-variable that is in the given unit-clauses.
+    /// Returns a `CNFVar`, of a Variable, that is a unit.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `clause` - The index of the clause in which a unit variable should be searched.
     fn find_unit_variable(&self, clause: usize) -> CNFVar {
         self.clauses[clause].literals.iter()
             .filter(|lit| self.variables[lit.id].value == VarValue::Free)
@@ -413,6 +510,9 @@ impl DataStructures {
             .clone()
     }
 
+    /// Checks if all clauses have been satisfied. Returns true
+    /// if all are satisfied and false if there are still some that are not true yet and still 
+    /// worked on.
     fn satisfaction_check(&mut self) -> bool {
         let mut satisfied = true;
         self.clauses.iter().for_each(|clause| {
