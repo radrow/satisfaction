@@ -2,7 +2,9 @@ use std::cmp::Ordering;
 use crate::{cnf, dpll};
 use cnf::CNFVar;
 use dpll::{Variables, Clauses, VarValue};
+use auto_impl::auto_impl;
 
+#[auto_impl(&, Box)]
 pub trait BranchingStrategy {
     /// Funtion that picks the next variable to be chosen for branching.
     /// Returns the index of the next variable, or None if there is no Variable to be picked

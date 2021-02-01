@@ -2,6 +2,7 @@ extern crate solver;
 
 use criterion::{criterion_group, criterion_main, Criterion, BatchSize};
 use solver::{SatisfactionSolver, CadicalSolver, CNF, Solver, JeroslawWang, DLCS, DLIS, MOM};
+use solver::time_limited_solver::InterruptibleSolverWrapper;
 use std::path::{PathBuf, Path};
 
 
@@ -47,8 +48,9 @@ fn criterion_benchmark(c: &mut Criterion) {
     // Change input directory
     let sat_dir = path.join("sat");
     // Append branching strategy
-    create_group_for_solver(c, "MOM", SatisfactionSolver::new(MOM), &sat_dir);
+    create_group_for_solver(c, "DLIS-I", InterruptibleSolverWrapper::from(SatisfactionSolver::new(DLIS)), &sat_dir);
     create_group_for_solver(c, "DLIS", SatisfactionSolver::new(DLIS), &sat_dir);
+    create_group_for_solver(c, "MOM", SatisfactionSolver::new(MOM), &sat_dir);
     create_group_for_solver(c, "Jeroslaw Wang", SatisfactionSolver::new(JeroslawWang), &sat_dir);
     create_group_for_solver(c, "DLCS", SatisfactionSolver::new(DLCS), &sat_dir);
 }
