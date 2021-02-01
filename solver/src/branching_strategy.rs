@@ -24,8 +24,7 @@ pub trait BranchingStrategy {
 
 /// A branching heuristic that chooses just the next unset variable 
 /// according to the order in `variables`.
-/// This is probably the slowest heuristic,
-/// as no information about clauses are taken into account.
+/// Thus no information about clauses are taken into account.
 pub struct NaiveBranching;
 
 impl BranchingStrategy for NaiveBranching {

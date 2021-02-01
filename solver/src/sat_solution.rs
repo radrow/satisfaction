@@ -24,7 +24,6 @@ impl std::iter::FromIterator<bool> for SATSolution {
 }
 
 impl SATSolution {
-    // 
     pub fn is_sat(&self) -> bool {
         match self {
             SATSolution::Satisfiable(_)  => true,
