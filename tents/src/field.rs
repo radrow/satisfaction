@@ -238,7 +238,7 @@ impl Field {
         let tent_mapping = tents.iter()
             .unique()
             .enumerate()
-            .map(|(id, coord)| (id+1, *coord))
+            .map(|(id, coord)| (id + 1, *coord))
             .collect::<HashMap<usize,TentPlace>>();
 
         // Coordinate to id
@@ -280,7 +280,7 @@ impl Field {
                     for x in 0..self.width {
                         match
                             t_mapping.get(&(y, x))
-                            .map(|var_name| assignment[*var_name]) {
+                            .map(|var_name| assignment[*var_name - 1]) {
                                 None => (),
                                 Some(true) => self.cells[y][x] = CellType::Tent,
                                 Some(false) => self.cells[y][x] = CellType::Meadow,
@@ -300,7 +300,8 @@ impl Field {
         }
     }
 
-
+    /// For each coordinate (extracted by the `by` function) describes
+    /// a vector of tent places that lie on it
     fn make_coord_set_by (
         by : &dyn Fn(&TentPlace) -> usize,
         tents : &HashMap<usize, TentPlace>,
@@ -315,15 +316,17 @@ impl Field {
         out
     }
 
+    /// Creates collection of pairs of adjacent tent places
     fn make_neighbour_set(id_to_coord : &HashMap<usize, TentPlace>, coord_to_id: &HashMap<TentPlace, usize>) -> NeiSet {
         let mut out : NeiSet = Vec::new();
 
         for (id, tent) in id_to_coord {
-            let mut neighbours = vec![];
+            let mut neighbours = Vec::new();
+            let mut candidates = Vec::new();
 
-            let mut candidates = vec![];
             candidates.push((tent.0 + 1, tent.1));
             candidates.push((tent.0, tent.1 + 1));
+
             if tent.1 > 0 {
                 candidates.push((tent.0 + 1, tent.1 - 1))
             }
@@ -342,6 +345,27 @@ impl Field {
         out
     }
 
+    /// Builds up a formula that forces certain number of present tents in
+    /// a given row or column
+    pub fn axis_constraint(variables: &Vec<usize>, count: usize) -> CNF {
+        let lower_bound_clauses =
+            variables.iter()
+            .map(|v| *v as u32)
+            .combinations(variables.len() - count + 1).par_bridge()
+            .map(|vs| vs.iter().map(|v| CNFVar::pos(*v as VarId)).collect::<CNFClause>());
+
+        let upper_bound_clauses =
+            variables.iter()
+            .map(|v| *v as u32)
+            .combinations(count+1).par_bridge()
+            .map(|vs| vs.iter().map(|v| CNFVar::neg(*v as VarId)).collect::<CNFClause>());
+
+        lower_bound_clauses.chain(upper_bound_clauses)
+            .collect::<CNF>()
+    }
+
+    /// Builds up a formula that forces certain number of present tents in
+    /// all rows or columns
     fn make_count_constraints(counts : &Vec<usize>, axes : &AxisSet) -> CNF {
         let mut clauses = CNF::empty();
 
@@ -357,15 +381,17 @@ impl Field {
         clauses
     }
 
-
+    /// Builds up a formula that bans tents placed on adjacent positions
     fn make_neighbour_constraints(neigh : &NeiSet) -> CNF {
         neigh
             .iter()
-            .map(|(x,y)|{
+            .map(|(x, y)|{
                 CNFClause{vars: vec![CNFVar::neg(*x as VarId), CNFVar::neg(*y as VarId)]}
             }).collect()
     }
 
+    /// Here are the dragons. Builds up a formula that asserts a bijection between
+    /// trees and tents
     fn make_correspondence_constraints(
         &self,
         id_mapping: &HashMap<TentPlace, usize>) -> (CNF, Vec<(Assignment, usize)>) {
@@ -554,22 +580,5 @@ impl Field {
          .iter().map(|(a, i)| (*a, *i))
          .collect::<Vec<(Assignment, usize)>>()
         )
-    }
-
-    pub fn axis_constraint(variables: &Vec<usize>, count: usize) -> CNF {
-        let lower_bound_clauses =
-            variables.iter()
-            .map(|v| *v as u32)
-            .combinations(variables.len() - count + 1).par_bridge()
-            .map(|vs| vs.iter().map(|v| CNFVar::pos(*v as VarId)).collect::<CNFClause>());
-
-        let upper_bound_clauses =
-            variables.iter()
-            .map(|v| *v as u32)
-            .combinations(count+1).par_bridge()
-            .map(|vs| vs.iter().map(|v| CNFVar::neg(*v as VarId)).collect::<CNFClause>());
-
-        lower_bound_clauses.chain(upper_bound_clauses)
-            .collect::<CNF>()
     }
 }
