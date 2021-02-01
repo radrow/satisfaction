@@ -17,12 +17,24 @@ use crate::{
     puzzle_creation,
 };
 
+/// Enum that represents all states that can appear
+/// if a field is available.
+///
+/// * `Playable(field)` - Tents can be played. To solve it after the user has changed the field the original have to be conserved.
+/// * `Solving` - The gui is not interactive anymore and the the solver is running.
+/// * `Solved` - The gui is not interactive but shows a solved field.
 pub enum FieldState {
     Playable(Field),
     Solving,
     Solved,
 }
 
+/// An Enum that categorises all possible states a program can be.
+///
+/// * `FieldAvailable`: A field is avaiable can be played and solved.
+/// * `Loading`: A field is currently loaded from file.
+/// * `Creating`: A random field is currently created.
+/// * `Empty`: Neither is a field avaiable nor is one loaded.
 enum GameState {
     FieldAvailable{field: Field, state: FieldState},
     Loading,
@@ -30,6 +42,9 @@ enum GameState {
     Empty,
 }
 
+/// Entry point of the whole Tents-application
+/// Speaking in Elm's parlance, it is the model of the program.
+///
 pub struct Game {
     state: GameState,
     log: Log,
@@ -52,15 +67,22 @@ impl Application for Game {
     type Message = Message;
     type Flags = ();
 
+    /// Startup of the application.
+    /// Here any configuration takes place.
+    ///
     fn new(_flags: ()) -> (Self, Command<Self::Message>) {
         let field_widget = FieldWidget::new(15, 2, 2);
         let control_widget = ControlWidget::new(180);
 
         let game = Game {
             state: GameState::Empty,
+
+            // Log for error messages
             log: Log::new(),
 
+            // View for the field
             field_widget,
+            // View for user interaction
             control_widget,
         };
         (game, Command::none())
@@ -70,14 +92,18 @@ impl Application for Game {
         String::from("Solving Tents")
     }
 
-    ///
+    /// Every time the user interacts with the gui, a system event appears or an asynchronous task
+    /// finishes the current model (i.e. `Game`) is updated according to the message those sent.
     ///
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match message {
+            // If a file is dropped, an asynchronous procedure is called loading this
+            // file and converting it into `Field`.
             Message::FileDropped(path) => match self.state {
                 GameState::Empty 
                     | GameState::FieldAvailable{state: FieldState::Playable(_), ..}
                     | GameState::FieldAvailable{state: FieldState::Solved, ..} => {
+
                         self.state = GameState::Loading;
                         return Command::perform(
                             Field::from_file(path),
@@ -90,6 +116,8 @@ impl Application for Game {
 
             },
 
+            // If the field is finally loaded, the game state is updated now containing the new
+            // field.
             Message::FieldLoaded(field) => match self.state {
                 GameState::Loading
                     | GameState::Creating => {
@@ -102,9 +130,14 @@ impl Application for Game {
                 _ => unreachable!(),
             },
 
+            // If the "Solve Puzzle"-button is pressed, this message is sent and the solver is
+            // started.
             Message::SolvePuzzle => {
                 let mut cmd = Command::none();
+
+                // This is enables swapping member variables for &mut.
                 scoped::scope(|scope| {
+                    // Take current state leaving `Game` in an inconsistent state
                     let (state, hole) = scope.take(&mut self.state);
 
                     match state {
@@ -112,6 +145,7 @@ impl Application for Game {
                             state: FieldState::Playable(old_field),
                             field,
                         } => {
+                            // Restore consistency by replacing former state
                             hole.fill(
                                 GameState::FieldAvailable {
                                     field,
@@ -119,11 +153,14 @@ impl Application for Game {
                                 }
                             );
 
+                            // Start solver with current field
                             let mut field = old_field;
                             let fun = lazy(move |_| {
                                 if field.solve(&CadicalSolver) {
+                                    // If solving was successfull, send an appropriate message
                                     Message::SolutionFound(field)
                                 } else {
+                                    // If solving failed, send and error message
                                     Message::ErrorOccurred("No solution for the current Tents puzzle was found!".to_string())
                                 }
                             });
@@ -136,15 +173,21 @@ impl Application for Game {
                 return cmd;
             },
 
+            // If the user has input a different size, the view have to be updated.
             Message::GridSizeInputChanged{width, height} => {
                 self.control_widget.field_creation_widget.update(width, height)
             },
 
+            // If the user orders a random puzzle, 
+            // start creation as an asynchronous task
+            // and inform the user that one is creating
             Message::CreateRandomPuzzle{width , height} => match self.state {
                 GameState::Empty 
                     | GameState::FieldAvailable{state: FieldState::Playable(_), ..}
                     | GameState::FieldAvailable{state: FieldState::Solved, ..} => {
+
                         self.state = GameState::Creating;
+
                         let lazy = lazy(move |_| {
                             match puzzle_creation::create_random_puzzle(height, width) {
                                 Ok(field) => Message::FieldLoaded(field),
@@ -156,10 +199,14 @@ impl Application for Game {
                 _ => {},
             },
 
+            // If an error occurres log it to the screen.
+            // TODO: Reset state appropriately
             Message::ErrorOccurred(error) => {
                 self.log.add_error(error);
             },
             
+            // If a solution was found,
+            // replace current field with the new, solved one.
             Message::SolutionFound(field) => {
                 self.state = GameState::FieldAvailable {
                     field, 
