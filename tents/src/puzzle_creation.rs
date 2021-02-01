@@ -8,7 +8,7 @@ const TOO_LARGE_FIELD: usize = 400;
 /// 
 /// # Arguments
 /// 
-/// * `height` - Height of the puzzle.
+/// * `height` - height of the puzzle.
 /// * `width` - The width of the puzzle.
 /// 
 /// # Example
@@ -27,7 +27,7 @@ pub fn create_random_puzzle(height: usize, width: usize) -> Result<Field, String
         trees = height * width / 6;
     }
 
-    /// Funtion to create an empty `field`.
+    /// Function to create an empty `field`.
     /// 
     /// # Arguments
     /// 
@@ -84,7 +84,7 @@ pub fn create_random_puzzle(height: usize, width: usize) -> Result<Field, String
     /// 
     /// # Arguments
     /// 
-    /// * `tree_count` - The number of trees to be set.
+    /// * `tree_count` - The amount of trees to be set.
     /// * `field` - The field in with the trees are going to be placed.
     fn place_tents(tree_count: usize, field: &mut Field) -> bool {
         let mut rng: ThreadRng = rand::thread_rng();
@@ -118,9 +118,9 @@ pub fn create_random_puzzle(height: usize, width: usize) -> Result<Field, String
         return true;
     }
 
-    /// Function to get all the neighbour coordinates of a field.
-    /// All surrounding fields next to the given fields are neighbours.
-    /// Returns a vector of tuples with the cooridnates of the nightbours of a given field. 
+    /// Function to get all the nighbour cordinates of a field.
+    /// All surrounding fields next to the given fields are nighbours.
+    /// Returns a vector of toupls with the cooridnates of the nightbours of a given field. 
     /// 
     /// # Arguments
     /// 
@@ -167,8 +167,8 @@ pub fn create_random_puzzle(height: usize, width: usize) -> Result<Field, String
         coords
     }
 
-    /// Function for checking if the checked field has a tent next to it.
-    /// Returns true if it has a neighbour, false if there are none.
+    /// Funtion for checking if the checked field has a tent next to it.
+    /// Returns true if it has a nighbuor, false if there are none.
     /// 
     /// # Arguments
     /// 
@@ -177,7 +177,7 @@ pub fn create_random_puzzle(height: usize, width: usize) -> Result<Field, String
     /// * `field` - The field in which the function checks the coordinates.
     fn has_tent_neighbours(row: usize, col: usize, field: &Field) -> bool {
         let coords: Vec<(usize, usize)> = get_neighbour_coords(col, row, field, CellType::Tent);
-        let mut has_neighbour = false;
+        let mut has_nighbour = false;
 
         if field.cells[row][col] == CellType::Tent {
             return false;
@@ -185,14 +185,14 @@ pub fn create_random_puzzle(height: usize, width: usize) -> Result<Field, String
         
         for c in coords {
             if field.cells[c.0][c.1] == CellType::Tent {
-                has_neighbour = true;
+                has_nighbour = true;
                 break;
             }
         }
-        has_neighbour
+        has_nighbour
     }
 
-    /// Function that sets a tree at the given coordinates.
+    /// Funtion thats sets a tree in the given coordinates.
     /// Returns true if successful, false if the tree cannot be set.
     /// 
     /// # Arguments 
@@ -214,8 +214,8 @@ pub fn create_random_puzzle(height: usize, width: usize) -> Result<Field, String
         can_set
     }
 
-    /// Function to place trees next to tents. Returns true on success,
-    /// false if unsuccessful
+    /// Funtion to place trees next to tents. Returns true if it was successful
+    /// false if it wasnt
     /// 
     /// # Arguments 
     /// 
@@ -236,7 +236,7 @@ pub fn create_random_puzzle(height: usize, width: usize) -> Result<Field, String
         is_possible
     }
 
-    /// Function to fill the side row and column for the amount of tents that are in it.
+    /// Funtion to fill the side row and column for the amount of tents that are in it.
     /// 
     /// # Arguments 
     /// 
@@ -263,7 +263,7 @@ pub fn create_random_puzzle(height: usize, width: usize) -> Result<Field, String
         }
     }
 
-    /// Function to remove all tents from a field
+    /// Funtion to remove all tents from a field
     /// 
     /// # Arguments 
     /// 
