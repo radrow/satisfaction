@@ -13,8 +13,7 @@ use clap::{App, Arg};
 use config::Config;
 use plotting::plot_runtimes;
 use solver::{
-    TimedSolver,
-    TimeLimitedSolver,
+    solvers::{TimedSolver, TimeLimitedSolver, InterruptibleSolver},
     SATSolution,
     CNF,
     SatisfactionSolver,
@@ -46,13 +45,13 @@ fn make_config<'a>() -> Config {
             .help("Timeout for a single instance in seconds"))
         .get_matches();
 
-    let solvers : Vec<(String, Box<dyn TimeLimitedSolver>)> =
+    let solvers: Vec<(String, Box<dyn InterruptibleSolver>)> = 
         vec![
             // Brute too expensive
             ("DLIS".to_string(),  Box::new(SatisfactionSolver::new(solver::DLIS))),
-            ("DLCS".to_string(),  Box::new(SatisfactionSolver::new(solver::DLCS))),
-            ("MOM".to_string(),  Box::new(SatisfactionSolver::new(solver::MOM))),
-            ("Jeroslaw-Wang".to_string(),  Box::new(SatisfactionSolver::new(solver::JeroslawWang))),
+            ("DLCS".to_string(), Box::new(SatisfactionSolver::new(solver::DLCS))),
+            ("MOM".to_string(), Box::new(SatisfactionSolver::new(solver::MOM))),
+            ("Jeroslaw-Wang".to_string(), Box::new(SatisfactionSolver::new(solver::JeroslawWang))),
         ];
 
     Config{
@@ -82,10 +81,11 @@ fn load_files(dir: &Path) -> io::Result<Vec<CNF>> {
     Ok(out)
 }
 
-fn run_tests<S: TimeLimitedSolver>(formulae: &Vec<CNF>, solver: TimedSolver<S>, max_duration: Duration) -> Vec<Duration> {
+fn run_tests(formulae: &Vec<CNF>, solver: impl InterruptibleSolver, max_duration: Duration) -> Vec<Duration> {
+    let solver = TimedSolver::new(TimeLimitedSolver::new(solver, max_duration));
     formulae.iter()
         .filter_map(|formula| {
-            let (duration, solution) = solver.solve_timed(formula, max_duration);
+            let (duration, solution) = solver.solve_timed(formula);
             match solution {
                 SATSolution::Unknown    => None,
                 _                       => Some(duration),
@@ -106,10 +106,9 @@ fn count_in_minute(durations: &Vec<Duration>) -> usize {
 }
 
 /// Returns a vector of test results; for each solver duration on each test
-fn run_benchmark(formulae: Vec<CNF>, solvers: Vec<(String, Box<dyn TimeLimitedSolver>)>, max_duration: Duration) -> HashMap<String, Vec<Duration>> {
+fn run_benchmark(formulae: Vec<CNF>, solvers: Vec<(String, Box<dyn InterruptibleSolver>)>, max_duration: Duration) -> HashMap<String, Vec<Duration>> {
     solvers.into_iter()
         .map(|(name, solver)| {
-            let solver = TimedSolver::new(solver);
             println!("Started {}", &name);
             let result = run_tests(&formulae, solver, max_duration);
             println!("Finished {}", &name);
