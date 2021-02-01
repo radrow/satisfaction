@@ -59,7 +59,7 @@ enum AssignmentType {
 }
 
 
-/// Datatype for assignment stack. 
+/// Datatype for assignment stack, which stores all assignments to variables that are done during the algorithm. 
 /// Used to store assignments made in the past, to potentially undo them later with backtracking
 /// 
 /// # Attributes 
@@ -451,7 +451,7 @@ impl DataStructures {
     }
 
 
-    /// Method if a conflict occurred, undos the last assignments from unit propagation until the last
+    /// Method to undo the last assignments from unit propagation until the last
     /// time it was branched, and takes the other branch. Returns true if backtracking was successful and
     /// the clauses and variables could be restored, false if backtracking was not possible and the 
     /// SAT-Problem is not satisfiable.
