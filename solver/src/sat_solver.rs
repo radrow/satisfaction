@@ -1,5 +1,6 @@
 use crate::{CNF, SATSolution};
 use rayon::prelude::*;
+use auto_impl::auto_impl;
 
 
 /// Abstraction over a SAT-Solver:
@@ -7,6 +8,7 @@ use rayon::prelude::*;
 /// and output a SATSolution.
 /// If the formula was satisfied it returns a Vec of booleans representing 
 /// a contiguous range from variable with ID 1 (index 0) to the variable with the maximal ID).
+#[auto_impl(Box)]
 pub trait Solver {
     fn solve(&self, formula: &CNF) -> SATSolution;
 }
@@ -14,10 +16,4 @@ pub trait Solver {
 pub fn check_valuation(formula: &CNF, val: &Vec<bool>) -> bool {
     formula.clauses.par_iter()
         .all(|clause| clause.vars.iter().any(|var| var.sign() == val[var.id() - 1]))
-}
-
-impl<S: Solver + ?Sized> Solver for Box<S> {
-    fn solve(&self, formula: &CNF) -> SATSolution {
-        self.as_ref().solve(formula)
-    }
 }

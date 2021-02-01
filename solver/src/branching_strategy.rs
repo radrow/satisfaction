@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 use crate::{cnf, dpll};
 use cnf::CNFVar;
 use dpll::{Variables, Clauses, VarValue};
+use auto_impl::auto_impl;
 
 /// A trait to choose the next variable to set during DPLL algorithm.
 /// Often a variable must have a specific boolean value
@@ -13,7 +14,8 @@ use dpll::{Variables, Clauses, VarValue};
 /// in order to achieve a fast convergence and thus improve runtime significantly.
 /// This traits abstracts these branching heuristics by allowing them to have a look at the
 /// current variables to suggest a promising literal to be set true.
-/// If all variables are set the heuristics is supposed to return None.
+/// If all variables are set, the heuristic is supposed to return None.
+#[auto_impl(&, Box)]
 pub trait BranchingStrategy {
     /// Funtion that picks the next variable to be chosen for branching.
     /// Returns the index of the next variable, or None if there is no Variable to be picked

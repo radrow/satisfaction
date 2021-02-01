@@ -1,13 +1,14 @@
-use crate::cnf;
-
-use cnf::CNF;
-use cnf::CNFClause;
-use cnf::CNFVar;
+use crate::cnf::{
+    CNF,
+    CNFClause,
+    CNFVar,
+};
 use std::fmt;
 use std::collections::VecDeque;
-use std::time::{Duration, Instant};
-use crate::{Solver, SATSolution, TimeLimitedSolver};
-use crate::{BranchingStrategy};
+use crate::{Solver, SATSolution, BranchingStrategy};
+use crate::solvers::InterruptibleSolver;
+use async_trait::async_trait;
+use async_std::task::yield_now;
 
 /// A DPLL based SAT-Solver, that solves a given SAT Problem. 
 /// It needs a branching strategy for picking variables, the strategy has to be passed by calling 
@@ -32,17 +33,18 @@ impl<B: BranchingStrategy> SatisfactionSolver<B> {
     }
 }
 
-impl<B: BranchingStrategy> TimeLimitedSolver for SatisfactionSolver<B> {
-    fn solve(&self, formula: &CNF, max_duration: Duration) -> SATSolution {
-        let mut data = DataStructures::new(formula);
-        data.time_limited_dpll(&self.strategy, max_duration)
-    }
-}
-
 impl<B: BranchingStrategy> Solver for SatisfactionSolver<B> {
     fn solve(&self, formula: &CNF) -> SATSolution {
         let mut data = DataStructures::new(formula);
         data.dpll(&self.strategy)
+    }
+}
+
+#[async_trait]
+impl<B: BranchingStrategy+Send+Sync> InterruptibleSolver for SatisfactionSolver<B> {
+    async fn solve_interruptible(&self, formula: &CNF) -> SATSolution {
+        let mut data = DataStructures::new(formula);
+        data.interruptible_dpll(&self.strategy).await
     }
 }
 
@@ -256,9 +258,7 @@ impl DataStructures {
         }
     }
 
-    /// Time limited dpll for, for solving in specific time
-    fn time_limited_dpll(&mut self, branching: &impl BranchingStrategy, max_duration: Duration) -> SATSolution {
-        let timer = Instant::now();
+    async fn interruptible_dpll(&mut self, branching: &impl BranchingStrategy) -> SATSolution {
         // unit propagation
         if !self.inital_unit_propagation() {
             return SATSolution::Unsatisfiable;
@@ -273,18 +273,16 @@ impl DataStructures {
                 && self.pure_literal_elimination());
 
             // If backtracking does not help, formula is unsat.
-            if conflict && !self.backtracking(){
+            if conflict && !self.backtracking() {
                 return SATSolution::Unsatisfiable;
             }
 
             if self.satisfaction_check() {
                 break;
             }
-
-            if timer.elapsed() > max_duration {
-                return SATSolution::Unknown;
-            }
+            yield_now().await;
         }
+
 
         // output assignment
         self.variables.iter().map(|x| match x.value {
@@ -534,4 +532,3 @@ impl DataStructures {
         println!("");
     }
 }
-

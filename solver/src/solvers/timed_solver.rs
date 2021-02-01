@@ -1,7 +1,6 @@
 use crate::sat_solver::*;
 use crate::{CNF, SATSolution};
 use std::time::{Instant, Duration};
-use crate::TimeLimitedSolver;
 
 /// A wrapper for another solver which exposes time performance
 /// measurement
@@ -23,10 +22,10 @@ impl<S> TimedSolver<S> {
 }
 
 
-impl<S: TimeLimitedSolver> TimedSolver<S> {
-    pub fn solve_timed(&self, formula: &CNF, max_duration: Duration) -> (Duration, SATSolution) {
+impl<S: Solver> TimedSolver<S> {
+    pub fn solve_timed(&self, formula: &CNF) -> (Duration, SATSolution) {
         let start = Instant::now();
-        let solution = self.solver.solve(formula, max_duration);
+        let solution = self.solver.solve(formula);
         let duration = start.elapsed();
         (duration, solution)
     }
