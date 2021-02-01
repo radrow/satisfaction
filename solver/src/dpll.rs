@@ -1,12 +1,12 @@
-use crate::cnf;
-
-use cnf::CNF;
-use cnf::CNFClause;
-use cnf::CNFVar;
+use crate::cnf::{
+    CNF,
+    CNFClause,
+    CNFVar,
+};
 use std::fmt;
 use std::collections::VecDeque;
-use crate::{Solver, SATSolution, BranchingStrategy, JeroslawWang};
-use crate::time_limited_solver::InterruptibleSolver;
+use crate::{Solver, SATSolution, BranchingStrategy};
+use crate::solvers::InterruptibleSolver;
 use async_trait::async_trait;
 use async_std::task::yield_now;
 
