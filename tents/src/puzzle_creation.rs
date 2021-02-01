@@ -3,12 +3,12 @@ use rand::prelude::*;
 
 const TOO_LARGE_FIELD: usize = 400;
 
-/// Funtion to create a random tent puzzle.
+/// Function to create a random tent puzzle.
 /// Returns a Result of a `Field` or an `String` with an errormessage.
 /// 
 /// # Arguments
 /// 
-/// * `hight` - Hight of the puzzle.
+/// * `height` - Height of the puzzle.
 /// * `width` - The width of the puzzle.
 /// 
 /// # Example
@@ -20,18 +20,18 @@ const TOO_LARGE_FIELD: usize = 400;
 ///     Err(err) => // do something with the error
 /// }
 /// ```
-pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String> {
-    let mut trees = (hight * width) / 5;
+pub fn create_random_puzzle(height: usize, width: usize) -> Result<Field, String> {
+    let mut trees = (height * width) / 5;
     // computation for a field of bigger size is very expansive, so using less trees will speed up the process
-    if hight * width >= TOO_LARGE_FIELD {
-        trees = hight * width / 6;
+    if height * width >= TOO_LARGE_FIELD {
+        trees = height * width / 6;
     }
 
     /// Funtion to create an empty `field`.
     /// 
     /// # Arguments
     /// 
-    /// * `hight` - Hight of the puzzle.
+    /// * `height` - Height of the puzzle.
     /// * `width` - Width of the puzzle.
     fn create_empty_field(height: usize, width: usize) -> Field {
         Field {
@@ -84,11 +84,11 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
     /// 
     /// # Arguments
     /// 
-    /// * `tree_count` - The amount of trees to be set.
+    /// * `tree_count` - The number of trees to be set.
     /// * `field` - The field in with the trees are going to be placed.
     fn place_tents(tree_count: usize, field: &mut Field) -> bool {
         let mut rng: ThreadRng = rand::thread_rng();
-        let hight = field.cells.len();
+        let height = field.cells.len();
         let width = field.cells[0].len();
 
         let mut curr_tree_count = tree_count;
@@ -106,7 +106,7 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
             if max_retries <= 0 {
                 return false;
             }
-            let tree_pos: usize = rng.gen_range(0, hight * width - 1);
+            let tree_pos: usize = rng.gen_range(0, height * width - 1);
             let col: usize = tree_pos % width;
             let row: usize = tree_pos / width;
             if field.cells[row][col] != CellType::Tent && !has_tent_neighbours(row, col, &field) {
@@ -118,9 +118,9 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
         return true;
     }
 
-    /// Function to get all the nighbour cordinates of a field.
-    /// All surrounding fields next to the given fields are nighbours.
-    /// Returns a vector of toupls with the cooridnates of the nightbours of a given field. 
+    /// Function to get all the neighbour coordinates of a field.
+    /// All surrounding fields next to the given fields are neighbours.
+    /// Returns a vector of tuples with the cooridnates of the nightbours of a given field. 
     /// 
     /// # Arguments
     /// 
@@ -130,7 +130,7 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
     /// * `checked_datatype` - Check for either tents or trees.
     fn get_neighbour_coords(col: usize, row: usize, field: &Field, checked_datatype: CellType) -> Vec<(usize, usize)> {
         let mut coords: Vec<(usize, usize)> = Vec::new();
-        let hight = field.cells.len();
+        let height = field.cells.len();
         let width = field.cells[0].len();
 
         let mut for_tent_check = false;
@@ -145,7 +145,7 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
             if row - 1 >= 0 && for_tent_check {
                 coords.push(((row - 1) as usize, (col - 1) as usize));
             }
-            if row + 1 < hight as isize && for_tent_check {
+            if row + 1 < height as isize && for_tent_check {
                 coords.push(((row + 1) as usize, (col - 1) as usize));
             }
         }
@@ -154,11 +154,11 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
             if row - 1 >= 0 && for_tent_check {
                 coords.push(((row - 1) as usize, (col + 1) as usize));
             }
-            if row + 1 < hight as isize && for_tent_check {
+            if row + 1 < height as isize && for_tent_check {
                 coords.push(((row + 1) as usize, (col + 1) as usize));
             }
         }
-        if row + 1 < hight as isize {
+        if row + 1 < height as isize {
             coords.push(((row + 1) as usize, col as usize));
         }
         if row - 1 >= 0 {
@@ -167,8 +167,8 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
         coords
     }
 
-    /// Funtion for checking if the checked field has a tent next to it.
-    /// Returns true if it has a nighbuor, false if there are none.
+    /// Function for checking if the checked field has a tent next to it.
+    /// Returns true if it has a neighbour, false if there are none.
     /// 
     /// # Arguments
     /// 
@@ -177,7 +177,7 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
     /// * `field` - The field in which the function checks the coordinates.
     fn has_tent_neighbours(row: usize, col: usize, field: &Field) -> bool {
         let coords: Vec<(usize, usize)> = get_neighbour_coords(col, row, field, CellType::Tent);
-        let mut has_nighbour = false;
+        let mut has_neighbour = false;
 
         if field.cells[row][col] == CellType::Tent {
             return false;
@@ -185,14 +185,14 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
         
         for c in coords {
             if field.cells[c.0][c.1] == CellType::Tent {
-                has_nighbour = true;
+                has_neighbour = true;
                 break;
             }
         }
-        has_nighbour
+        has_neighbour
     }
 
-    /// Funtion thats sets a tree in the given coordinates.
+    /// Function that sets a tree at the given coordinates.
     /// Returns true if successful, false if the tree cannot be set.
     /// 
     /// # Arguments 
@@ -214,8 +214,8 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
         can_set
     }
 
-    /// Funtion to place trees next to tents. Returns true if it was successful
-    /// false if it wasnt
+    /// Function to place trees next to tents. Returns true on success,
+    /// false if unsuccessful
     /// 
     /// # Arguments 
     /// 
@@ -236,7 +236,7 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
         is_possible
     }
 
-    /// Funtion to fill the side row and column for the amount of tents that are in it.
+    /// Function to fill the side row and column for the amount of tents that are in it.
     /// 
     /// # Arguments 
     /// 
@@ -263,7 +263,7 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
         }
     }
 
-    /// Funtion to remove all tents from a field
+    /// Function to remove all tents from a field
     /// 
     /// # Arguments 
     /// 
@@ -279,14 +279,14 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
     }
 
     let mut can_create = false;
-    let mut field: Field = create_empty_field(hight, width);
+    let mut field: Field = create_empty_field(height, width);
     let mut loop_count = 0;
 
     while can_create == false {
         if loop_count >= 100000 {
             return Err("couldnt find a puzzle in 10000 iterations".to_string());
         }
-        field = create_empty_field(hight, width);
+        field = create_empty_field(height, width);
         let tents_worked = place_tents(trees, &mut field);
         if tents_worked {
             can_create = place_trees(&mut field);
