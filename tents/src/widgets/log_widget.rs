@@ -1,5 +1,5 @@
 use iced::{
-    Column, Text, Element, Color, Scrollable,
+    Text, Element, Color, Scrollable,
     scrollable::State,
     Length,
 };

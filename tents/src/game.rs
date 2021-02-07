@@ -42,8 +42,8 @@ pub struct Game {
 impl Game {
     fn is_solvable(&self) -> bool {
         match self.state {
-            GameState::FieldAvailable{state: FieldState::Playable(_), ..} => true,
-            _                       => false,
+            GameState::FieldAvailable{state: FieldState::Playable(_), ..}   => true,
+            _                                                               => false,
         }
     }
 }
@@ -147,9 +147,9 @@ impl Application for Game {
                     | GameState::FieldAvailable{state: FieldState::Solved, ..} => {
                         self.state = GameState::Creating;
                         let lazy = lazy(move |_| {
-                            match create_random_puzzle(height, width) {
+                            match create_random_puzzle(width, height) {
                                 Ok(field) => Message::FieldLoaded(field),
-                                Err(msg) => Message::ErrorOccurred(msg),
+                                Err(msg) => Message::ErrorOccurred(msg.to_string()),
                             }
                         });
                         return Command::perform(lazy, identity)

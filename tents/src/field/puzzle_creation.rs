@@ -1,53 +1,13 @@
-use super::{Field, CellType};
+use super::field::{Field, CellType};
 use rand::prelude::*;
 
-const TOO_LARGE_FIELD: usize = 400;
-
-pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String> {
-    let mut trees = (hight * width) / 5;
-    if hight * width >= TOO_LARGE_FIELD {
-        trees = hight * width / 6;
-    }
-
-    fn create_empty_field(height: usize, width: usize) -> Field {
-        Field {
-            cells: vec![vec![CellType::Meadow; width]; height],
-            row_counts: vec![0; height],
-            column_counts: vec![0; width],
-            width: width,
-            height: height,
-            tent_tree_assgs: None
-        }
-    }
-
+pub fn create_random_puzzle(width: usize, height: usize) -> Result<Field, Box<dyn std::error::Error>> {
     fn reset_field(field: &mut Field) {
         for x in 0..field.cells.len() {
             for y in 0..field.cells[0].len() {
                 field.cells[x][y] = CellType::Meadow;
             }
         }
-    }
-
-    #[allow(dead_code)]
-    fn print_field(field: &Field) {
-        for (y, row) in field.cells.iter().enumerate() {
-            for cell in row {
-                if cell == &CellType::Tent {
-                    print!("x");
-                } else
-                if cell == &CellType::Tree {
-                    print!("T");
-                }
-                else {
-                    print!(".");
-                }
-            }
-            println!(" {}",  field.row_counts[y]);
-        }
-        for c in &field.column_counts {
-            print!("{} ", c);
-        }
-        println!(" ");
     }
 
     fn place_tents(tree_count: usize, field: &mut Field) -> bool {
@@ -201,14 +161,15 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
     }
 
     let mut can_create = false;
-    let mut field: Field = create_empty_field(hight, width);
+    let mut field = Field::create_empty(width, height)?;
+    let trees = (height * width) / 5;
     let mut loop_count = 0;
 
     while can_create == false {
         if loop_count >= 100000 {
-            return Err("couldnt find a puzzle in 10000 iterations".to_string());
+            return Err("couldnt find a puzzle in 10000 iterations".into());
         }
-        field = create_empty_field(hight, width);
+        field = Field::create_empty(width, height)?;
         let tents_worked = place_tents(trees, &mut field);
         if tents_worked {
             can_create = place_trees(&mut field);
@@ -217,7 +178,6 @@ pub fn create_random_puzzle(hight: usize, width: usize) -> Result<Field, String>
     }
     fill_col_row_count(&mut field);
     remove_tents(&mut field);
-    //print_field(&field);
     Ok(field)
 }
 

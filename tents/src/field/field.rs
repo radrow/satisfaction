@@ -11,6 +11,11 @@ use rayon;
 use solver::cnf::{CNF, CNFClause, CNFVar, VarId};
 use solver::SATSolution;
 
+const MIN_WIDTH: usize = 2;
+const MAX_WIDTH: usize = 45;
+const MIN_HEIGHT: usize = 2;
+const MAX_HEIGHT: usize = 35;
+
 /// Coordinate of a tent
 type TentPlace = (usize, usize);
 
@@ -37,18 +42,57 @@ enum FieldParserError {
 impl std::fmt::Display for FieldParserError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            FieldParserError::WidthNotSpecified => "A width was expected but not found".to_string(),
-            FieldParserError::HeightNotSpecified => "A height was expected but not found".to_string(),
-            FieldParserError::MissingRowCount(line) => format!("In line {} no tent count was specified", line),
-            FieldParserError::WrongNumberOfCells{line, expected, found} => format!("Not enough cells were specified in line {}: Expected {} but found {}", line, expected, found),
-            FieldParserError::MissingColumnCounts{expected, found} => format!("Could not find enough column counts in last line: Expected {} but found {}", expected, found),
-            FieldParserError::InvalidCharacter(character) => format!("Encountered an invalid character {}", character),
-            FieldParserError::ParsingFailed(line) => format!("Parsing failed in line {}", line),
+            FieldParserError::WidthNotSpecified =>
+                "A width was expected but not found".to_string(),
+            FieldParserError::HeightNotSpecified =>
+                "A height was expected but not found".to_string(),
+            FieldParserError::MissingRowCount(line) =>
+                format!("In line {} no tent count was specified", line),
+            FieldParserError::WrongNumberOfCells{line, expected, found} =>
+                format!("Not enough cells were specified in line {}: Expected {} but found {}", line, expected, found),
+            FieldParserError::MissingColumnCounts{expected, found} =>
+                format!("Could not find enough column counts in last line: Expected {} but found {}", expected, found),
+            FieldParserError::InvalidCharacter(character) =>
+                format!("Encountered an invalid character {}", character),
+            FieldParserError::ParsingFailed(line) =>
+                format!("Parsing failed in line {}", line),
         })
     }
 }
 
 impl Error for FieldParserError {}
+
+#[derive(Debug)]
+pub enum FieldCreationError {
+    WidthColumnCountDifference(usize, usize),
+    HightRowCountDIfference(usize, usize),
+    WidthTooLarge(usize),
+    HeightTooLarge(usize),
+    UnequalHeight{column: usize, expected: usize, found: usize},
+    FieldTooSmall,
+}
+
+impl std::fmt::Display for FieldCreationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            FieldCreationError::WidthColumnCountDifference(width, column_count) =>
+                format!("Field width {} and number of column counts {} differ.", width, column_count),
+            FieldCreationError::HightRowCountDIfference(height, row_count) => 
+                format!("Field height {} and number of row counts {} differ.", height, row_count),
+            FieldCreationError::WidthTooLarge(width) => 
+                format!("Field width {} is to large. It should be less than {}.", width, MAX_WIDTH),
+            FieldCreationError::HeightTooLarge(height) => 
+                format!("Field height {} is to large. It should be less than {}.", height, MAX_HEIGHT),
+            FieldCreationError::FieldTooSmall => 
+                format!("Specified field size was too small. It must be at least {} x {}.", MIN_WIDTH, MIN_HEIGHT),
+            FieldCreationError::UnequalHeight{column, expected, found} => 
+                format!("In column {} the there are not enough cells specified: Expected {} but found {}.", column, expected, found),
+        })
+    }
+}
+
+impl Error for FieldCreationError {}
+
 
 /// Datatype that describes the content of a single cell
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -64,40 +108,69 @@ pub struct Field {
     pub cells: Vec<Vec<CellType>>,
     pub row_counts: Vec<usize>,
     pub column_counts: Vec<usize>,
-    pub height : usize,
-    pub width : usize,
+    pub height: usize,
+    pub width: usize,
     pub tent_tree_assgs: Option<Vec<(TreePlace, TentPlace)>>
 }
 
 /// Connection between a tree and assigned tent
 #[derive (PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 struct Assignment {
-    tent : TentPlace,
-    tree : TreePlace
+    tent: TentPlace,
+    tree: TreePlace
 }
 
 impl Field {
+    pub fn new(cells: Vec<Vec<CellType>>, row_counts: Vec<usize>, column_counts: Vec<usize>) -> Result<Field, FieldCreationError> {
+        // The field have to be of a certain size, otherwise the Tents game is futile.
+        let height = cells.len();
+        if height < MIN_HEIGHT { return Err(FieldCreationError::FieldTooSmall) }
+
+        let width = cells[0].len();
+        if width < MIN_WIDTH { return Err(FieldCreationError::FieldTooSmall) }
+
+        // Field that are too big, are neither solvable nor presentable via gui.
+        if width > MAX_WIDTH  { return Err(FieldCreationError::WidthTooLarge(width)) }
+        if height > MAX_HEIGHT  { return Err(FieldCreationError::HeightTooLarge(height)) }
+
+        // Each column vector must have the same size.
+        if let Some((column, found)) = cells.iter()
+            .enumerate()
+            .find_map(|(index, col)| {
+                if col.len() != width { Some((index, col.len())) }
+                else { None } 
+            }) { return Err(FieldCreationError::UnequalHeight{column, expected: height, found}) }
+
+        // The number of column and row counts must be the same as the width and height
+        if width != column_counts.len() { return Err(FieldCreationError::WidthColumnCountDifference(width, column_counts.len())) }
+        if height != row_counts.len() { return Err(FieldCreationError::HightRowCountDIfference(height, row_counts.len())) }
+
+        Ok(Field {
+            cells,
+            row_counts,
+            column_counts,
+            width,
+            height,
+            tent_tree_assgs: None,
+        })
+    }
+
+
     #[allow(dead_code)]
-    pub fn create_empty(width: usize, height: usize) -> Field {
-        let prototype = vec![CellType::Meadow;width];
+    pub fn create_empty(width: usize, height: usize) -> Result<Field, FieldCreationError> {
+        let prototype = vec![CellType::Meadow; width];
         let cells = vec![prototype; height];
 
         let column_counts = vec![0, width];
         let row_counts = vec![0; height];
 
-        Field {
-            cells,
-            height: row_counts.len(),
-            width: column_counts.len(),
-            row_counts,
-            column_counts,
-            tent_tree_assgs: None,
-        }
+        Field::new(cells, row_counts, column_counts)
     }
 
     pub async fn from_file(path: impl AsRef<Path>) -> Result<Field, Box<dyn std::error::Error>> {
         let contents: String = read_to_string(path).await?;
 
+        // Only numbers, 'T', '.' and space are allowed.
         if let Some(c) = contents.chars()
             .filter(|c| !(c.is_ascii_whitespace() || c.is_numeric() || *c == 'T' || *c == '.'))
             .next() {
@@ -123,15 +196,8 @@ impl Field {
             .ok_or(FieldParserError::MissingColumnCounts{expected: width, found: 0})
             .and_then(|(line, number)| Field::parse_column_counts(line, number, width))?;
 
-
-        Ok(Field {
-            row_counts,
-            column_counts,
-            cells,
-            height: height,
-            width: width,
-            tent_tree_assgs: None
-        })
+        Field::new(cells, row_counts, column_counts)
+            .map_err(FieldCreationError::into)
     }
 
     fn parse_size(line: &str) -> Result<(usize, usize), FieldParserError> {
