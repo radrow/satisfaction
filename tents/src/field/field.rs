@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use solver::sat_solver::Solver;
-use std::io;
 use std::path::Path;
 use std::error::Error;
 
@@ -10,7 +9,7 @@ use rayon::prelude::*;
 use rayon;
 
 use solver::cnf::{CNF, CNFClause, CNFVar, VarId};
-use solver::{SATSolution};
+use solver::SATSolution;
 
 /// Coordinate of a tent
 type TentPlace = (usize, usize);

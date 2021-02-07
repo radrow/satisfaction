@@ -1,4 +1,4 @@
-use crate::field::*;
+use super::{Field, CellType};
 use rand::prelude::*;
 
 const TOO_LARGE_FIELD: usize = 400;

@@ -1,6 +1,8 @@
-use crate::{message::*, log_widget::LogWidget};
-use crate::random_creation_widget::RandomCreationWidget;
-use crate::log::Log;
+use crate::{
+    message::*, 
+    widgets::{LogWidget, RandomCreationWidget},
+};
+use super::Log;
 
 use iced::button::State;
 use iced::{Length, HorizontalAlignment, Element, Button, Text, Column};

@@ -7,9 +7,9 @@ use crate::{
 };
 
 lazy_static!{
-    static ref TENT_SVG: Svg   = Svg::new(Handle::from_memory(include_bytes!("../images/tent.svg").to_vec()));
-    static ref TREE_SVG: Svg   = Svg::new(Handle::from_memory(include_bytes!("../images/tree.svg").to_vec()));
-    static ref MEADOW_SVG: Svg = Svg::new(Handle::from_memory(include_bytes!("../images/meadow.svg").to_vec()));
+    static ref TENT_SVG: Svg   = Svg::new(Handle::from_memory(include_bytes!("../../images/tent.svg").to_vec()));
+    static ref TREE_SVG: Svg   = Svg::new(Handle::from_memory(include_bytes!("../../images/tree.svg").to_vec()));
+    static ref MEADOW_SVG: Svg = Svg::new(Handle::from_memory(include_bytes!("../../images/meadow.svg").to_vec()));
 }
 
 pub struct FieldWidget {

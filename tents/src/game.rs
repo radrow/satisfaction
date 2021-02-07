@@ -11,10 +11,11 @@ use take_mut::scoped;
 use crate::{
     message::Message, 
     field::*, 
-    log::Log,
-    control_widget::*, 
-    field_widget::FieldWidget,
-    puzzle_creation,
+    widgets::{
+        FieldWidget,
+        ControlWidget,
+        Log,
+    },
 };
 
 pub enum FieldState {
@@ -146,7 +147,7 @@ impl Application for Game {
                     | GameState::FieldAvailable{state: FieldState::Solved, ..} => {
                         self.state = GameState::Creating;
                         let lazy = lazy(move |_| {
-                            match puzzle_creation::create_random_puzzle(height, width) {
+                            match create_random_puzzle(height, width) {
                                 Ok(field) => Message::FieldLoaded(field),
                                 Err(msg) => Message::ErrorOccurred(msg),
                             }

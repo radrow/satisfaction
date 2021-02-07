@@ -3,7 +3,7 @@ use iced::{
     Element, Color
 };
 use crate::message::Message;
-use crate::log::{Log, LogType};
+use super::{Log, LogType};
 
 pub struct LogWidget {
     font_size: u16,
