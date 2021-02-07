@@ -22,7 +22,7 @@ impl ControlWidget {
         ControlWidget {
             width: Length::Units(width),
             field_creation_widget: RandomCreationWidget::new(10, 10),
-            log_widget: LogWidget::new(12), // TODO: Use dynamic font size
+            log_widget: LogWidget::new(10), // TODO: Use dynamic font size
 
             solve_puzzle_button: State::new(),
         }
