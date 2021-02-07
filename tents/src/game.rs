@@ -159,7 +159,8 @@ impl Application for Game {
 
             Message::ErrorOccurred(error) => {
                 self.log.add_error(error);
-            },
+                self.state = GameState::Empty;
+            }
             
             Message::SolutionFound(field) => {
                 self.state = GameState::FieldAvailable {
