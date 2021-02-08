@@ -120,10 +120,9 @@ impl Application for Game {
                                 }
                             );
 
-                            let mut field = old_field;
                             let fun = lazy(move |_| {
-                                if field.solve(&CadicalSolver) {
-                                    Message::SolutionFound(field)
+                                if let Some(new_field) = field_to_cnf(old_field, &CadicalSolver) {
+                                    Message::SolutionFound(new_field)
                                 } else {
                                     Message::ErrorOccurred("No solution for the current Tents puzzle was found!".to_string())
                                 }
