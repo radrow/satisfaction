@@ -12,13 +12,11 @@ pub fn create_random_puzzle(width: usize, height: usize) -> Result<Field, Box<dy
 
     fn place_tents(tree_count: usize, field: &mut Field) -> bool {
         let mut rng: ThreadRng = rand::thread_rng();
-        let hight = field.cells.len();
-        let width = field.cells[0].len();
 
         let mut curr_tree_count = tree_count;
         let mut loop_count = 0;
         let mut max_retries = 10000;
-        let mut fields_count = field.cells[0].len() * field.cells.len() * 20;
+        let mut fields_count = field.width * field.height * 20;
 
         while curr_tree_count > 0 {
             if loop_count >= fields_count {
@@ -30,11 +28,11 @@ pub fn create_random_puzzle(width: usize, height: usize) -> Result<Field, Box<dy
             if max_retries <= 0 {
                 return false;
             }
-            let tree_pos: usize = rng.gen_range(0, hight * width - 1);
-            let col: usize = tree_pos % width;
-            let row: usize = tree_pos / width;
-            if field.cells[row][col] != CellType::Tent && !has_tent_neighbours(row, col, &field) {
-                field.cells[row][col] = CellType::Tent;
+            let tree_pos: usize = rng.gen_range(0, field.height * field.width - 1);
+            let col: usize = tree_pos % field.width;
+            let row: usize = tree_pos / field.width;
+            if field.get_cell(row, col) != CellType::Tent && !has_tent_neighbours(row, col, &field) {
+                *field.get_cell_mut(row, col) = CellType::Tent;
                 curr_tree_count -= 1;
             }
             loop_count += 1;
@@ -42,69 +40,75 @@ pub fn create_random_puzzle(width: usize, height: usize) -> Result<Field, Box<dy
         return true;
     }
 
-    fn get_neighbour_coords(col: usize, row: usize, field: &Field, checked_datatype: CellType) -> Vec<(usize, usize)> {
+    fn get_neighbour_coords(row: usize, col: usize, field: &Field, checked_datatype: CellType) -> Vec<(usize, usize)> {
         let mut coords: Vec<(usize, usize)> = Vec::new();
-        let hight = field.cells.len();
-        let width = field.cells[0].len();
 
         let mut for_tent_check = false;
         if checked_datatype == CellType::Tent {
             for_tent_check = true;
         }
-        let col: isize = col as isize;
-        let row: isize = row as isize;
 
-        if col - 1 >= 0 {
-            coords.push((row as usize, (col - 1) as usize));
-            if row - 1 >= 0 && for_tent_check {
-                coords.push(((row - 1) as usize, (col - 1) as usize));
+        if let Some(left) = col.checked_sub(1) {
+            coords.push((row, left));
+            if let Some(top) = row.checked_sub(1) {
+                if for_tent_check {
+                    coords.push((top, left));
+                }
             }
-            if row + 1 < hight as isize && for_tent_check {
-                coords.push(((row + 1) as usize, (col - 1) as usize));
-            }
-        }
-        if col + 1 < width as isize {
-            coords.push((row as usize, (col + 1) as usize));
-            if row - 1 >= 0 && for_tent_check {
-                coords.push(((row - 1) as usize, (col + 1) as usize));
-            }
-            if row + 1 < hight as isize && for_tent_check {
-                coords.push(((row + 1) as usize, (col + 1) as usize));
+            let bottom = row + 1;
+            if bottom < field.height && for_tent_check {
+                coords.push((bottom, left));
             }
         }
-        if row + 1 < hight as isize {
-            coords.push(((row + 1) as usize, col as usize));
+
+        let right = col + 1;
+        if right < field.width {
+            coords.push((row, right));
+            if let Some(top) = row.checked_sub(1) {
+                if for_tent_check {
+                    coords.push((top, right));
+                }
+            }
+            let bottom = row + 1;
+            if bottom < field.height && for_tent_check {
+                coords.push((bottom, right));
+            }
         }
-        if row - 1 >= 0 {
-            coords.push(((row - 1) as usize, col as usize));
+        let top = row + 1;
+        if top < field.height {
+            coords.push((top, col));
+        }
+        if let Some(top) = row.checked_sub(1) {
+            coords.push((top, col));
         }
         coords
     }
 
     fn has_tent_neighbours(row: usize, col: usize, field: &Field) -> bool {
-        let coords: Vec<(usize, usize)> = get_neighbour_coords(col, row, field, CellType::Tent);
-        let mut has_nighbour = false;
+        let coords: Vec<(usize, usize)> = get_neighbour_coords(row, col, field, CellType::Tent);
+        let mut has_neighbour = false;
 
-        if field.cells[row][col] == CellType::Tent {
+        if field.get_cell(row, col) == CellType::Tent {
             return false;
         }
         
-        for c in coords {
-            if field.cells[c.0][c.1] == CellType::Tent {
-                has_nighbour = true;
+        for (row, col) in coords {
+            if field.get_cell(row, col) == CellType::Tent {
+                has_neighbour = true;
                 break;
             }
         }
-        has_nighbour
+        has_neighbour
     }
 
     fn set_a_tree(row: usize, col: usize, field: &mut Field) -> bool {
-        let coords = get_neighbour_coords(col, row, field, CellType::Tree);
+        let coords = get_neighbour_coords(row, col, field, CellType::Tree);
         
         let mut can_set = false;
-        for c in &coords {
-            if field.cells[c.0][c.1] == CellType::Meadow {
-                field.cells[c.0][c.1] = CellType::Tree;
+        for (row, col) in &coords {
+            let cell = field.get_cell_mut(*row, *col);
+            if *cell == CellType::Meadow {
+                *cell = CellType::Tree;
                 can_set = true;
                 break;
             }
@@ -115,10 +119,10 @@ pub fn create_random_puzzle(width: usize, height: usize) -> Result<Field, Box<dy
     fn place_trees(mut field: &mut Field) -> bool {
         let mut is_possible = true;
         
-        for y in 0..field.cells.len() {
-            for x in 0..field.cells[0].len() {
-                if field.cells[y][x] == CellType::Tent {
-                    if !set_a_tree(y, x, &mut field) {
+        for row in 0..field.height {
+            for column in 0..field.width {
+                if field.get_cell(row, column) == CellType::Tent {
+                    if !set_a_tree(row, column, &mut field) {
                         is_possible = false;
                     } 
                 }
@@ -139,22 +143,22 @@ pub fn create_random_puzzle(width: usize, height: usize) -> Result<Field, Box<dy
             field.row_counts[y] = row_count;
         }
 
-        for x1 in 0..field.cells[0].len() {
+        for column in 0..field.width {
             let mut col_count = 0;
-            for y1 in 0..field.cells.len() {
-                if field.cells[y1][x1] == CellType::Tent {
+            for row in 0..field.height {
+                if field.get_cell(row, column) == CellType::Tent {
                     col_count += 1;
                 }
             }
-            field.column_counts[x1] = col_count;
+            field.column_counts[column] = col_count;
         }
     }
 
     fn remove_tents(field: &mut Field) {
-        for y in 0..field.cells.len() {
-            for x in 0..field.cells[0].len() {
-                if field.cells[y][x] == CellType::Tent {
-                    field.cells[y][x] = CellType::Meadow;
+        for row in 0..field.height {
+            for column in 0..field.width {
+                if field.get_cell(row, column) == CellType::Tent {
+                    *field.get_cell_mut(row, column) = CellType::Meadow;
                 }
             }
         }

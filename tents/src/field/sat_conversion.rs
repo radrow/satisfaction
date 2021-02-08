@@ -30,14 +30,14 @@ pub fn field_to_cnf(mut field: Field, solver: &impl Solver) -> Option<Field> {
 
     match solver.solve(&formula) {
         SATSolution::Satisfiable(assignment) => {
-            for y in 0..field.height {
-                for x in 0..field.width {
+            for row in 0..field.height {
+                for column in 0..field.width {
                     match
-                        t_mapping.get(&(y, x))
+                        t_mapping.get(&(row, column))
                         .map(|var_name| assignment[*var_name - 1]) {
                             None => (),
-                            Some(true) => field.cells[y][x] = CellType::Tent,
-                            Some(false) => field.cells[y][x] = CellType::Meadow,
+                            Some(true) => *field.get_cell_mut(row, column) = CellType::Tent,
+                            Some(false) => *field.get_cell_mut(row, column) = CellType::Meadow,
                         }
                 }
             };

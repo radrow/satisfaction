@@ -135,7 +135,7 @@ impl Field {
         let prototype = vec![CellType::Meadow; width];
         let cells = vec![prototype; height];
 
-        let column_counts = vec![0, width];
+        let column_counts = vec![0; width];
         let row_counts = vec![0; height];
 
         Field::new(cells, row_counts, column_counts)
