@@ -131,6 +131,12 @@ impl Field {
         })
     }
 
+    /// Function to create an empty `field`.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `height` - Height of the puzzle.
+    /// * `width` - Width of the puzzle.
     pub fn create_empty(width: usize, height: usize) -> Result<Field, FieldCreationError> {
         let prototype = vec![CellType::Meadow; width];
         let cells = vec![prototype; height];

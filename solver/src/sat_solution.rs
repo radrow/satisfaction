@@ -4,6 +4,12 @@ pub type Valuation = Vec<bool>;
 
 const MAX_LITERALS_PER_LINE: usize = 8;
 
+/// An enum which represents all output possibilities for solving a SAT-problem.
+/// * `Satisfiable(Valuation) - The an satisfying assignment was found.
+///     `Valuation` a Vec of booleans representing a contiguous range from variable with ID 1
+///     (index 0) to the variable with the maximal ID).
+/// * `Unsatisfiable` - The formula is not satisfiable i.e. to assignment makes the formula true.
+/// * `Unknown` - A satisfying assignment could not be found, however, there still could be one. 
 #[derive(PartialEq, Eq)]
 pub enum SATSolution {
     Satisfiable(Valuation),
@@ -39,6 +45,7 @@ impl SATSolution {
         }
     }
 
+    /// Transform it a output
     pub fn to_dimacs(&self) -> String {
         format!("s {}\n",
             match self {
