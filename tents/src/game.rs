@@ -64,6 +64,8 @@ pub struct Game {
     control_widget: ControlWidget,
 }
 
+/// The entry point of a gui for the `iced` framework
+/// is the implementation of the [`Application`] trait.
 impl Application for Game {
     type Executor = iced_futures::executor::Tokio;
     type Message = Message;
@@ -71,12 +73,12 @@ impl Application for Game {
 
     /// Startup of the application.
     /// Here any configuration takes place.
-    ///
     fn new(_flags: ()) -> (Self, Command<Self::Message>) {
         let field_widget = FieldWidget::new(15, 2, 2);
         let control_widget = ControlWidget::new(180, 10);
 
         let game = Game {
+            // At the beginning no field is avaiable
             state: GameState::Empty,
 
             // Log for error messages
@@ -96,7 +98,12 @@ impl Application for Game {
 
     /// Every time the user interacts with the gui, a system event appears or an asynchronous task
     /// finishes the current model (i.e. `Game`) is updated according to the message those sent.
+    /// If asynchronous work has to be done, it is wrapped into a [`Command`].
     ///
+    /// # Arguments
+    ///
+    /// * `message` - A message that was sent due to an event and that orders the game to change
+    ///               its state accordingly.
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match message {
             // If a file is dropped, an asynchronous procedure is called loading this
@@ -218,6 +225,7 @@ impl Application for Game {
         Command::none()
     }
 
+    /// The graphical representation of the current model.
     fn view(&mut self) -> Element<Self::Message> {
         Row::new()
         .align_items(Align::Start)
@@ -248,10 +256,15 @@ impl Application for Game {
             .into()
     }
 
+    /// Non-widget-related events,
+    /// e.g. dropping a file,
+    /// can be checked by a subscription.
+    /// An appropriate message is sent to process it.
     fn subscription(&self) -> Subscription<Self::Message> {
         iced_native::subscription::events_with(
             |event, _| {
                 match event {
+                    // If a file is dropped, sent an appropriate message
                     iced_native::Event::Window(Event::FileDropped(path)) => Some(Message::FileDropped(path)),
                     _ => None
                 }
