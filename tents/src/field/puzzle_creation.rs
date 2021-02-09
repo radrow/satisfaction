@@ -1,4 +1,4 @@
-use super::field::{Field, CellType, FieldCreationError};
+use super::field::{Field, CellType};
 use rand::prelude::*;
 use std::error::Error;
 
@@ -9,7 +9,7 @@ const MAX_NUM_ITERATIONS: usize = 10_000;
 /// Function to create a random tent puzzle.
 /// On success a solvable [`Field`] with the specified size is returned.
 /// If the creation fails, a dynamic [`Error`] is return,
-/// that is either a [`FieldCreationError`]
+/// that is either a [`FieldCreationError`](super::field::FieldCreationError)
 /// or a [`String`] warning
 /// that a solution could not be found in [`MAX_NUM_ITERATIONS`].
 ///

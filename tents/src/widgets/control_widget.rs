@@ -1,6 +1,7 @@
 use crate::{
     message::*, 
     widgets::{LogWidget, RandomCreationWidget},
+    game::{GameState, FieldState},
 };
 use super::Log;
 
@@ -18,30 +19,37 @@ pub struct ControlWidget {
 }
 
 impl ControlWidget {
-    pub fn new(width: u16) -> ControlWidget {
+    pub fn new(width: u16, log_font_size: u16) -> ControlWidget {
         ControlWidget {
             width: Length::Units(width),
             field_creation_widget: RandomCreationWidget::new(10, 10),
-            log_widget: LogWidget::new(10), // TODO: Use dynamic font size
+            log_widget: LogWidget::new(log_font_size),
 
             solve_puzzle_button: State::new(),
         }
     }
 
-    pub fn view(&mut self, solvable: bool, log: &Log) -> Element<Message> {
+    pub fn view(&mut self, state: &GameState, log: &Log) -> Element<Message> {
         let mut control = Column::new()
             .spacing(10)
             .width(self.width)
             .push(self.field_creation_widget.view());
 
-        if solvable {
-            control = control.push(
-                ControlWidget::button(
-                    &mut self.solve_puzzle_button,
-                    "Solve Puzzle",
-                    Message::SolvePuzzle
-                ));
+        match state {
+            GameState::FieldAvailable {
+                state: FieldState::Playable(_),
+                ..
+            } => {
+                control = control.push(
+                    ControlWidget::button(
+                        &mut self.solve_puzzle_button,
+                        "Solve Puzzle",
+                        Message::SolvePuzzle
+                    ));
+            },
+            _ => {},
         }
+
         control.push(self.log_widget.view(log))
             .into()
     }

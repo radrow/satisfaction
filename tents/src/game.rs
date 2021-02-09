@@ -33,7 +33,7 @@ pub enum FieldState {
 }
 
 /// An Enum that categorises all possible states a program can be.
-enum GameState {
+pub enum GameState {
     /// `FieldAvailable`: A field is avaiable can be played and solved.
     /// 
     /// # Arguments
@@ -64,15 +64,6 @@ pub struct Game {
     control_widget: ControlWidget,
 }
 
-impl Game {
-    fn is_solvable(&self) -> bool {
-        match self.state {
-            GameState::FieldAvailable{state: FieldState::Playable(_), ..}   => true,
-            _                                                               => false,
-        }
-    }
-}
-
 impl Application for Game {
     type Executor = iced_futures::executor::Tokio;
     type Message = Message;
@@ -83,7 +74,7 @@ impl Application for Game {
     ///
     fn new(_flags: ()) -> (Self, Command<Self::Message>) {
         let field_widget = FieldWidget::new(15, 2, 2);
-        let control_widget = ControlWidget::new(180);
+        let control_widget = ControlWidget::new(180, 10);
 
         let game = Game {
             state: GameState::Empty,
@@ -230,7 +221,7 @@ impl Application for Game {
     fn view(&mut self) -> Element<Self::Message> {
         Row::new()
         .align_items(Align::Start)
-        .push(self.control_widget.view(self.is_solvable(), &self.log))
+        .push(self.control_widget.view(&self.state, &self.log))
         .push(Container::new(
             match &mut self.state {
                 GameState::Empty => Element::from(
