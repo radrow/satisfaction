@@ -4,14 +4,15 @@ use proptest::{
     bool::weighted,
 };
 use std::path::PathBuf;
-use solver::{CadicalSolver, Solver, CNFClause, CNFVar, SATSolution, CNF, SatisfactionSolver, NaiveBranching, JeroslawWang, DLCS, DLIS, MOM};
+use solver::{CadicalSolver, Solver, CNFClause, CNFVar, SATSolution, CNF, SatisfactionSolver, JeroslawWang};
 
 const MAX_NUM_VARIABLES: usize = 50;
 const MAX_NUM_LITERALS: usize = 10;
 const MAX_NUM_CLAUSES: usize = 50;
 
-fn setup_custom_solver() -> SatisfactionSolver<NaiveBranching> {
-    SatisfactionSolver::new(NaiveBranching)
+
+fn setup_custom_solver() -> SatisfactionSolver<JeroslawWang> {
+    SatisfactionSolver::new(JeroslawWang)
 }
 
 fn execute_solvers(formula: &CNF) -> (SATSolution, SATSolution) {
@@ -38,14 +39,13 @@ fn is_satisfied(mut formula: impl Iterator<Item=CNFClause>, assignment: Vec<bool
         )
 }
 
+
 #[test]
 fn prescribed_instances() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/prescribed_instances");
 
-    let solver = SatisfactionSolver::new(MOM);
-    //let solver = SatisfactionSolver::new(DLIS);
-    //let solver = SatisfactionSolver::new(DLCS);
+    let solver = setup_custom_solver();
 
     let process = |files: PathBuf, satisfiable: bool| {
         files.read_dir()
@@ -64,7 +64,7 @@ fn prescribed_instances() {
                 assert!(match solver.solve(&formula) {
                     SATSolution::Satisfiable(_) => true,
                     SATSolution::Unsatisfiable => false,
-                    SATSolution::Unknown => unreachable!(),
+                    SATSolution::Unknown => panic!("Could not solve puzzle in time"),
                 } == satisfiable)
             })
     };
