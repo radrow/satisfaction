@@ -30,6 +30,7 @@ pub enum Message {
     /// If the user changes the size setting for the random puzzle creation,
     /// this message orders the program to change the respective widget.
     GridSizeInputChanged{width: usize, height: usize},
+    ChangedSolver{new_solver: String},
 
     /// If an error occurres during the program execution,
     /// e.g. a file wasn't found, a puzzle is unsolvable,

@@ -11,7 +11,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "0.3.4", features = ["fs"] }
+tokio = { version = "0.3.4", features = ["fs", "sync"] }
 iced = { version = "0.2.0", features = ["svg", "tokio"] }
 iced_native = "0.3.0"
 iced_futures = "0.2.0"
@@ -23,3 +23,4 @@ rayon = "1.5.0"
 lazy_static = "1.4.0"
 solver = {path = "../solver"}
 take_mut = "0.2.2"
+vec_box = "1.0.0"

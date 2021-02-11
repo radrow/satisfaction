@@ -1,8 +1,14 @@
 extern crate iced;
 
 use futures::future::lazy;
-use solver::CadicalSolver;
-use std::convert::identity;
+use solver::solvers::InterruptibleSolver;
+use std::{
+    collections::HashMap,
+    convert::identity,
+    sync::Arc,
+};
+
+use tokio::sync::RwLock;
 use iced::{Length, Align};
 use iced::{Element, Row, Application, Text, Command, Subscription, HorizontalAlignment, VerticalAlignment, Container};
 use iced_native::window::Event;
@@ -17,6 +23,8 @@ use crate::{
         Log,
     },
 };
+
+pub type SolverList = HashMap<&'static str, Box<dyn InterruptibleSolver>>;
 
 /// States a field can have
 /// w.r.t. the user interaction that is possible.
@@ -52,6 +60,8 @@ pub enum GameState {
 /// Speaking in Elm's parlance, it is the model of the program.
 ///
 pub struct Game {
+    solvers: Arc<RwLock<SolverList>>,
+    
     /// Current state of the game determining how it should react on messages.
     state: GameState,
     /// Text messages, i.e. errors or hints, can be push to this log and are shown to the user.
@@ -59,6 +69,7 @@ pub struct Game {
 
     /// Graphical representation of the current field.
     field_widget: FieldWidget,
+
     /// Widget gathering any user interaction that is not directly related to the field,
     /// e.g. a button to solve or create a Tents puzzle.
     control_widget: ControlWidget,
@@ -69,15 +80,20 @@ pub struct Game {
 impl Application for Game {
     type Executor = iced_futures::executor::Tokio;
     type Message = Message;
-    type Flags = ();
+    type Flags = SolverList;
 
     /// Startup of the application.
     /// Here any configuration takes place.
-    fn new(_flags: ()) -> (Self, Command<Self::Message>) {
+    fn new(solvers: SolverList) -> (Self, Command<Self::Message>) {
         let field_widget = FieldWidget::new(15, 2, 2);
-        let control_widget = ControlWidget::new(180, 10);
+        let control_widget = ControlWidget::new(180, 10, solvers.keys()
+            .map(|name| (*name).to_string())
+            .collect::<Vec<_>>()
+        );
 
         let game = Game {
+            solvers: Arc::new(RwLock::new(solvers)),
+
             // At the beginning no field is avaiable
             state: GameState::Empty,
 
@@ -162,17 +178,24 @@ impl Application for Game {
                                 }
                             );
 
-                            // Start solver with current field
-                            let fun = lazy(move |_| {
-                                if let Some(new_field) = field_to_cnf(old_field, &CadicalSolver) {
+
+                            let solvers = self.solvers.clone();
+                            let solver_name = self.control_widget.selected_solver.clone();
+
+                            cmd = Command::perform(async move {
+                                let solvers = solvers.read()
+                                    .await;
+
+                                let solver = solvers.get(solver_name.as_str())
+                                    .expect("Specified solver was not found!");
+
+                                if let Some(new_field) = field_to_cnf(old_field, &solver).await {
                                     Message::SolutionFound(new_field)
                                 } else {
                                     // If solving failed, send and error message
                                     Message::ErrorOccurred("No solution for the current Tents puzzle was found!".to_string())
                                 }
-                            });
-
-                            cmd = Command::perform(fun, identity);
+                            }, identity);
                         },
                         _ => unreachable!(),
                     };
@@ -207,7 +230,6 @@ impl Application for Game {
             },
 
             // If an error occurres log it to the screen.
-            // TODO: Reset state appropriately
             Message::ErrorOccurred(error) => {
                 self.log.add_error(error);
                 self.state = GameState::Empty;
@@ -221,6 +243,10 @@ impl Application for Game {
                     state: FieldState::Solved,
                 }
             }
+
+            Message::ChangedSolver{new_solver} =>  {
+                self.control_widget.selected_solver = new_solver;
+            },
         };
         Command::none()
     }
