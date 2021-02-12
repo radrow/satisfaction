@@ -11,10 +11,10 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "0.3.4", features = ["fs"] }
-iced = { version = "0.2.0", features = ["svg", "tokio"] }
+tokio = { version = "0.3.4", features = ["fs", "sync"] }
+iced = { version = "0.2.0", features = ["svg"] }
 iced_native = "0.3.0"
-iced_futures = "0.2.0"
+iced_futures = { version = "0.2.0", features = ["tokio"] }
 rand = "0.7"
 cadical = "0.1.13"
 itertools = "0.9.0"

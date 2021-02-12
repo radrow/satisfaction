@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 pub enum LogType {
     Error,
@@ -15,6 +16,7 @@ impl Log {
         self.0.push((type_, msg));
     }
 
+    #[allow(dead_code)]
     pub fn add_hint(&mut self, msg: String) {
         self.add_message(msg, LogType::Hint);
     }

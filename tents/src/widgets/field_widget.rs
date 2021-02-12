@@ -6,6 +6,8 @@ use crate::{
     message::*,
 };
 
+use crate::game::Config;
+
 lazy_static!{
     static ref TENT_SVG: Svg   = Svg::new(Handle::from_memory(include_bytes!("../../images/tent.svg").to_vec()));
     static ref TREE_SVG: Svg   = Svg::new(Handle::from_memory(include_bytes!("../../images/tree.svg").to_vec()));
@@ -13,17 +15,17 @@ lazy_static!{
 }
 
 pub struct FieldWidget {
-    rect_size: Length,
-    vertical_spacing: u16,
-    horizontal_spacing: u16,
+    cell_size: Length,
+    cell_spacing: u16,
+    font_size: u16,
 }
 
 impl FieldWidget {
-    pub fn new(rect_size: u16, vertical_spacing: u16, horizontal_spacing: u16) -> FieldWidget {
+    pub fn new(config: &Config) -> FieldWidget {
         FieldWidget {
-            rect_size: Length::Units(rect_size),
-            vertical_spacing,
-            horizontal_spacing,
+            cell_size: config.cell_size,
+            cell_spacing: config.cell_spacing,
+            font_size: config.count_font_size,
         }
     }
 }
@@ -35,14 +37,15 @@ impl FieldWidget {
             CellType::Tent => TENT_SVG.clone(),
             CellType::Tree => TREE_SVG.clone(),
             CellType::Meadow => MEADOW_SVG.clone(),
-        }.width(self.rect_size)
-            .height(self.rect_size)
+        }.width(self.cell_size)
+            .height(self.cell_size)
             .into()
     }
     fn draw_number(&self, number: usize) -> Element<Message> {
         Text::new(number.to_string())
-            .width(self.rect_size)
-            .height(self.rect_size)
+            .width(self.cell_size)
+            .height(self.cell_size)
+            .size(self.font_size)
             .horizontal_alignment(HorizontalAlignment::Center)
             .vertical_alignment(VerticalAlignment::Center)
             .into()
@@ -57,7 +60,7 @@ impl FieldWidget {
                         rows.iter()
                             .map(|cell| self.draw_cell(cell))
                             .collect()
-                    ).spacing(self.vertical_spacing)
+                    ).spacing(self.cell_spacing)
                         .push(self.draw_number(*row_count))
                         .into()
                 }).collect()
@@ -66,8 +69,8 @@ impl FieldWidget {
                 field.column_counts.iter()
                     .map(|number| self.draw_number(*number))
                     .collect()
-            ).spacing(self.horizontal_spacing)
-        ).spacing(self.horizontal_spacing)
+            ).spacing(self.cell_spacing)
+        ).spacing(self.cell_spacing)
             .into()
     }
 }

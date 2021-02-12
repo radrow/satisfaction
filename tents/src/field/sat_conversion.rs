@@ -4,7 +4,7 @@ use rayon::prelude::*;
 use rayon;
 
 use solver::cnf::{CNF, CNFClause, CNFVar, VarId};
-use solver::{SATSolution, Solver};
+use solver::{SATSolution, solvers::InterruptibleSolver};
 
 use super::field::{Field, CellType, TentPlace};
 
@@ -25,10 +25,10 @@ struct Assignment {
 }
 
 /// Solve the puzzle
-pub fn field_to_cnf(mut field: Field, solver: &impl Solver) -> Option<Field> {
+pub async fn field_to_cnf(mut field: Field, solver: &impl InterruptibleSolver) -> Option<Field> {
     let (formula, t_mapping) = to_formula(&field);
 
-    match solver.solve(&formula) {
+    match solver.solve_interruptible(&formula).await {
         SATSolution::Satisfiable(assignment) => {
             for row in 0..field.height {
                 for column in 0..field.width {

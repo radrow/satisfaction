@@ -1,7 +1,6 @@
 use std::time::Duration;
 use async_std::future::timeout;
 use async_std::task::block_on;
-use async_trait::async_trait;
 use super::InterruptibleSolver;
 use crate::{SATSolution, CNF, Solver};
 

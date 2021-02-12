@@ -12,7 +12,7 @@ pub enum Message {
     /// is now available as [`Field`].
     /// The game's state changes to 
     /// [`FieldAvailable`](crate::game::GameState::FieldAvailable).
-    FieldLoaded(Field),
+    FieldLoaded{field: Field, task_id: usize},
 
     /// The user has ordered the program to create a random [`Field`]
     /// of specified size.
@@ -25,16 +25,20 @@ pub enum Message {
     /// If the SAT-solver has finished its computation,
     /// it sends this message to inform the program and submit a solve [`Field`].
     /// The field's state changes to [`Solved`](crate::game::FieldState::Solved).
-    SolutionFound(Field),
+    SolutionFound{field: Field, task_id: usize},
 
     /// If the user changes the size setting for the random puzzle creation,
     /// this message orders the program to change the respective widget.
     GridSizeInputChanged{width: usize, height: usize},
+    ChangedSolver{new_solver: String},
 
     /// If an error occurres during the program execution,
     /// e.g. a file wasn't found, a puzzle is unsolvable,
     /// the user is notified via this message.
     ErrorOccurred(String),
+
+
+    AbortedExecution,
 }
 
 impl<E: std::error::Error> From<E> for Message {

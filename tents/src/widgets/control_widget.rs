@@ -1,38 +1,50 @@
 use crate::{
     message::*, 
-    widgets::{LogWidget, RandomCreationWidget},
-    game::{GameState, FieldState},
+    widgets::RandomCreationWidget,
+    game::{GameState, FieldState, Config},
 };
-use super::Log;
 
-use iced::button::State;
-use iced::{Length, HorizontalAlignment, Element, Button, Text, Column};
-
+use iced::{Length, HorizontalAlignment, Element, Button, Text, Column, pick_list, PickList, button};
 
 pub struct ControlWidget {
-    width: Length,
+    solver_names: Vec<String>,
+    pub selected_solver: String,
 
     pub field_creation_widget: RandomCreationWidget,
-    log_widget: LogWidget,
 
-    solve_puzzle_button: State,
+    solve_puzzle_button: button::State,
+    solver_choice_list: pick_list::State<String>,
+
+    spacing: u16,
 }
 
 impl ControlWidget {
-    pub fn new(width: u16, log_font_size: u16) -> ControlWidget {
+    pub fn new(config: &Config, solver_names: Vec<String>) -> ControlWidget {
         ControlWidget {
-            width: Length::Units(width),
-            field_creation_widget: RandomCreationWidget::new(10, 10),
-            log_widget: LogWidget::new(log_font_size),
+            selected_solver: solver_names.first()
+                .expect("No solver was found!")
+                .to_string(),
+            solver_names,
 
-            solve_puzzle_button: State::new(),
+            field_creation_widget: RandomCreationWidget::new(10, 10),
+
+            solve_puzzle_button: button::State::default(),
+            solver_choice_list: pick_list::State::default(),
+
+            spacing: config.spacing,
         }
     }
 
-    pub fn view(&mut self, state: &GameState, log: &Log) -> Element<Message> {
+
+    pub fn view(&mut self, state: &GameState) -> Element<Message> {
         let mut control = Column::new()
-            .spacing(10)
-            .width(self.width)
+            .spacing(self.spacing)
+            .push(PickList::new(
+                    &mut self.solver_choice_list,
+                    &self.solver_names,
+                    Some(self.selected_solver.clone()),
+                    |new_solver| Message::ChangedSolver{new_solver},
+            ).width(Length::Fill))
             .push(self.field_creation_widget.view());
 
         match state {
@@ -49,17 +61,15 @@ impl ControlWidget {
             },
             _ => {},
         }
-
-        control.push(self.log_widget.view(log))
-            .into()
+        control.into()
     }
 
     
-    fn button<'a>(state: &'a mut State, text: &str, message: Message) -> Button<'a, Message> {
+    fn button<'a>(state: &'a mut button::State, text: &str, message: Message) -> Button<'a, Message> {
         Button::new(state, 
             Text::new(text)
-            .horizontal_alignment(HorizontalAlignment::Center)
-            .width(Length::Fill)
+                .horizontal_alignment(HorizontalAlignment::Center)
+                .width(Length::Fill)
         )
         .width(Length::Fill)
         .on_press(message)

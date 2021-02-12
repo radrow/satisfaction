@@ -1,3 +1,5 @@
+#[macro_use] extern crate async_trait;
+
 pub mod cnf;
 pub mod sat_solver;
 mod cadical_solver;

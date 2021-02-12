@@ -14,8 +14,8 @@ use auto_impl::auto_impl;
 ///
 /// See `SatisfactionSolver`for an example.
 #[async_trait]
-#[auto_impl(Box)]
-pub trait InterruptibleSolver {
+#[auto_impl(Box, &)]
+pub trait InterruptibleSolver: Send + Sync {
     /// A method for solving CNF-formulae following the same specifcations as `Solver::solve`.
     /// However, this function can transfer execution control to its caller.
     async fn solve_interruptible(&self, formula: &CNF) -> SATSolution;

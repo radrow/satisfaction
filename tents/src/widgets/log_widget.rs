@@ -4,17 +4,22 @@ use iced::{
     Length,
 };
 use crate::message::Message;
+use crate::game::Config;
 use super::{Log, LogType};
 
 pub struct LogWidget {
     font_size: u16,
+    scrollbar_width: u16,
+    scrollbar_margin: u16,
     scrollbar_state: State,
 }
 
 impl LogWidget {
-    pub fn new(font_size: u16) -> LogWidget {
+    pub fn new(config: &Config) -> LogWidget {
         LogWidget {
-            font_size,
+            font_size: config.log_font_size,
+            scrollbar_width: config.scrollbar_width,
+            scrollbar_margin: config.scrollbar_margin,
             scrollbar_state: State::new(),
         }
     }
@@ -22,11 +27,11 @@ impl LogWidget {
     pub fn view(&mut self, log: &Log) -> Element<Message> {
         let font_size = self.font_size;
         let scrollbar = Scrollable::new(&mut self.scrollbar_state)
-            .scroller_width(5)
-            .spacing(5)
-            .scrollbar_margin(2)
+            .scroller_width(self.scrollbar_width)
+            .scrollbar_margin(self.scrollbar_margin)
             .width(Length::Fill)
-            .height(Length::Units(50));
+            .height(Length::Fill);
+
         log.0.iter()
             .rev()
             .fold(scrollbar, |scrollbar, (type_, msg)| {
