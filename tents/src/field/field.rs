@@ -241,6 +241,25 @@ impl Field {
             
     }
 
+    pub fn is_solved(&self) -> bool {
+        return self.count_constrain_holds() &&
+            self.neighbour_constraint_holds() &&
+            self.correspondence_constrain_holds()
+
+    }
+
+    pub fn count_constrain_holds(&self) -> bool {
+        unimplemented!()
+    }
+
+    pub fn neighbour_constraint_holds(&self) -> bool {
+        unimplemented!()
+    }
+
+    pub fn correspondence_constrain_holds(&self) -> bool {
+        unimplemented!()
+    }
+
     #[inline]
     pub fn get_cell(&self, row: usize, column: usize) -> CellType {
         self.cells[row][column]
