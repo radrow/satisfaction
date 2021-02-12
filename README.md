@@ -110,3 +110,11 @@ Execution:
 ```
 cargo run --release --bin tents
 ```
+
+# Division of work
+
+Most of the parts of the project were developed in cooperation of all team members. However there are some focus points of the contributors that include:
+
+* Radosław Rowicki – Implementation of the CNF library and most of the formula generation algorithm for tents puzzle. Design and implementation of CLI.
+* Alexander Lankheit – Design and implementation of GUI, interruptible and timed solvers, property based testing, plotting, benchmarks.
+* Korbinian Fedelholzner – DPLL algorithm, random puzzle creation, parsing, unit tests.
