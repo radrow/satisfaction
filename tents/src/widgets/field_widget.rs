@@ -1,38 +1,43 @@
 use iced::{Length, HorizontalAlignment, VerticalAlignment};
-use iced::{Column, Element, Row, Space, Svg, Text};
-use std::collections::{HashMap};
+use iced::{Column, Element, Row, Svg, Text};
+use iced::svg::Handle;
 use crate::{
     field::*,
     message::*,
 };
 
+lazy_static!{
+    static ref TENT_SVG: Svg   = Svg::new(Handle::from_memory(include_bytes!("../../images/tent.svg").to_vec()));
+    static ref TREE_SVG: Svg   = Svg::new(Handle::from_memory(include_bytes!("../../images/tree.svg").to_vec()));
+    static ref MEADOW_SVG: Svg = Svg::new(Handle::from_memory(include_bytes!("../../images/meadow.svg").to_vec()));
+}
+
 pub struct FieldWidget {
     rect_size: Length,
     vertical_spacing: u16,
     horizontal_spacing: u16,
-    svgs: HashMap<CellType, Svg>,
-    pub arrows: Vec<((usize, usize), (usize, usize))>,
 }
 
 impl FieldWidget {
-    pub fn new(rect_size: u16, vertical_spacing: u16, horizontal_spacing: u16, svgs: HashMap<CellType, Svg>) -> FieldWidget {
+    pub fn new(rect_size: u16, vertical_spacing: u16, horizontal_spacing: u16) -> FieldWidget {
         FieldWidget {
             rect_size: Length::Units(rect_size),
             vertical_spacing,
             horizontal_spacing,
-            svgs,
-            arrows: vec![],
         }
     }
+}
 
+
+impl FieldWidget {
     fn draw_cell(&self, cell: &CellType) -> Element<Message> {
-        match self.svgs.get(cell) {
-            Some(svg) => svg.clone()
-                            .width(self.rect_size)
-                            .height(self.rect_size)
-                            .into(),
-            None => Space::new(self.rect_size, self.rect_size).into(),
-        }
+        match cell {
+            CellType::Tent => TENT_SVG.clone(),
+            CellType::Tree => TREE_SVG.clone(),
+            CellType::Meadow => MEADOW_SVG.clone(),
+        }.width(self.rect_size)
+            .height(self.rect_size)
+            .into()
     }
     fn draw_number(&self, number: usize) -> Element<Message> {
         Text::new(number.to_string())
