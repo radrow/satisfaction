@@ -333,6 +333,11 @@ impl Application for Game {
                             CellType::Tent => CellType::Meadow,
                             CellType::Meadow => CellType::Tent,
                             CellType::Tree => CellType::Tree,
+                        };
+
+                        if field.is_solved() {
+                            println!("Kacke");
+                            self.state = GameState::FieldAvailable{state: FieldState::Solved, field: field.clone()};
                         }
                     },
                     _ => unreachable!(),

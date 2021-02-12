@@ -1,5 +1,7 @@
-use std::path::Path;
+use std::{collections::HashSet, path::Path, slice::SliceIndex};
 use std::error::Error;
+
+use itertools::Itertools;
 
 use tokio::fs::read_to_string;
 
@@ -7,6 +9,7 @@ const MIN_WIDTH: usize = 2;
 const MAX_WIDTH: usize = 45;
 const MIN_HEIGHT: usize = 2;
 const MAX_HEIGHT: usize = 35;
+
 
 
 /// Coordignates of a tree
@@ -245,19 +248,32 @@ impl Field {
         return self.count_constraint_holds() &&
             self.neighbour_constraint_holds() &&
             self.correspondence_constraint_holds()
-
     }
 
     pub fn count_constraint_holds(&self) -> bool {
-        unimplemented!()
+        let possible_tents: HashSet<_> = self.tent_coordinates().into_iter().collect();
+        let mut row_counts = vec![0; self.height];
+        let mut column_counts = vec![0; self.width];
+
+        println!("{:?}", &possible_tents);
+        for (row, col) in possible_tents.iter()
+            .filter(|(row,col)|  self.get_cell(*row, *col) == CellType::Tent) {
+                row_counts[*row] += 1;
+                column_counts[*col] += 1;
+            }
+
+        println!("{:?}", row_counts);
+        println!("{:?}\n", column_counts);
+        self.row_counts.eq(&row_counts) &&
+            self.column_counts.eq(&column_counts)
     }
 
     pub fn neighbour_constraint_holds(&self) -> bool {
-        unimplemented!()
+        true // unimplemented!()
     }
 
     pub fn correspondence_constraint_holds(&self) -> bool {
-        unimplemented!()
+        true // unimplemented!()
     }
 
     #[inline]
@@ -265,10 +281,27 @@ impl Field {
         self.cells[row][column]
     }
 
-    #[allow(dead_code)]
     #[inline]
     pub fn get_cell_mut(&mut self, row: usize, column: usize) -> &mut CellType {
         &mut self.cells[row][column]
+    }
+
+    pub fn neighbour_coordinates(&self, row: usize, col: usize) -> Vec<CellType> {
+        let rows = row.checked_sub(1)
+            .unwrap_or(row)..row+1;
+
+        let columns = col.checked_sub(1)
+            .unwrap_or(col)..col+1;
+
+        rows.cartesian_product(columns)
+            .filter_map(|coord| {
+                if coord != (row, col) {
+                    self.cells.get(row)
+                        .and_then(|row| row.get(col).cloned())
+                } else {
+                    None
+                }
+            }).collect()
     }
 
     /// Returns a vector of eligible places for a tent
