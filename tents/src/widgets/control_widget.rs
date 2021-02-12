@@ -26,7 +26,7 @@ impl ControlWidget {
                 .to_string(),
             solver_names,
 
-            field_creation_widget: RandomCreationWidget::new(10, 10),
+            field_creation_widget: RandomCreationWidget::new(5, 5),
 
             solve_puzzle_button: button::State::default(),
             solver_choice_list: pick_list::State::default(),

@@ -3,7 +3,7 @@ use std::error::Error;
 
 use itertools::Itertools;
 use super::sat_conversion;
-use solver::sat_solver;
+use solver::{Solver, CadicalSolver, CNFVar, CNFClause, CNF, SATSolution};
 
 use tokio::fs::read_to_string;
 
@@ -243,7 +243,6 @@ impl Field {
                 if vec.len() == width { Ok(vec) }
                 else { Err(FieldParserError::MissingColumnCounts{expected: width, found: vec.len()}) }
             })
-            
     }
 
     pub fn is_solved(&self) -> bool {
@@ -268,29 +267,35 @@ impl Field {
     }
 
     pub fn neighbour_constraint_holds(&self) -> bool {
-        true // unimplemented!()
+        self.tent_coordinates()
+            .iter()
+            .filter(|(x, y)| self.get_cell(*x, *y) == CellType::Tent)
+            .flat_map(|(x, y)| self.neighbour_coordinates(*x, *y))
+            .all(|c| c != CellType::Tent)
     }
 
 
     /// Asserts if tree-tent correspondence constraints hold in a current setup
     pub fn correspondence_constraint_holds(&self) -> bool {
-        // unimplemented!()
         let id_mapping = sat_conversion::make_id_mapping(self);
 
-        let (formula, assg_mapping) = sat_conversion::make_correspondence_constraints(self, &id_mapping);
+        let (assg_formula, _) = sat_conversion::make_correspondence_constraints(self, &id_mapping);
 
-        let v_size = *assg_mapping.iter().map(|(_, i)| i).max().unwrap();
-        let mut valuation = vec![false; v_size];
+        let mut force_formula: CNF = id_mapping.iter()
+            .filter_map(|((x, y), i)|
+                 match self.get_cell(*x, *y) {
+                     CellType::Tent => Some(CNFClause::single(CNFVar::pos(*i))),
+                     CellType::Meadow => Some(CNFClause::single(CNFVar::neg(*i))),
+                     _ => None
+                 })
+            .collect();
 
-        for (assg, i) in assg_mapping.iter() {
-            let (x, y) = assg.tent;
-            match self.get_cell(x, y) {
-                CellType::Tent => valuation[*i - 1] = true,
-                _ => {}
-            }
+        force_formula.extend(assg_formula);
+
+        match CadicalSolver.solve(&force_formula) {
+            SATSolution::Satisfiable(_) => true,
+            _ => false
         }
-
-        sat_solver::check_valuation(&formula, &valuation)
     }
 
     #[inline]
@@ -313,8 +318,8 @@ impl Field {
         rows.cartesian_product(columns)
             .filter_map(|coord| {
                 if coord != (row, col) {
-                    self.cells.get(row)
-                        .and_then(|row| row.get(col).cloned())
+                    self.cells.get(coord.0)
+                        .and_then(|row| row.get(coord.1).cloned())
                 } else {
                     None
                 }

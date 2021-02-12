@@ -4,7 +4,7 @@ use rayon::prelude::*;
 use rayon;
 
 use solver::cnf::{CNF, CNFClause, CNFVar, VarId};
-use solver::{SATSolution, solvers::InterruptibleSolver};
+use solver::{SATSolution, solvers::InterruptibleSolver, sat_solver};
 
 use super::field::{Field, CellType, TentPlace};
 
@@ -18,7 +18,7 @@ pub type AxisSet = HashMap<usize, Vec<usize>>;
 pub type NeighbourSet = Vec<(usize, usize)>;
 
 /// Connection between a tree and assigned tent
-#[derive (PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive (PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug)]
 pub struct Assignment {
     pub tent: TentPlace,
     pub tree: TreePlace
@@ -200,14 +200,16 @@ pub fn make_correspondence_constraints(
     for row in 0..field.height {
         for column in 0..field.width {
             let cell = field.get_cell(row, column);
-            if cell == CellType::Tree || cell == CellType::Meadow {
+            if cell == CellType::Tree || cell == CellType::Meadow || cell == CellType::Tent {
                 let is_tree = cell == CellType::Tree;
-                let looking_for = if is_tree {CellType::Meadow} else {CellType::Tree};
+                let looking_for = |t| {
+                    if is_tree {t == CellType::Meadow || t == CellType::Tent} else {t == CellType::Tree}
+                };
 
                 let mut pack: Vec<Assignment> = vec![];
 
                 if let Some(left) = column.checked_sub(1) {
-                    if field.get_cell(row, left) == looking_for {
+                    if looking_for(field.get_cell(row, left)) {
                         let asg = if is_tree {
                             Assignment{
                                 tent: (row, left),
@@ -226,7 +228,7 @@ pub fn make_correspondence_constraints(
 
 
                 let right = column + 1;
-                if right < field.width && field.get_cell(row, right) == looking_for {
+                if right < field.width && looking_for(field.get_cell(row, right)) {
                     let asg = if  is_tree {
                         Assignment{
                             tent: (row, right),
@@ -243,7 +245,7 @@ pub fn make_correspondence_constraints(
                 }
 
                 if let Some(top) = row.checked_sub(1) {
-                    if field.get_cell(top, column) == looking_for {
+                    if looking_for(field.get_cell(top, column)) {
                         let asg = if  is_tree {
                             Assignment{
                                 tent: (top, column),
@@ -261,7 +263,7 @@ pub fn make_correspondence_constraints(
                 }
 
                 let bottom = row + 1;
-                if bottom < field.height && field.get_cell(bottom, column) == looking_for {
+                if bottom < field.height && looking_for(field.get_cell(bottom, column)) {
                     let asg = if  is_tree {
                         Assignment{
                             tent: (bottom, column),
