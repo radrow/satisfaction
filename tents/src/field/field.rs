@@ -152,7 +152,7 @@ impl Field {
     /// 
     /// # Arguments
     ///
-    /// * `path` - The path to the file that should get parsed
+    /// * `path` - The path to the file that should get parsed.
     pub async fn from_file(path: impl AsRef<Path>) -> Result<Field, Box<dyn std::error::Error>> {
         let contents: String = read_to_string(path).await?;
 
@@ -191,7 +191,7 @@ impl Field {
     ///
     /// # Arguments 
     ///
-    /// * `line` - The line of a parsed file, that holds the information of width and height
+    /// * `line` - The line of a parsed file, that holds the information of width and height.
     fn parse_size(line: &str) -> Result<(usize, usize), FieldParserError> {
         let mut split = line.split(' ');
 
@@ -244,9 +244,9 @@ impl Field {
     ///
     /// # Arguments
     /// 
-    /// * `line` - The line in which the column counts are represented
-    /// * `line_number` - The line number in which the column counts apeard
-    /// * `width` - The width of the puzzle indicating the amount of columns
+    /// * `line` - The line in which the column counts are represented.
+    /// * `line_number` - The line number in which the column counts apeard.
+    /// * `width` - The width of the puzzle indicating the amount of columns.
     fn parse_column_counts(line: &str, line_number: usize, width: usize) -> Result<Vec<usize>, FieldParserError> {
         line.split(' ')
             .map(|number| {
@@ -272,7 +272,7 @@ impl Field {
         &mut self.cells[row][column]
     }
 
-    /// Returns a vector of eligible places for a tent
+    /// Returns a vector of eligible places for a tent.
     pub fn tent_coordinates(&self) -> Vec<TentPlace> {
         let mut tents_by_trees = Vec::new();
 
