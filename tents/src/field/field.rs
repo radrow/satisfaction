@@ -386,12 +386,14 @@ impl Field {
             })
     }
 
+    /// Checks if the puzzle has been solved
     pub fn is_solved(&self) -> bool {
         return self.count_constraint_holds() &&
             self.neighbour_constraint_holds() &&
             self.correspondence_constraint_holds()
     }
 
+    /// Check if count constraints are satisfied
     pub fn count_constraint_holds(&self) -> bool {
         let possible_tents: HashSet<_> = self.tent_coordinates().into_iter().collect();
         let mut row_counts = vec![0; self.height];
@@ -407,6 +409,7 @@ impl Field {
             self.column_counts.eq(&column_counts)
     }
 
+    /// Check if neighbour constraints are satisfied
     pub fn neighbour_constraint_holds(&self) -> bool {
         self.tent_coordinates()
             .iter()
@@ -416,7 +419,7 @@ impl Field {
     }
 
 
-    /// Asserts if tree-tent correspondence constraints hold in a current setup
+    /// Check if correspondence constraints are satisfied
     pub fn correspondence_constraint_holds(&self) -> bool {
         let id_mapping = sat_conversion::make_id_mapping(self);
 
@@ -439,11 +442,13 @@ impl Field {
         }
     }
 
+    /// Return the cell under given coordinates
     #[inline]
     pub fn get_cell(&self, row: usize, column: usize) -> CellType {
         self.cells[row][column]
     }
 
+    /// Return the cell under given coordinates as a mutable reference
     #[inline]
     pub fn get_cell_mut(&mut self, row: usize, column: usize) -> &mut CellType {
         &mut self.cells[row][column]
