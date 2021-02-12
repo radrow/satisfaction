@@ -22,6 +22,9 @@ auto_impl = "0.4.1"
 proptest = "0.10.1"
 criterion = "0.3.3"
 
+[lib]
+doctest = false
+
 [[bench]]
 name = "bench"
 harness = false
