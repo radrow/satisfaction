@@ -7,7 +7,6 @@ use std::fmt;
 use std::collections::VecDeque;
 use crate::{Solver, SATSolution, BranchingStrategy};
 use crate::solvers::InterruptibleSolver;
-use async_trait::async_trait;
 use async_std::task::yield_now;
 
 /// A DPLL based SAT-Solver, that solves a given SAT Problem. 

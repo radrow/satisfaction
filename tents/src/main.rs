@@ -8,7 +8,7 @@ mod message;
 use iced::{Settings, Application, Length};
 use game::{Game, Config};
 use solver::solvers::InterruptibleSolver;
-use solver::{SatisfactionSolver, DLCS, DLIS, JeroslawWang, MOM};
+use solver::{SatisfactionSolver, DLCS, DLIS, JeroslawWang, MOM, CadicalSolver};
 use std::collections::HashMap;
 
 fn main() -> iced::Result {
@@ -17,6 +17,7 @@ fn main() -> iced::Result {
     solvers.insert("DLCS", Box::new(SatisfactionSolver::new(DLCS)));
     solvers.insert("MOM", Box::new(SatisfactionSolver::new(MOM)));
     solvers.insert("JeroslawWang", Box::new(SatisfactionSolver::new(JeroslawWang)));
+    solvers.insert("CadicalSolver", Box::new(CadicalSolver));
 
     let config = Config {
         cell_size: Length::Units(15),
