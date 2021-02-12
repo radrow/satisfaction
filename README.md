@@ -18,6 +18,7 @@ be empty or contain a tree. Tents should be placed in empty cells, such that:
 * No two tents are adjacent in any of the (up to) 8 directions.
 * The number of tents in each row/column matches the number specied.
 * It is possible to match tents to trees 1:1, such that each tree is orthogonally adjacent to its own tent (but may also be adjacent to other tents).
+An online version of the game can be found at: https://www.chiark.greenend.org.uk/~sgtatham/puzzles/js/tents.html
 
 
 # Project Structure
