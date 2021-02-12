@@ -1,7 +1,6 @@
-use super::field::{Field, CellType};
+use super::field::{CellType, Field};
 use rand::prelude::*;
 use std::error::Error;
-
 
 /// A constant that fixes the maximal number of retries to create a random puzzle.
 const MAX_NUM_ITERATIONS: usize = 10_000;
@@ -14,12 +13,12 @@ const MAX_NUM_ITERATIONS: usize = 10_000;
 /// that a solution could not be found in [`MAX_NUM_ITERATIONS`].
 ///
 /// # Arguments
-/// 
+///
 /// * `height` - height of the puzzle.
 /// * `width` - The width of the puzzle.
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// // creation of a 8x8 puzzle
 /// match create_random_puzzle(8, 8) {
@@ -49,11 +48,10 @@ pub fn create_random_puzzle(width: usize, height: usize) -> Result<Field, Box<dy
     Ok(field)
 }
 
-
 /// Function to reset a given field to be only Celltype::Meadow again.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `field` - The field that has to be reset.
 fn reset_field(field: &mut Field) {
     for x in 0..field.cells.len() {
@@ -65,9 +63,9 @@ fn reset_field(field: &mut Field) {
 
 /// Method for placing the tents in an empty field.
 /// Retuns true if successful and false if it couldnt set all tents.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `tree_count` - The amount of trees to be set.
 /// * `field` - The field in with the trees are going to be placed.
 fn place_tents(tree_count: usize, field: &mut Field) -> bool {
@@ -103,15 +101,20 @@ fn place_tents(tree_count: usize, field: &mut Field) -> bool {
 
 /// Function to get all the nighbour cordinates of a field.
 /// All surrounding fields next to the given fields are nighbours.
-/// Returns a vector of toupls with the cooridnates of the nightbours of a given field. 
-/// 
+/// Returns a vector of toupls with the cooridnates of the nightbours of a given field.
+///
 /// # Arguments
-/// 
+///
 /// * `row` - The row of the checked field.
 /// * `col` - The colum of the checked field.
 /// * `field` - The field in which the coordinates have to be checked.
 /// * `checked_datatype` - Check for either tents or trees.
-fn get_neighbour_coords(row: usize, col: usize, field: &Field, checked_datatype: CellType) -> Vec<(usize, usize)> {
+fn get_neighbour_coords(
+    row: usize,
+    col: usize,
+    field: &Field,
+    checked_datatype: CellType,
+) -> Vec<(usize, usize)> {
     let mut coords: Vec<(usize, usize)> = Vec::new();
 
     let mut for_tent_check = false;
@@ -155,13 +158,11 @@ fn get_neighbour_coords(row: usize, col: usize, field: &Field, checked_datatype:
     coords
 }
 
-
-
 /// Function for checking if the checked field has a tent next to it.
 /// Returns true if it has a neighbour, false if there are none.
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `row` - The row of the checked field.
 /// * `col` - The col of the checked field.
 /// * `field` - The field in which the function checks the coordinates.
@@ -172,7 +173,7 @@ fn has_tent_neighbours(row: usize, col: usize, field: &Field) -> bool {
     if field.get_cell(row, col) == CellType::Tent {
         return false;
     }
-    
+
     for (row, col) in coords {
         if field.get_cell(row, col) == CellType::Tent {
             has_neighbour = true;
@@ -184,15 +185,15 @@ fn has_tent_neighbours(row: usize, col: usize, field: &Field) -> bool {
 
 /// Function that sets a tree in the given coordinates.
 /// Returns true if successful, false if the tree cannot be set.
-/// 
-/// # Arguments 
-/// 
+///
+/// # Arguments
+///
 /// * `row` - The row of the checked field.
 /// * `col` - The col of the checked field.
 /// * `field` - The field in which the function checks the coordinates.
 fn set_a_tree(row: usize, col: usize, field: &mut Field) -> bool {
     let coords = get_neighbour_coords(row, col, field, CellType::Tree);
-    
+
     let mut can_set = false;
     for (row, col) in &coords {
         let cell = field.get_cell_mut(*row, *col);
@@ -205,22 +206,21 @@ fn set_a_tree(row: usize, col: usize, field: &mut Field) -> bool {
     can_set
 }
 
-
 /// Function to place trees next to tents. Returns true if it was successful
 /// false if it wasn't.
-/// 
-/// # Arguments 
-/// 
+///
+/// # Arguments
+///
 /// * `field` - The field in which the trees are placed in.
 fn place_trees(mut field: &mut Field) -> bool {
     let mut is_possible = true;
-    
+
     for row in 0..field.height {
         for column in 0..field.width {
             if field.get_cell(row, column) == CellType::Tent {
                 if !set_a_tree(row, column, &mut field) {
                     is_possible = false;
-                } 
+                }
             }
         }
     }
@@ -229,9 +229,9 @@ fn place_trees(mut field: &mut Field) -> bool {
 }
 
 /// Function to fill the side row and column for the amount of tents that are in it.
-/// 
-/// # Arguments 
-/// 
+///
+/// # Arguments
+///
 /// * `field` - The field in which the trees and tents are already placed.
 fn fill_col_row_count(field: &mut Field) {
     for (y, row) in field.cells.iter().enumerate() {
@@ -240,7 +240,7 @@ fn fill_col_row_count(field: &mut Field) {
             if cell == &CellType::Tent {
                 row_count += 1;
             }
-       }
+        }
         field.row_counts[y] = row_count;
     }
 
@@ -255,11 +255,10 @@ fn fill_col_row_count(field: &mut Field) {
     }
 }
 
-
 /// Function to remove all tents from a field
-/// 
-/// # Arguments 
-/// 
+///
+/// # Arguments
+///
 /// * `field` - The field in which the trees and tents are already placed.
 fn remove_tents(field: &mut Field) {
     for row in 0..field.height {
@@ -320,7 +319,6 @@ mod tests {
     fn calc30x30() {
         calc_puzzle(30, 30);
     }
-
 
     #[test]
     fn calc10x5() {
