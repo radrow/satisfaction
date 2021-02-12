@@ -1,5 +1,9 @@
-use std::path::Path;
+use std::{collections::HashSet, path::Path, slice::SliceIndex};
 use std::error::Error;
+
+use itertools::Itertools;
+use super::sat_conversion;
+use solver::{Solver, CadicalSolver, CNFVar, CNFClause, CNF, SATSolution};
 
 use tokio::fs::read_to_string;
 
@@ -7,6 +11,7 @@ const MIN_WIDTH: usize = 2;
 const MAX_WIDTH: usize = 45;
 const MIN_HEIGHT: usize = 2;
 const MAX_HEIGHT: usize = 35;
+
 
 
 /// Coordignates of a tree
@@ -258,7 +263,59 @@ impl Field {
                 if vec.len() == width { Ok(vec) }
                 else { Err(FieldParserError::MissingColumnCounts{expected: width, found: vec.len()}) }
             })
-            
+    }
+
+    pub fn is_solved(&self) -> bool {
+        return self.count_constraint_holds() &&
+            self.neighbour_constraint_holds() &&
+            self.correspondence_constraint_holds()
+    }
+
+    pub fn count_constraint_holds(&self) -> bool {
+        let possible_tents: HashSet<_> = self.tent_coordinates().into_iter().collect();
+        let mut row_counts = vec![0; self.height];
+        let mut column_counts = vec![0; self.width];
+
+        for (row, col) in possible_tents.iter()
+            .filter(|(row,col)|  self.get_cell(*row, *col) == CellType::Tent) {
+                row_counts[*row] += 1;
+                column_counts[*col] += 1;
+            }
+
+        self.row_counts.eq(&row_counts) &&
+            self.column_counts.eq(&column_counts)
+    }
+
+    pub fn neighbour_constraint_holds(&self) -> bool {
+        self.tent_coordinates()
+            .iter()
+            .filter(|(x, y)| self.get_cell(*x, *y) == CellType::Tent)
+            .flat_map(|(x, y)| self.neighbour_coordinates(*x, *y))
+            .all(|c| c != CellType::Tent)
+    }
+
+
+    /// Asserts if tree-tent correspondence constraints hold in a current setup
+    pub fn correspondence_constraint_holds(&self) -> bool {
+        let id_mapping = sat_conversion::make_id_mapping(self);
+
+        let (assg_formula, _) = sat_conversion::make_correspondence_constraints(self, &id_mapping);
+
+        let mut force_formula: CNF = id_mapping.iter()
+            .filter_map(|((x, y), i)|
+                 match self.get_cell(*x, *y) {
+                     CellType::Tent => Some(CNFClause::single(CNFVar::pos(*i))),
+                     CellType::Meadow => Some(CNFClause::single(CNFVar::neg(*i))),
+                     _ => None
+                 })
+            .collect();
+
+        force_formula.extend(assg_formula);
+
+        match CadicalSolver.solve(&force_formula) {
+            SATSolution::Satisfiable(_) => true,
+            _ => false
+        }
     }
 
     #[inline]
@@ -266,13 +323,34 @@ impl Field {
         self.cells[row][column]
     }
 
-    #[allow(dead_code)]
     #[inline]
     pub fn get_cell_mut(&mut self, row: usize, column: usize) -> &mut CellType {
         &mut self.cells[row][column]
     }
 
+<<<<<<< HEAD
     /// Returns a vector of eligible places for a tent.
+=======
+    pub fn neighbour_coordinates(&self, row: usize, col: usize) -> Vec<CellType> {
+        let rows = row.checked_sub(1)
+            .unwrap_or(row)..row+1;
+
+        let columns = col.checked_sub(1)
+            .unwrap_or(col)..col+1;
+
+        rows.cartesian_product(columns)
+            .filter_map(|coord| {
+                if coord != (row, col) {
+                    self.cells.get(coord.0)
+                        .and_then(|row| row.get(coord.1).cloned())
+                } else {
+                    None
+                }
+            }).collect()
+    }
+
+    /// Returns a vector of eligible places for a tent
+>>>>>>> 6ffad06 (Hold checks)
     pub fn tent_coordinates(&self) -> Vec<TentPlace> {
         let mut tents_by_trees = Vec::new();
 

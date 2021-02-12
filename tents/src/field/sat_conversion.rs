@@ -4,24 +4,24 @@ use rayon::prelude::*;
 use rayon;
 
 use solver::cnf::{CNF, CNFClause, CNFVar, VarId};
-use solver::{SATSolution, solvers::InterruptibleSolver};
+use solver::{SATSolution, solvers::InterruptibleSolver, sat_solver};
 
 use super::field::{Field, CellType, TentPlace};
 
 
 /// Coordinate of a tent
-type TreePlace = (usize, usize);
+pub type TreePlace = (usize, usize);
 
 /// Constraints on the number of tents at given axis
-type AxisSet = HashMap<usize, Vec<usize>>;
+pub type AxisSet = HashMap<usize, Vec<usize>>;
 /// Constraints on the neighbourhood of tents
-type NeighbourSet = Vec<(usize, usize)>;
+pub type NeighbourSet = Vec<(usize, usize)>;
 
 /// Connection between a tree and assigned tent
-#[derive (PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-struct Assignment {
-    tent: TentPlace,
-    tree: TreePlace
+#[derive (PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug)]
+pub struct Assignment {
+    pub tent: TentPlace,
+    pub tree: TreePlace
 }
 
 /// Solve the puzzle
@@ -48,24 +48,26 @@ pub async fn field_to_cnf(mut field: Field, solver: &impl InterruptibleSolver) -
     }
 }
 
+/// Mapping from tent places to variable ids
+pub fn make_id_mapping(field: &Field) -> HashMap<TentPlace, usize> {
+    let tents = field.tent_coordinates();
+    tents.iter()
+        .unique()
+        .enumerate()
+        .map(|(id, coord)| (*coord, id + 1))
+        .collect::<HashMap<TentPlace,usize>>()
+}
+
 
 /// Compiles the puzzle to CNF. On the latter positions returns mapings
 /// from tent places to assiociated variables and list of tree-tent
 /// assignments with assiociated variables.
 pub fn to_formula(field: &Field) -> (CNF, HashMap<TentPlace, VarId>) {
-    let tents = field.tent_coordinates();
+    let id_mapping: HashMap<TentPlace, VarId> = make_id_mapping(field);
 
-    // Id to coordinate
-    let tent_mapping = tents.iter()
-        .unique()
-        .enumerate()
-        .map(|(id, coord)| (id + 1, *coord))
-        .collect::<HashMap<usize,TentPlace>>();
-
-    // Coordinate to id
-    let id_mapping = tent_mapping.iter()
-        .map(|(id, coord)| (*coord, *id))
-        .collect::<HashMap<TentPlace, usize>>();
+    let tent_mapping: HashMap<VarId, TentPlace> = id_mapping.iter()
+        .map(|(coord, id)| (*id, *coord))
+        .collect::<HashMap<VarId, TentPlace>>();
 
     let col_set: AxisSet = make_coord_set_by(
         &|x : &TentPlace| -> usize {x.1}, &tent_mapping
@@ -110,7 +112,9 @@ fn make_coord_set_by (
 }
 
 /// Creates collection of pairs of adjacent tent places
-fn make_neighbour_set(id_to_coord : &HashMap<usize, TentPlace>, coord_to_id: &HashMap<TentPlace, usize>) -> NeighbourSet {
+fn make_neighbour_set(id_to_coord : &HashMap<usize, TentPlace>,
+                      coord_to_id: &HashMap<TentPlace, usize>
+                     ) -> NeighbourSet {
     let mut out : NeighbourSet = Vec::new();
 
     for (id, (row, column)) in id_to_coord {
@@ -185,7 +189,7 @@ fn make_neighbour_constraints(neigh : &NeighbourSet) -> CNF {
 
 /// Here are the dragons. Builds up a formula that asserts a bijection between
 /// trees and tents
-fn make_correspondence_constraints(
+pub fn make_correspondence_constraints(
     field: &Field,
     id_mapping: &HashMap<TentPlace, usize>) -> (CNF, Vec<(Assignment, usize)>) {
 
@@ -196,14 +200,16 @@ fn make_correspondence_constraints(
     for row in 0..field.height {
         for column in 0..field.width {
             let cell = field.get_cell(row, column);
-            if cell == CellType::Tree || cell == CellType::Meadow {
+            if cell == CellType::Tree || cell == CellType::Meadow || cell == CellType::Tent {
                 let is_tree = cell == CellType::Tree;
-                let looking_for = if is_tree {CellType::Meadow} else {CellType::Tree};
+                let looking_for = |t| {
+                    if is_tree {t == CellType::Meadow || t == CellType::Tent} else {t == CellType::Tree}
+                };
 
                 let mut pack: Vec<Assignment> = vec![];
 
                 if let Some(left) = column.checked_sub(1) {
-                    if field.get_cell(row, left) == looking_for {
+                    if looking_for(field.get_cell(row, left)) {
                         let asg = if is_tree {
                             Assignment{
                                 tent: (row, left),
@@ -222,7 +228,7 @@ fn make_correspondence_constraints(
 
 
                 let right = column + 1;
-                if right < field.width && field.get_cell(row, right) == looking_for {
+                if right < field.width && looking_for(field.get_cell(row, right)) {
                     let asg = if  is_tree {
                         Assignment{
                             tent: (row, right),
@@ -239,7 +245,7 @@ fn make_correspondence_constraints(
                 }
 
                 if let Some(top) = row.checked_sub(1) {
-                    if field.get_cell(top, column) == looking_for {
+                    if looking_for(field.get_cell(top, column)) {
                         let asg = if  is_tree {
                             Assignment{
                                 tent: (top, column),
@@ -257,7 +263,7 @@ fn make_correspondence_constraints(
                 }
 
                 let bottom = row + 1;
-                if bottom < field.height && field.get_cell(bottom, column) == looking_for {
+                if bottom < field.height && looking_for(field.get_cell(bottom, column)) {
                     let asg = if  is_tree {
                         Assignment{
                             tent: (bottom, column),
