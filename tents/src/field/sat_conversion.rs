@@ -4,7 +4,7 @@ use rayon::prelude::*;
 use rayon;
 
 use solver::cnf::{CNF, CNFClause, CNFVar, VarId};
-use solver::{SATSolution, solvers::InterruptibleSolver, sat_solver};
+use solver::{SATSolution, solvers::InterruptibleSolver};
 
 use super::field::{Field, CellType, TentPlace};
 

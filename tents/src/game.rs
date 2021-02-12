@@ -336,7 +336,7 @@ impl Application for Game {
                         };
 
                         if field.is_solved() {
-                            println!("Kacke");
+                            self.log.add_hint("Congratulations, you solved the puzzle!".to_string());
                             self.state = GameState::FieldAvailable{state: FieldState::Solved, field: field.clone()};
                         }
                     },

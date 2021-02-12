@@ -1,4 +1,4 @@
-use std::{collections::HashSet, path::Path, slice::SliceIndex};
+use std::{collections::HashSet, path::Path};
 use std::error::Error;
 
 use itertools::Itertools;
