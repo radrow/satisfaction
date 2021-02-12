@@ -10,7 +10,7 @@ use iced::{
 };
 
 use crate::message::Message;
-use crate::number_input::NumberInput;
+use super::util::NumberInput;
 
 pub struct RandomCreationWidget  {
     width_input: NumberInput,

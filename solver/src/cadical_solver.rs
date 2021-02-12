@@ -1,5 +1,6 @@
 use cadical;
 use crate::{Solver, SATSolution, CNF};
+use crate::solvers::InterruptibleSolver;
 
 pub struct CadicalSolver;
 
@@ -30,5 +31,12 @@ impl Solver for CadicalSolver {
                     }).collect()
             }
         }
+    }
+}
+
+#[async_trait]
+impl InterruptibleSolver for CadicalSolver {
+    async fn solve_interruptible(&self, formula: &CNF) -> SATSolution {
+        self.solve(formula)
     }
 }
