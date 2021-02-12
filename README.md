@@ -1,4 +1,6 @@
 # Rust/SAT-Solving
+By Group F: Radosław Rowicki, Alexander Lankheit, Korbinian Federholzner
+
 
 The project consists of three parts:
 
