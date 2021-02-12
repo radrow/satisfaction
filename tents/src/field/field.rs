@@ -1,6 +1,9 @@
 use std::path::Path;
 use std::error::Error;
 
+use super::sat_conversion;
+use solver::sat_solver;
+
 use tokio::fs::read_to_string;
 
 const MIN_WIDTH: usize = 2;
@@ -257,7 +260,23 @@ impl Field {
     }
 
     pub fn correspondence_constraint_holds(&self) -> bool {
-        unimplemented!()
+        let id_mapping = sat_conversion::make_id_mapping(self);
+
+        let (formula, _) = sat_conversion::make_correspondence_constraints(self, &id_mapping);
+
+        let v_size = id_mapping.len();
+        let mut valuation = Vec::with_capacity(v_size);
+        unsafe { valuation.set_len(v_size); }
+
+        for ((x, y), i) in id_mapping.iter() {
+            match self.get_cell(*x, *y) {
+                Tent => valuation[*i] = true,
+                Meadow => valuation[*i] = false,
+                _ => ()
+            }
+        }
+
+        sat_solver::check_valuation(&formula, &valuation)
     }
 
     #[inline]
