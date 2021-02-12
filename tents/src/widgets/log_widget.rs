@@ -1,11 +1,7 @@
-use iced::{
-    Text, Element, Color, Scrollable,
-    scrollable::State,
-    Length,
-};
-use crate::message::Message;
-use crate::game::Config;
 use super::{Log, LogType};
+use crate::game::Config;
+use crate::message::Message;
+use iced::{scrollable::State, Color, Element, Length, Scrollable, Text};
 
 /// A widget that holds information about
 /// how text messages are sent to the user.
@@ -26,7 +22,7 @@ impl LogWidget {
         }
     }
 
-    /// The log is printed to the user. 
+    /// The log is printed to the user.
     /// The newest message is always at the top,
     /// older ones can be seen by scrolling down.
     pub fn view(&mut self, log: &Log) -> Element<Message> {
@@ -37,7 +33,8 @@ impl LogWidget {
             .width(Length::Fill)
             .height(Length::Fill);
 
-        log.0.iter()
+        log.0
+            .iter()
             .rev() // Iterate reversely so the newest message is on top.
             .fold(scrollbar, |scrollbar, (type_, msg)| {
                 let (tag, color) = match type_ {
@@ -48,6 +45,7 @@ impl LogWidget {
                     .color(color)
                     .size(font_size);
                 scrollbar.push(text)
-            }).into()
+            })
+            .into()
     }
 }

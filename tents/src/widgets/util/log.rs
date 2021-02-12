@@ -1,6 +1,6 @@
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
-/// Classication of a message so 
+/// Classication of a message so
 /// the user can directly see if
 /// it is a error or just and general information.
 pub enum LogType {
@@ -8,7 +8,7 @@ pub enum LogType {
     Hint,
 }
 
-/// Simple stack of text messages to inform 
+/// Simple stack of text messages to inform
 /// the user about interesting event or errors.
 pub struct Log(pub Vec<(LogType, String)>);
 

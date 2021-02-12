@@ -93,7 +93,7 @@ pub enum FieldCreationError {
     /// The field is too high, e.g. to draw it or.
     HeightTooLarge(usize),
     /// Subvectors have different sizes
-    /// 
+    ///
     /// # Arguments:
     /// * `column` - Index of the subvector
     /// * `expected` - Expected number of elements in subvector
@@ -110,18 +110,12 @@ pub enum FieldCreationError {
 impl std::fmt::Display for FieldCreationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            FieldCreationError::WidthColumnCountDifference(width, column_count) =>
-                format!("Field width {} and number of column counts {} differ.", width, column_count),
-            FieldCreationError::HightRowCountDifference(height, row_count) => 
-                format!("Field height {} and number of row counts {} differ.", height, row_count),
-            FieldCreationError::WidthTooLarge(width) => 
-                format!("Field width {} is to large. It should be less than {}.", width, MAX_WIDTH),
-            FieldCreationError::HeightTooLarge(height) => 
-                format!("Field height {} is to large. It should be less than {}.", height, MAX_HEIGHT),
-            FieldCreationError::FieldTooSmall => 
-                format!("Specified field size was too small. It must be at least {} x {}.", MIN_WIDTH, MIN_HEIGHT),
-            FieldCreationError::UnequalHeight{column, expected, found} => 
-                format!("In column {} the there are not enough cells specified: Expected {} but found {}.", column, expected, found),
+            FieldCreationError::WidthColumnCountDifference(width, column_count) => format!("Field width {} and number of column counts {} differ.", width, column_count),
+            FieldCreationError::HightRowCountDifference(height, row_count) => format!("Field height {} and number of row counts {} differ.", height, row_count),
+            FieldCreationError::WidthTooLarge(width) => format!("Field width {} is to large. It should be less than {}.", width, MAX_WIDTH),
+            FieldCreationError::HeightTooLarge(height) => format!("Field height {} is to large. It should be less than {}.", height, MAX_HEIGHT),
+            FieldCreationError::FieldTooSmall => format!("Specified field size was too small. It must be at least {} x {}.", MIN_WIDTH, MIN_HEIGHT),
+            FieldCreationError::UnequalHeight{column, expected, found} => format!("In column {} the there are not enough cells specified: Expected {} but found {}.", column, expected, found),
         })
     }
 }
@@ -233,7 +227,7 @@ impl Field {
 
     /// Load a filed from a string.
     /// Expected format:
-    /// 
+    ///
     /// <height> <width>
     /// <Line of tiles (T = Tree, . = Nothing)> <row count>
     ///   .
