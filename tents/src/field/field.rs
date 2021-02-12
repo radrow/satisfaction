@@ -328,9 +328,7 @@ impl Field {
         &mut self.cells[row][column]
     }
 
-<<<<<<< HEAD
     /// Returns a vector of eligible places for a tent.
-=======
     pub fn neighbour_coordinates(&self, row: usize, col: usize) -> Vec<CellType> {
         let rows = row.checked_sub(1)
             .unwrap_or(row)..row+1;
@@ -350,7 +348,6 @@ impl Field {
     }
 
     /// Returns a vector of eligible places for a tent
->>>>>>> 6ffad06 (Hold checks)
     pub fn tent_coordinates(&self) -> Vec<TentPlace> {
         let mut tents_by_trees = Vec::new();
 
