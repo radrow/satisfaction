@@ -23,6 +23,7 @@ impl<S> TimedSolver<S> {
 
 
 impl<S: Solver> TimedSolver<S> {
+    /// Solves a given formula but measures time additionally
     pub fn solve_timed(&self, formula: &CNF) -> (Duration, SATSolution) {
         let start = Instant::now();
         let solution = self.solver.solve(formula);
