@@ -31,6 +31,7 @@ pub enum Message {
     /// this message orders the program to change the respective widget.
     GridSizeInputChanged{width: usize, height: usize},
     ChangedSolver{new_solver: String},
+    FieldButtonPressed(usize, usize),
 
     /// If an error occurres during the program execution,
     /// e.g. a file wasn't found, a puzzle is unsolvable,

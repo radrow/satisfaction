@@ -49,7 +49,7 @@ impl ControlWidget {
 
         match state {
             GameState::FieldAvailable {
-                state: FieldState::Playable(_),
+                state: FieldState::Playable(_,_),
                 ..
             } => {
                 control = control.push(
