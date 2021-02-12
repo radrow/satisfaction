@@ -264,16 +264,15 @@ impl Field {
     pub fn correspondence_constraint_holds(&self) -> bool {
         let id_mapping = sat_conversion::make_id_mapping(self);
 
-        let (formula, _) = sat_conversion::make_correspondence_constraints(self, &id_mapping);
+        let (formula, assg_mapping) = sat_conversion::make_correspondence_constraints(self, &id_mapping);
 
-        let v_size = id_mapping.len();
-        let mut valuation = Vec::with_capacity(v_size);
-        unsafe { valuation.set_len(v_size); }
+        let v_size = *assg_mapping.iter().map(|(_, i)| i).max().unwrap();
+        let mut valuation = vec![false; v_size];
 
-        for ((x, y), i) in id_mapping.iter() {
-            match self.get_cell(*x, *y) {
-                Tent => valuation[*i] = true,
-                Meadow => valuation[*i] = false,
+        for (assg, i) in assg_mapping.iter() {
+            let (x, y) = assg.tent;
+            match self.get_cell(x, y) {
+                Tent => valuation[*i - 1] = true,
                 _ => ()
             }
         }

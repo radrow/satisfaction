@@ -20,8 +20,8 @@ pub type NeighbourSet = Vec<(usize, usize)>;
 /// Connection between a tree and assigned tent
 #[derive (PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub struct Assignment {
-    tent: TentPlace,
-    tree: TreePlace
+    pub tent: TentPlace,
+    pub tree: TreePlace
 }
 
 /// Solve the puzzle
