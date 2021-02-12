@@ -1,6 +1,8 @@
 #[macro_use] extern crate async_trait;
 
+/// The CNF representation of a formula
 pub mod cnf;
+/// The Solver trait which has to be implemented by each solver
 pub mod sat_solver;
 mod cadical_solver;
 mod dpll;
