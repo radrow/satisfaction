@@ -275,84 +275,70 @@ fn remove_tents(field: &mut Field) {
 mod tests {
     use super::*;
 
+    fn calc_puzzle(width: usize, height: usize) {
+        assert!(create_random_puzzle(width, height).is_ok(), "random puzzle creation for a {}x{} puzzle failed", width, height);
+
+    }
+
+    #[test]
+    fn calc_ten_random_puzzle_sizes() {
+        for _ in 0..10 {
+            let mut rng: ThreadRng = rand::thread_rng();
+            let width: usize = rng.gen_range(5, 40);
+            let height: usize = rng.gen_range(5, 40);
+
+            calc_puzzle(width, height);
+        }
+    }
+
     #[test]
     fn calc5x5() {
-        match create_random_puzzle(5, 5) {
-            Ok(_) => assert!(true),
-            Err(_) => assert!(false),
-        }
+        calc_puzzle(5, 5);
     }
 
     #[test]
     fn calc10x10() {
-        match create_random_puzzle(10, 10) {
-            Ok(_) => assert!(true),
-            Err(_) => assert!(false),
-        }
+        calc_puzzle(10, 10);
     }
 
     #[test]
     fn calc15x15() {
-        match create_random_puzzle(15, 15) {
-            Ok(_) => assert!(true),
-            Err(_) => assert!(false),
-        }
+        calc_puzzle(15, 15);
     }
 
     #[test]
     fn calc20x20() {
-        match create_random_puzzle(20, 20) {
-            Ok(_) => assert!(true),
-            Err(_) => assert!(false),
-        }
+        calc_puzzle(20, 20);
     }
 
     #[test]
     fn calc25x25() {
-        match create_random_puzzle(25, 25) {
-            Ok(_) => assert!(true),
-            Err(_) => assert!(false),
-        }
+        calc_puzzle(25, 25);
     }
 
     #[test]
     fn calc30x30() {
-        match create_random_puzzle(30, 30) {
-            Ok(_) => assert!(true),
-            Err(_) => assert!(false),
-        }
+        calc_puzzle(30, 30);
     }
 
 
     #[test]
     fn calc10x5() {
-        match create_random_puzzle(10, 5) {
-            Ok(_) => assert!(true),
-            Err(_) => assert!(false),
-        }
+        calc_puzzle(5, 10);
     }
 
     #[test]
     fn calc15x5() {
-        match create_random_puzzle(15, 5) {
-            Ok(_) => assert!(true),
-            Err(_) => assert!(false),
-        }
+        calc_puzzle(15, 5);
     }
 
     #[test]
     fn calc5x10() {
-        match create_random_puzzle(5, 10) {
-            Ok(_) => assert!(true),
-            Err(_) => assert!(false),
-        }
+        calc_puzzle(5, 10);
     }
 
     #[test]
     fn calc5x15() {
-        match create_random_puzzle(5, 15) {
-            Ok(_) => assert!(true),
-            Err(_) => assert!(false),
-        }
+        calc_puzzle(5, 15);
     }
 }
