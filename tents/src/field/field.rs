@@ -242,9 +242,9 @@ impl Field {
     }
 
     pub fn is_solved(&self) -> bool {
-        return self.count_constrain_holds() &&
+        return self.count_constraint_holds() &&
             self.neighbour_constraint_holds() &&
-            self.correspondence_constrain_holds()
+            self.correspondence_constraint_holds()
 
     }
 
