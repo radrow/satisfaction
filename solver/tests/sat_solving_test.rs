@@ -4,24 +4,48 @@ use proptest::{
     bool::weighted,
 };
 use std::path::PathBuf;
-use solver::{CadicalSolver, Solver, CNFClause, CNFVar, SATSolution, CNF, SatisfactionSolver, JeroslawWang};
+use solver::{CadicalSolver, Solver, CNFClause, CNFVar, SATSolution, CNF, SatisfactionSolver, JeroslawWang, DLCS, DLIS, MOM, NaiveBranching};
 
 const MAX_NUM_VARIABLES: usize = 50;
 const MAX_NUM_LITERALS: usize = 10;
 const MAX_NUM_CLAUSES: usize = 50;
 
 
-fn setup_custom_solver() -> SatisfactionSolver<JeroslawWang> {
-    SatisfactionSolver::new(JeroslawWang)
+fn setup_custom_solver() -> Vec<Box<dyn Solver>> {
+    let mut solvers: Vec<Box <dyn Solver>> = Vec::new();
+    solvers.push(Box::new(SatisfactionSolver::new(NaiveBranching)));
+    solvers.push(Box::new(SatisfactionSolver::new(JeroslawWang)));
+    solvers.push(Box::new(SatisfactionSolver::new(DLIS)));
+    solvers.push(Box::new(SatisfactionSolver::new(DLCS)));
+    solvers.push(Box::new(SatisfactionSolver::new(MOM)));
+    solvers
+}
+
+fn solve_custom_solvers(formula: &CNF, solvers: Vec<Box<dyn Solver>>) -> SATSolution {
+    let mut sat_solution: SATSolution = SATSolution::Unknown;
+    let solutions: Vec<bool> = solvers.iter().map(
+        |solver| {
+            sat_solution = solver.solve(formula);
+            match sat_solution {
+                SATSolution::Satisfiable(_) => true,
+                SATSolution::Unsatisfiable => false,
+                SATSolution::Unknown => panic!("Could not solve puzzle in time"),
+            }
+    }).collect();
+    let first = solutions[0].clone();
+    if !solutions.iter().all(|solution| *solution == first) {
+        assert!(false);
+    }
+    solvers[0].solve(formula)
 }
 
 fn execute_solvers(formula: &CNF) -> (SATSolution, SATSolution) {
     println!("{:?}", &formula);
 
-    let testing_solver = setup_custom_solver();
+    let testing_solvers = setup_custom_solver();
     let reference_solver = CadicalSolver;
 
-    let testing_solution = testing_solver.solve(formula);
+    let testing_solution = solve_custom_solvers(formula, testing_solvers);
     let reference_solution = reference_solver.solve(formula);
 
     (testing_solution, reference_solution)
@@ -45,8 +69,6 @@ fn prescribed_instances() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/prescribed_instances");
 
-    let solver = setup_custom_solver();
-
     let process = |files: PathBuf, satisfiable: bool| {
         files.read_dir()
             .unwrap()
@@ -61,7 +83,8 @@ fn prescribed_instances() {
                 let content = std::fs::read_to_string(file).unwrap();
                 let formula = CNF::from_dimacs(&content).unwrap();
 
-                assert!(match solver.solve(&formula) {
+                let solvers = setup_custom_solver();
+                assert!(match solve_custom_solvers(&formula, solvers) {
                     SATSolution::Satisfiable(_) => true,
                     SATSolution::Unsatisfiable => false,
                     SATSolution::Unknown => panic!("Could not solve puzzle in time"),
