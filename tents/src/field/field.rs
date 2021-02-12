@@ -259,6 +259,8 @@ impl Field {
         unimplemented!()
     }
 
+
+    /// Asserts if tree-tent correspondence constraints hold in a current setup
     pub fn correspondence_constraint_holds(&self) -> bool {
         let id_mapping = sat_conversion::make_id_mapping(self);
 
