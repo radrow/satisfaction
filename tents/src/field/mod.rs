@@ -1,6 +1,6 @@
 mod field;
 mod puzzle_creation;
-mod sat_conversion;
+pub mod sat_conversion;
 
 pub use field::{Field, CellType};
 pub use puzzle_creation::create_random_puzzle;

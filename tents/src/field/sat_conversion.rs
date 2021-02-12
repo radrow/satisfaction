@@ -10,18 +10,18 @@ use super::field::{Field, CellType, TentPlace};
 
 
 /// Coordinate of a tent
-type TreePlace = (usize, usize);
+pub type TreePlace = (usize, usize);
 
 /// Constraints on the number of tents at given axis
-type AxisSet = HashMap<usize, Vec<usize>>;
+pub type AxisSet = HashMap<usize, Vec<usize>>;
 /// Constraints on the neighbourhood of tents
-type NeighbourSet = Vec<(usize, usize)>;
+pub type NeighbourSet = Vec<(usize, usize)>;
 
 /// Connection between a tree and assigned tent
 #[derive (PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-struct Assignment {
-    tent: TentPlace,
-    tree: TreePlace
+pub struct Assignment {
+    pub tent: TentPlace,
+    pub tree: TreePlace
 }
 
 /// Solve the puzzle
@@ -48,24 +48,26 @@ pub async fn field_to_cnf(mut field: Field, solver: &impl InterruptibleSolver) -
     }
 }
 
+/// Mapping from tent places to variable ids
+pub fn make_id_mapping(field: &Field) -> HashMap<TentPlace, usize> {
+    let tents = field.tent_coordinates();
+    tents.iter()
+        .unique()
+        .enumerate()
+        .map(|(id, coord)| (*coord, id + 1))
+        .collect::<HashMap<TentPlace,usize>>()
+}
+
 
 /// Compiles the puzzle to CNF. On the latter positions returns mapings
 /// from tent places to assiociated variables and list of tree-tent
 /// assignments with assiociated variables.
 pub fn to_formula(field: &Field) -> (CNF, HashMap<TentPlace, VarId>) {
-    let tents = field.tent_coordinates();
+    let id_mapping: HashMap<TentPlace, VarId> = make_id_mapping(field);
 
-    // Id to coordinate
-    let tent_mapping = tents.iter()
-        .unique()
-        .enumerate()
-        .map(|(id, coord)| (id + 1, *coord))
-        .collect::<HashMap<usize,TentPlace>>();
-
-    // Coordinate to id
-    let id_mapping = tent_mapping.iter()
-        .map(|(id, coord)| (*coord, *id))
-        .collect::<HashMap<TentPlace, usize>>();
+    let tent_mapping: HashMap<VarId, TentPlace> = id_mapping.iter()
+        .map(|(coord, id)| (*id, *coord))
+        .collect::<HashMap<VarId, TentPlace>>();
 
     let col_set: AxisSet = make_coord_set_by(
         &|x : &TentPlace| -> usize {x.1}, &tent_mapping
@@ -110,7 +112,9 @@ fn make_coord_set_by (
 }
 
 /// Creates collection of pairs of adjacent tent places
-fn make_neighbour_set(id_to_coord : &HashMap<usize, TentPlace>, coord_to_id: &HashMap<TentPlace, usize>) -> NeighbourSet {
+fn make_neighbour_set(id_to_coord : &HashMap<usize, TentPlace>,
+                      coord_to_id: &HashMap<TentPlace, usize>
+                     ) -> NeighbourSet {
     let mut out : NeighbourSet = Vec::new();
 
     for (id, (row, column)) in id_to_coord {
@@ -185,7 +189,7 @@ fn make_neighbour_constraints(neigh : &NeighbourSet) -> CNF {
 
 /// Here are the dragons. Builds up a formula that asserts a bijection between
 /// trees and tents
-fn make_correspondence_constraints(
+pub fn make_correspondence_constraints(
     field: &Field,
     id_mapping: &HashMap<TentPlace, usize>) -> (CNF, Vec<(Assignment, usize)>) {
 

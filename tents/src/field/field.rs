@@ -2,6 +2,8 @@ use std::{collections::HashSet, path::Path, slice::SliceIndex};
 use std::error::Error;
 
 use itertools::Itertools;
+use super::sat_conversion;
+use solver::sat_solver;
 
 use tokio::fs::read_to_string;
 
@@ -255,15 +257,12 @@ impl Field {
         let mut row_counts = vec![0; self.height];
         let mut column_counts = vec![0; self.width];
 
-        println!("{:?}", &possible_tents);
         for (row, col) in possible_tents.iter()
             .filter(|(row,col)|  self.get_cell(*row, *col) == CellType::Tent) {
                 row_counts[*row] += 1;
                 column_counts[*col] += 1;
             }
 
-        println!("{:?}", row_counts);
-        println!("{:?}\n", column_counts);
         self.row_counts.eq(&row_counts) &&
             self.column_counts.eq(&column_counts)
     }
@@ -272,8 +271,26 @@ impl Field {
         true // unimplemented!()
     }
 
+
+    /// Asserts if tree-tent correspondence constraints hold in a current setup
     pub fn correspondence_constraint_holds(&self) -> bool {
-        true // unimplemented!()
+        // unimplemented!()
+        let id_mapping = sat_conversion::make_id_mapping(self);
+
+        let (formula, assg_mapping) = sat_conversion::make_correspondence_constraints(self, &id_mapping);
+
+        let v_size = *assg_mapping.iter().map(|(_, i)| i).max().unwrap();
+        let mut valuation = vec![false; v_size];
+
+        for (assg, i) in assg_mapping.iter() {
+            let (x, y) = assg.tent;
+            match self.get_cell(x, y) {
+                CellType::Tent => valuation[*i - 1] = true,
+                _ => {}
+            }
+        }
+
+        sat_solver::check_valuation(&formula, &valuation)
     }
 
     #[inline]
