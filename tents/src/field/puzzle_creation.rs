@@ -50,7 +50,7 @@ pub fn create_random_puzzle(width: usize, height: usize) -> Result<Field, Box<dy
 }
 
 
-/// Funtion to reset a given field to be only Celltype::Meadow again.
+/// Function to reset a given field to be only Celltype::Meadow again.
 /// 
 /// # Arguments
 /// 
@@ -157,8 +157,8 @@ fn get_neighbour_coords(row: usize, col: usize, field: &Field, checked_datatype:
 
 
 
-/// Funtion for checking if the checked field has a tent next to it.
-/// Returns true if it has a nighbuor, false if there are none.
+/// Function for checking if the checked field has a tent next to it.
+/// Returns true if it has a neighbour, false if there are none.
 /// 
 /// # Arguments
 /// 
@@ -182,7 +182,7 @@ fn has_tent_neighbours(row: usize, col: usize, field: &Field) -> bool {
     has_neighbour
 }
 
-/// Funtion thats sets a tree in the given coordinates.
+/// Function that sets a tree in the given coordinates.
 /// Returns true if successful, false if the tree cannot be set.
 /// 
 /// # Arguments 
@@ -206,8 +206,8 @@ fn set_a_tree(row: usize, col: usize, field: &mut Field) -> bool {
 }
 
 
-/// Funtion to place trees next to tents. Returns true if it was successful
-/// false if it wasnt
+/// Function to place trees next to tents. Returns true if it was successful
+/// false if it wasn't.
 /// 
 /// # Arguments 
 /// 
@@ -228,7 +228,7 @@ fn place_trees(mut field: &mut Field) -> bool {
     is_possible
 }
 
-/// Funtion to fill the side row and column for the amount of tents that are in it.
+/// Function to fill the side row and column for the amount of tents that are in it.
 /// 
 /// # Arguments 
 /// 
@@ -256,7 +256,7 @@ fn fill_col_row_count(field: &mut Field) {
 }
 
 
-/// Funtion to remove all tents from a field
+/// Function to remove all tents from a field
 /// 
 /// # Arguments 
 /// 
