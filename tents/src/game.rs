@@ -1,10 +1,9 @@
 extern crate iced;
 
-use futures::future::lazy;
+use futures::{Future, future::{AbortHandle, Abortable, abortable, lazy}};
 use solver::solvers::InterruptibleSolver;
 use std::{
     collections::HashMap,
-    convert::identity,
     sync::Arc,
 };
 
@@ -56,6 +55,39 @@ pub enum GameState {
     Empty,
 }
 
+struct CancelHandle {
+    abort_handle: Option<AbortHandle>,
+    current_task_id: usize,
+}
+
+impl CancelHandle {
+    fn new() -> CancelHandle {
+        CancelHandle {
+            abort_handle: None,
+            current_task_id: 0,
+        }
+    }
+
+    fn register<F: Future>(&mut self, future: F) -> (Abortable<F>, usize) {
+        let (abortable_future, handle) = abortable(future);
+        if let Some(old_handle) = self.abort_handle.take() {
+            old_handle.abort();
+        }
+        self.abort_handle = Some(handle);
+        self.current_task_id = self.current_task_id.wrapping_add(1);
+        (abortable_future, self.current_task_id)
+    }
+
+    fn finish_task(&mut self, task_id: usize) -> bool {
+        if self.current_task_id == task_id {
+            self.abort_handle = None;
+            true
+        } else {
+            false
+        }
+    }
+}
+
 /// Entry point of the whole Tents-application
 /// Speaking in Elm's parlance, it is the model of the program.
 ///
@@ -73,6 +105,8 @@ pub struct Game {
     /// Widget gathering any user interaction that is not directly related to the field,
     /// e.g. a button to solve or create a Tents puzzle.
     control_widget: ControlWidget,
+
+    cancel_handle: CancelHandle,
 }
 
 /// The entry point of a gui for the `iced` framework
@@ -104,6 +138,8 @@ impl Application for Game {
             field_widget,
             // View for user interaction
             control_widget,
+
+            cancel_handle: CancelHandle::new(),
         };
         (game, Command::none())
     }
@@ -124,26 +160,25 @@ impl Application for Game {
         match message {
             // If a file is dropped, an asynchronous procedure is called loading this
             // file and converting it into `Field`.
-            Message::FileDropped(path) => match self.state {
-                GameState::Empty 
-                    | GameState::FieldAvailable{state: FieldState::Playable(_), ..}
-                    | GameState::FieldAvailable{state: FieldState::Solved, ..} => {
-
-                        self.state = GameState::Loading;
-                        return Command::perform(
-                            Field::from_file(path),
-                            |result| {
-                                result.map(Message::FieldLoaded)
-                                    .unwrap_or_else(|error| Message::ErrorOccurred(error.to_string()))
-                            })
-                    },
-                _ => {},
-
+            Message::FileDropped(path) => {
+                self.state = GameState::Loading;
+                let (fut, task_id) = self.cancel_handle.register(Field::from_file(path));
+                return Command::perform(
+                    fut,
+                    move |result| match result { 
+                        Ok(Ok(new_field)) => 
+                                Message::FieldLoaded{field: new_field, task_id},
+                        Ok(Err(msg)) => 
+                                Message::ErrorOccurred(msg.to_string()),
+                        Err(_) =>
+                            Message::AbortedExecution,
+                    });
             },
 
             // If the field is finally loaded, the game state is updated now containing the new
             // field.
-            Message::FieldLoaded(field) => match self.state {
+            Message::FieldLoaded{field, task_id}
+                if self.cancel_handle.finish_task(task_id) => match self.state {
                 GameState::Loading
                     | GameState::Creating => {
                         let old_field = field.clone();
@@ -178,24 +213,27 @@ impl Application for Game {
                                 }
                             );
 
-
                             let solvers = self.solvers.clone();
                             let solver_name = self.control_widget.selected_solver.clone();
 
-                            cmd = Command::perform(async move {
+                            let (fut, task_id) = self.cancel_handle.register(async move {
                                 let solvers = solvers.read()
                                     .await;
 
                                 let solver = solvers.get(solver_name.as_str())
                                     .expect("Specified solver was not found!");
 
-                                if let Some(new_field) = field_to_cnf(old_field, &solver).await {
-                                    Message::SolutionFound(new_field)
-                                } else {
-                                    // If solving failed, send and error message
-                                    Message::ErrorOccurred("No solution for the current Tents puzzle was found!".to_string())
-                                }
-                            }, identity);
+                                field_to_cnf(old_field, &solver).await
+                            });
+
+                            cmd = Command::perform(fut, move |result| match result {
+                                Ok(Some(new_field)) => 
+                                    Message::SolutionFound{field: new_field, task_id},
+                                Ok(None) => 
+                                    Message::ErrorOccurred("No solution for the current Tents puzzle was found!".to_string()),
+                                Err(_) =>
+                                    Message::AbortedExecution,
+                            });
                         },
                         _ => unreachable!(),
                     };
@@ -211,42 +249,43 @@ impl Application for Game {
             // If the user orders a random puzzle, 
             // start creation as an asynchronous task
             // and inform the user that one is creating
-            Message::CreateRandomPuzzle{width , height} => match self.state {
-                GameState::Empty 
-                    | GameState::FieldAvailable{state: FieldState::Playable(_), ..}
-                    | GameState::FieldAvailable{state: FieldState::Solved, ..} => {
+            Message::CreateRandomPuzzle{width , height} => {
+                self.state = GameState::Creating;
+                let (fut, task_id) = self.cancel_handle.register(
+                    lazy(move |_| create_random_puzzle(width, height))
+                );
 
-                        self.state = GameState::Creating;
-
-                        let lazy = lazy(move |_| {
-                            match create_random_puzzle(width, height) {
-                                Ok(field) => Message::FieldLoaded(field),
-                                Err(msg) => Message::ErrorOccurred(msg.to_string()),
-                            }
-                        });
-                        return Command::perform(lazy, identity)
-                },
-                _ => {},
+                return Command::perform(fut, move |result| match result {
+                    Ok(Ok(new_field)) => 
+                            Message::FieldLoaded{field: new_field, task_id},
+                    Ok(Err(msg)) => 
+                            Message::ErrorOccurred(msg.to_string()),
+                    Err(_) =>
+                            Message::AbortedExecution,
+                });
             },
 
             // If an error occurres log it to the screen.
             Message::ErrorOccurred(error) => {
                 self.log.add_error(error);
                 self.state = GameState::Empty;
-            }
+            },
             
             // If a solution was found,
             // replace current field with the new, solved one.
-            Message::SolutionFound(field) => {
+            Message::SolutionFound{field, task_id}
+                if self.cancel_handle.finish_task(task_id) => {
                 self.state = GameState::FieldAvailable {
                     field, 
                     state: FieldState::Solved,
                 }
-            }
+            },
 
             Message::ChangedSolver{new_solver} =>  {
                 self.control_widget.selected_solver = new_solver;
             },
+
+            _ => {},
         };
         Command::none()
     }
