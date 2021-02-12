@@ -8,8 +8,8 @@ use std::{
 };
 
 use tokio::sync::RwLock;
-use iced::{Length, Align};
-use iced::{Element, Row, Application, Text, Command, Subscription, HorizontalAlignment, VerticalAlignment, Container};
+use iced::{Align, Column, Length};
+use iced::{Element, Row, Application, Text, Command, Subscription, Container};
 use iced_native::window::Event;
 use take_mut::scoped;
 
@@ -19,11 +19,28 @@ use crate::{
     widgets::{
         FieldWidget,
         ControlWidget,
+        LogWidget,
         Log,
     },
 };
 
+
 pub type SolverList = HashMap<&'static str, Box<dyn InterruptibleSolver>>;
+
+pub struct Config {
+    pub cell_size: Length,
+    pub cell_spacing: u16,
+    pub count_font_size: u16,
+    pub solvers: SolverList,
+    pub log_field_ratio: (u16, u16),
+    pub control_field_ratio: (u16, u16),
+    pub spacing: u16,
+    pub padding: u16,
+    pub button_font_size: u16,
+    pub log_font_size: u16,
+    pub scrollbar_width: u16,
+    pub scrollbar_margin: u16,
+}
 
 /// States a field can have
 /// w.r.t. the user interaction that is possible.
@@ -106,6 +123,12 @@ pub struct Game {
     /// e.g. a button to solve or create a Tents puzzle.
     control_widget: ControlWidget,
 
+    log_widget: LogWidget,
+
+    log_field_ratio: (u16, u16),
+    control_field_ratio: (u16, u16),
+    padding: u16,
+
     cancel_handle: CancelHandle,
 }
 
@@ -114,30 +137,33 @@ pub struct Game {
 impl Application for Game {
     type Executor = iced_futures::executor::Tokio;
     type Message = Message;
-    type Flags = SolverList;
+    type Flags = Config;
 
     /// Startup of the application.
     /// Here any configuration takes place.
-    fn new(solvers: SolverList) -> (Self, Command<Self::Message>) {
-        let field_widget = FieldWidget::new(15, 2, 2);
-        let control_widget = ControlWidget::new(180, 10, solvers.keys()
+    fn new(config: Config) -> (Self, Command<Self::Message>) {
+        let field_widget = FieldWidget::new(&config);
+        let control_widget = ControlWidget::new(&config, config.solvers.keys()
             .map(|name| (*name).to_string())
             .collect::<Vec<_>>()
         );
 
-        let game = Game {
-            solvers: Arc::new(RwLock::new(solvers)),
+        let log_widget = LogWidget::new(&config);
 
-            // At the beginning no field is avaiable
+        let game = Game {
+            solvers: Arc::new(RwLock::new(config.solvers)),
+
             state: GameState::Empty,
 
-            // Log for error messages
             log: Log::new(),
 
-            // View for the field
             field_widget,
-            // View for user interaction
             control_widget,
+            log_widget,
+
+            log_field_ratio: config.log_field_ratio,
+            control_field_ratio: config.control_field_ratio,
+            padding: config.padding,
 
             cancel_handle: CancelHandle::new(),
         };
@@ -292,33 +318,33 @@ impl Application for Game {
 
     /// The graphical representation of the current model.
     fn view(&mut self) -> Element<Self::Message> {
-        Row::new()
-        .align_items(Align::Start)
-        .push(self.control_widget.view(&self.state, &self.log))
-        .push(Container::new(
-            match &mut self.state {
-                GameState::Empty => Element::from(
-                    Text::new("Drag and drop a file!")
-                        .horizontal_alignment(HorizontalAlignment::Center)
-                        .vertical_alignment(VerticalAlignment::Center)
-                ),
-                GameState::Loading => Element::from(
-                    Text::new("Loading puzzle ...")
-                        .horizontal_alignment(HorizontalAlignment::Center)
-                        .vertical_alignment(VerticalAlignment::Center)
-                ),
-                GameState::Creating => Element::from(
-                    Text::new("Creating random puzzle ...")
-                        .horizontal_alignment(HorizontalAlignment::Center)
-                        .vertical_alignment(VerticalAlignment::Center)
-                ),
-                GameState::FieldAvailable{field, ..} => self.field_widget.view(&field),
-            }).center_x()
-                .center_y()
+        Column::new()
+            .push(
+                Row::new()
+                .align_items(Align::Start)
+                .push(Container::new(
+                    self.control_widget.view(&self.state)
+                    ).width(Length::FillPortion(self.control_field_ratio.0)))
+                .push(Container::new(
+                    match &mut self.state {
+                        GameState::Empty => Element::from(Text::new("Drag and drop a file!")),
+                        GameState::Loading => Element::from(Text::new("Loading puzzle ...")),
+                        GameState::Creating => Element::from(Text::new("Creating random puzzle ...")),
+                        GameState::FieldAvailable{field, ..} => self.field_widget.view(&field),
+                    }).center_x()
+                        .center_y()
+                        .width(Length::FillPortion(self.control_field_ratio.1))
+                        .height(Length::Fill)
+                ).padding(self.padding)
+                .height(Length::FillPortion(self.log_field_ratio.1))
+            ).push(Container::new(
+                self.log_widget.view(&self.log)
+            ).height(Length::FillPortion(self.log_field_ratio.0))
                 .width(Length::Fill)
-                .height(Length::Fill)
-        ).padding(10)
-            .into()
+                .align_y(Align::End)
+            ).height(Length::Fill)
+            .padding(self.padding)
+                .into()
     }
 
     /// Non-widget-related events,
