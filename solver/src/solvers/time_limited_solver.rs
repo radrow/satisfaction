@@ -1,9 +1,8 @@
-use std::time::Duration;
+use super::InterruptibleSolver;
+use crate::{SATSolution, Solver, CNF};
 use async_std::future::timeout;
 use async_std::task::block_on;
-use super::InterruptibleSolver;
-use crate::{SATSolution, CNF, Solver};
-
+use std::time::Duration;
 
 /// A wrapper for an `InterruptibleSolver`
 /// that cancels execution after a specified period of time.
@@ -30,16 +29,18 @@ impl<S: InterruptibleSolver> TimeLimitedSolver<S> {
 impl<S: InterruptibleSolver> Solver for TimeLimitedSolver<S> {
     fn solve(&self, formula: &CNF) -> SATSolution {
         block_on(async {
-            timeout(self.max_duration, self.solver.solve_interruptible(formula)).await
+            timeout(self.max_duration, self.solver.solve_interruptible(formula))
+                .await
                 .unwrap_or(SATSolution::Unknown)
         })
     }
 }
 
 #[async_trait]
-impl <S: InterruptibleSolver+Send+Sync> InterruptibleSolver for TimeLimitedSolver<S> {
+impl<S: InterruptibleSolver + Send + Sync> InterruptibleSolver for TimeLimitedSolver<S> {
     async fn solve_interruptible(&self, formula: &CNF) -> SATSolution {
-        timeout(self.max_duration, self.solver.solve_interruptible(formula)).await
+        timeout(self.max_duration, self.solver.solve_interruptible(formula))
+            .await
             .unwrap_or(SATSolution::Unknown)
     }
 }

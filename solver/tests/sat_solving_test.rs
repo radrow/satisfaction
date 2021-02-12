@@ -1,18 +1,16 @@
-use proptest::{
-    prelude::*,
-    collection::vec,
-    bool::weighted,
+use proptest::{bool::weighted, collection::vec, prelude::*};
+use solver::{
+    CNFClause, CNFVar, CadicalSolver, JeroslawWang, NaiveBranching, SATSolution,
+    SatisfactionSolver, Solver, CNF, DLCS, DLIS, MOM,
 };
 use std::path::PathBuf;
-use solver::{CadicalSolver, Solver, CNFClause, CNFVar, SATSolution, CNF, SatisfactionSolver, JeroslawWang, DLCS, DLIS, MOM, NaiveBranching};
 
 const MAX_NUM_VARIABLES: usize = 50;
 const MAX_NUM_LITERALS: usize = 10;
 const MAX_NUM_CLAUSES: usize = 50;
 
-
 fn setup_custom_solver() -> Vec<Box<dyn Solver>> {
-    let mut solvers: Vec<Box <dyn Solver>> = Vec::new();
+    let mut solvers: Vec<Box<dyn Solver>> = Vec::new();
     solvers.push(Box::new(SatisfactionSolver::new(NaiveBranching)));
     solvers.push(Box::new(SatisfactionSolver::new(JeroslawWang)));
     solvers.push(Box::new(SatisfactionSolver::new(DLIS)));
@@ -23,15 +21,17 @@ fn setup_custom_solver() -> Vec<Box<dyn Solver>> {
 
 fn solve_custom_solvers(formula: &CNF, solvers: Vec<Box<dyn Solver>>) -> SATSolution {
     let mut sat_solution: SATSolution = SATSolution::Unknown;
-    let solutions: Vec<bool> = solvers.iter().map(
-        |solver| {
+    let solutions: Vec<bool> = solvers
+        .iter()
+        .map(|solver| {
             sat_solution = solver.solve(formula);
             match sat_solution {
                 SATSolution::Satisfiable(_) => true,
                 SATSolution::Unsatisfiable => false,
                 SATSolution::Unknown => panic!("Could not solve puzzle in time"),
             }
-    }).collect();
+        })
+        .collect();
     let first = solutions[0].clone();
     if !solutions.iter().all(|solution| *solution == first) {
         assert!(false);
@@ -51,44 +51,45 @@ fn execute_solvers(formula: &CNF) -> (SATSolution, SATSolution) {
     (testing_solution, reference_solution)
 }
 
-
-fn is_satisfied(mut formula: impl Iterator<Item=CNFClause>, assignment: Vec<bool>) -> bool {
-    formula.all(|clause|
-        clause.vars.iter()
-            .any(|var|
+fn is_satisfied(mut formula: impl Iterator<Item = CNFClause>, assignment: Vec<bool>) -> bool {
+    formula.all(|clause| {
+        clause.vars.iter().any(|var|
                 // If sign is negative assignment is inverted
                 // else it is passed by.
-                !(assignment[var.id-1] ^ var.sign)
-            )
-        )
+                !(assignment[var.id-1] ^ var.sign))
+    })
 }
-
 
 #[test]
 fn prescribed_instances() {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/prescribed_instances");
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/prescribed_instances");
 
     let process = |files: PathBuf, satisfiable: bool| {
-        files.read_dir()
+        files
+            .read_dir()
             .unwrap()
             .filter_map(|file| {
-                let path = file.ok()?
-                    .path();
+                let path = file.ok()?.path();
 
-                if path.extension()? == "cnf" { Some(path) }
-                else { None }
-            }).for_each(|file| {
+                if path.extension()? == "cnf" {
+                    Some(path)
+                } else {
+                    None
+                }
+            })
+            .for_each(|file| {
                 println!("{:?}", file.file_stem().unwrap());
                 let content = std::fs::read_to_string(file).unwrap();
                 let formula = CNF::from_dimacs(&content).unwrap();
 
                 let solvers = setup_custom_solver();
-                assert!(match solve_custom_solvers(&formula, solvers) {
-                    SATSolution::Satisfiable(_) => true,
-                    SATSolution::Unsatisfiable => false,
-                    SATSolution::Unknown => panic!("Could not solve puzzle in time"),
-                } == satisfiable)
+                assert!(
+                    match solve_custom_solvers(&formula, solvers) {
+                        SATSolution::Satisfiable(_) => true,
+                        SATSolution::Unsatisfiable => false,
+                        SATSolution::Unknown => panic!("Could not solve puzzle in time"),
+                    } == satisfiable
+                )
             })
     };
 
@@ -96,31 +97,23 @@ fn prescribed_instances() {
     process(path.join("unsat"), false);
 }
 
-
 #[test]
 fn failed_proptest_instance() {
-    let formula = CNF { 
+    let formula = CNF {
         clauses: vec![
             CNFClause {
-                vars: vec![
-                    CNFVar::new(37, false),
-                    CNFVar::new(39, false),
-                ]
+                vars: vec![CNFVar::new(37, false), CNFVar::new(39, false)],
             },
             CNFClause {
-                vars: vec![
-                    CNFVar::new(37, false),
-                    CNFVar::new(39, true),
-                ]
+                vars: vec![CNFVar::new(37, false), CNFVar::new(39, true)],
             },
         ],
-        num_variables: 39
+        num_variables: 39,
     };
     let (custom, reference) = execute_solvers(&formula);
 
     assert_eq!(custom, reference);
 }
-
 
 proptest! {
     #[test]
@@ -170,7 +163,7 @@ proptest! {
             .expect("There are zero clauses!");
 
         let formula = clauses.iter()
-            .map(|clause| 
+            .map(|clause|
                 CNFClause{ vars:
                 clause.iter()
                     .cloned()

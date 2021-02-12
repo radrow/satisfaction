@@ -1,6 +1,6 @@
-use crate::{CNF, SATSolution, Solver};
-use async_trait::async_trait;
+use crate::{SATSolution, Solver, CNF};
 use async_std::task::block_on;
+use async_trait::async_trait;
 use auto_impl::auto_impl;
 
 /// A solver that can be interrupted at fixed location
@@ -29,7 +29,7 @@ pub struct InterruptibleSolverWrapper<S: InterruptibleSolver> {
 
 impl<S: InterruptibleSolver> From<S> for InterruptibleSolverWrapper<S> {
     fn from(solver: S) -> Self {
-        InterruptibleSolverWrapper{solver}
+        InterruptibleSolverWrapper { solver }
     }
 }
 

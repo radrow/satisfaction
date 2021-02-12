@@ -1,7 +1,7 @@
-use iced::{Button, HorizontalAlignment, Length, VerticalAlignment};
-use iced::{Column, Element, Row, Svg, Text};
 use crate::{field::*, message::*};
 use iced::svg::Handle;
+use iced::{Button, HorizontalAlignment, Length, VerticalAlignment};
+use iced::{Column, Element, Row, Svg, Text};
 
 use crate::game::{Config, FieldState};
 
@@ -62,13 +62,16 @@ impl FieldWidget {
     }
 
     /// A field is simply a grid of SVGs.
-    pub fn view<'a,'b,'c>(&'a self, field: &'b Field, state: &'c mut FieldState) -> Element<'c, Message> {
-        let mut cells = field.cells.iter()
-            .map(|row| row.iter()
-                .map(|cell| self.draw_cell(cell))
-                .collect()
-                ).collect::<Vec<Vec<_>>>();
-
+    pub fn view<'a, 'b, 'c>(
+        &'a self,
+        field: &'b Field,
+        state: &'c mut FieldState,
+    ) -> Element<'c, Message> {
+        let mut cells = field
+            .cells
+            .iter()
+            .map(|row| row.iter().map(|cell| self.draw_cell(cell)).collect())
+            .collect::<Vec<Vec<_>>>();
 
         match state {
             FieldState::Playable(_, button_states) => {
@@ -79,19 +82,30 @@ impl FieldWidget {
                         .on_press(Message::FieldButtonPressed(*row, *col))
                         .into();
                 }
-            },
-            _ => {},
+            }
+            _ => {}
         }
 
-        cells.into_iter()
+        cells
+            .into_iter()
             .zip(field.row_counts.iter())
-            .fold(Column::new().spacing(self.cell_spacing), |vertical, (row, row_count)| {
-                vertical.push(row.into_iter()
-                    .fold(Row::new().spacing(self.cell_spacing), |horizontal, cell| horizontal.push(cell)
-                    ).push(self.draw_number(*row_count)))
-            }).push(field.column_counts.iter()
-                .fold(Row::new().spacing(self.cell_spacing), |horizontal, col_count|
-                    horizontal.push(self.draw_number(*col_count)))
-            ).spacing(self.cell_spacing).into()
+            .fold(
+                Column::new().spacing(self.cell_spacing),
+                |vertical, (row, row_count)| {
+                    vertical.push(
+                        row.into_iter()
+                            .fold(Row::new().spacing(self.cell_spacing), |horizontal, cell| {
+                                horizontal.push(cell)
+                            })
+                            .push(self.draw_number(*row_count)),
+                    )
+                },
+            )
+            .push(field.column_counts.iter().fold(
+                Row::new().spacing(self.cell_spacing),
+                |horizontal, col_count| horizontal.push(self.draw_number(*col_count)),
+            ))
+            .spacing(self.cell_spacing)
+            .into()
     }
 }

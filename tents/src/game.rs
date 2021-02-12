@@ -7,8 +7,8 @@ use futures::{
 use solver::solvers::InterruptibleSolver;
 use std::{collections::HashMap, sync::Arc};
 
-use iced::{Align, Column, Length, button};
-use iced::{Element, Row, Application, Text, Command, Subscription, Container};
+use iced::{button, Align, Column, Length};
+use iced::{Application, Command, Container, Element, Row, Subscription, Text};
 use iced_native::window::Event;
 use take_mut::scoped;
 use tokio::sync::RwLock;
@@ -54,15 +54,13 @@ pub enum FieldState {
 
 impl FieldState {
     fn playable(field: Field) -> FieldState {
-        let possible_tents = field.tent_coordinates()
+        let possible_tents = field
+            .tent_coordinates()
             .into_iter()
             .map(|coord| (coord, button::State::default()))
             .collect();
 
-        FieldState::Playable(
-            field,
-            possible_tents,
-        )
+        FieldState::Playable(field, possible_tents)
     }
 }
 
@@ -351,26 +349,31 @@ impl Application for Game {
                 self.control_widget.selected_solver = new_solver;
             }
 
-            Message::FieldButtonPressed(row, col) => {
-                match &mut self.state {
-                    GameState::FieldAvailable{state: FieldState::Playable(_,_), field} => {
-                        let cell = field.get_cell_mut(row, col);
-                        *cell = match cell {
-                            CellType::Tent => CellType::Meadow,
-                            CellType::Meadow => CellType::Tent,
-                            CellType::Tree => CellType::Tree,
-                        };
+            Message::FieldButtonPressed(row, col) => match &mut self.state {
+                GameState::FieldAvailable {
+                    state: FieldState::Playable(_, _),
+                    field,
+                } => {
+                    let cell = field.get_cell_mut(row, col);
+                    *cell = match cell {
+                        CellType::Tent => CellType::Meadow,
+                        CellType::Meadow => CellType::Tent,
+                        CellType::Tree => CellType::Tree,
+                    };
 
-                        if field.is_solved() {
-                            self.log.add_hint("Congratulations, you solved the puzzle!".to_string());
-                            self.state = GameState::FieldAvailable{state: FieldState::Solved, field: field.clone()};
-                        }
-                    },
-                    _ => unreachable!(),
+                    if field.is_solved() {
+                        self.log
+                            .add_hint("Congratulations, you solved the puzzle!".to_string());
+                        self.state = GameState::FieldAvailable {
+                            state: FieldState::Solved,
+                            field: field.clone(),
+                        };
+                    }
                 }
+                _ => unreachable!(),
             },
 
-            _ => {},
+            _ => {}
         };
         Command::none()
     }
@@ -380,17 +383,23 @@ impl Application for Game {
         Column::new()
             .push(
                 Row::new()
-                .align_items(Align::Start)
-                .push(Container::new(
-                    self.control_widget.view(&self.state)
-                    ).width(Length::FillPortion(self.control_field_ratio.0)))
-                .push(Container::new(
-                    match &mut self.state {
-                        GameState::Empty => Element::from(Text::new("Drag and drop a file!")),
-                        GameState::Loading => Element::from(Text::new("Loading puzzle ...")),
-                        GameState::Creating => Element::from(Text::new("Creating random puzzle ...")),
-                        GameState::FieldAvailable{field, state} => self.field_widget.view(&field, state),
-                    }).center_x()
+                    .align_items(Align::Start)
+                    .push(
+                        Container::new(self.control_widget.view(&self.state))
+                            .width(Length::FillPortion(self.control_field_ratio.0)),
+                    )
+                    .push(
+                        Container::new(match &mut self.state {
+                            GameState::Empty => Element::from(Text::new("Drag and drop a file!")),
+                            GameState::Loading => Element::from(Text::new("Loading puzzle ...")),
+                            GameState::Creating => {
+                                Element::from(Text::new("Creating random puzzle ..."))
+                            }
+                            GameState::FieldAvailable { field, state } => {
+                                self.field_widget.view(&field, state)
+                            }
+                        })
+                        .center_x()
                         .center_y()
                         .width(Length::FillPortion(self.control_field_ratio.1))
                         .height(Length::Fill),

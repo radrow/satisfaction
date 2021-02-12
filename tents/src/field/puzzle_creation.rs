@@ -275,8 +275,12 @@ mod tests {
     use super::*;
 
     fn calc_puzzle(width: usize, height: usize) {
-        assert!(create_random_puzzle(width, height).is_ok(), "random puzzle creation for a {}x{} puzzle failed", width, height);
-
+        assert!(
+            create_random_puzzle(width, height).is_ok(),
+            "random puzzle creation for a {}x{} puzzle failed",
+            width,
+            height
+        );
     }
 
     #[test]

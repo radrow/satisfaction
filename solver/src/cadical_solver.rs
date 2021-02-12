@@ -1,6 +1,6 @@
-use cadical;
-use crate::{Solver, SATSolution, CNF};
 use crate::solvers::InterruptibleSolver;
+use crate::{SATSolution, Solver, CNF};
+use cadical;
 
 pub struct CadicalSolver;
 
@@ -25,10 +25,12 @@ impl Solver for CadicalSolver {
                 // TODO: Use more index independent formulation
                 (1..=num_variables)
                     .map(|variable| {
-                        solver.value(variable as i32)
+                        solver
+                            .value(variable as i32)
                             // If None, the variable can be choosen arbitrarily and thus true. TODO: Discuss behaviour.
                             .unwrap_or(false)
-                    }).collect()
+                    })
+                    .collect()
             }
         }
     }

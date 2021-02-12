@@ -64,7 +64,7 @@ impl ControlWidget {
 
         match state {
             GameState::FieldAvailable {
-                state: FieldState::Playable(_,_),
+                state: FieldState::Playable(_, _),
                 ..
             } => {
                 control = control.push(ControlWidget::button(

@@ -1,8 +1,8 @@
-use std::cmp::Ordering;
 use crate::{cnf, dpll};
-use cnf::CNFVar;
-use dpll::{Variables, Clauses, VarValue};
 use auto_impl::auto_impl;
+use cnf::CNFVar;
+use dpll::{Clauses, VarValue, Variables};
+use std::cmp::Ordering;
 
 /// A trait to choose the next variable to set during DPLL algorithm.
 /// Often a variable must have a specific boolean value
@@ -22,20 +22,22 @@ pub trait BranchingStrategy {
     fn pick_branching_variable(&self, variables: &Variables, clauses: &Clauses) -> Option<CNFVar>;
 }
 
-/// A branching heuristic that chooses just the next unset variable 
+/// A branching heuristic that chooses just the next unset variable
 /// according to the order in `variables`.
 /// Thus no information about clauses are taken into account.
 pub struct NaiveBranching;
 
 impl BranchingStrategy for NaiveBranching {
     fn pick_branching_variable(&self, variables: &Variables, _clauses: &Clauses) -> Option<CNFVar> {
-        variables.iter()
+        variables
+            .iter()
             .enumerate()
             // Only consider unset variables
-            .filter_map(|(i,v)| match v.value {
-                VarValue::Free  => Some(CNFVar::new(i, true)),
-                _               => None,
-            }).next() // Take the first one
+            .filter_map(|(i, v)| match v.value {
+                VarValue::Free => Some(CNFVar::new(i, true)),
+                _ => None,
+            })
+            .next() // Take the first one
     }
 }
 
@@ -100,7 +102,7 @@ impl BranchingStrategy for DLCS {
                 }*/
                 let pos = count_number_of_clauses(&v.pos_occ, clauses);
                 let neg = count_number_of_clauses(&v.neg_occ, clauses);
-                let h = pos+neg;
+                let h = pos + neg;
                 if h > max {
                     max = h;
                     cnf_var = Some(CNFVar::new(i, pos > neg));
@@ -117,24 +119,32 @@ pub struct JeroslawWang;
 
 impl BranchingStrategy for JeroslawWang {
     fn pick_branching_variable(&self, variables: &Variables, clauses: &Clauses) -> Option<CNFVar> {
-        let values: Vec<_> = clauses.iter()
-            .map(|clause| if clause.satisfied.is_none() {
-                Some(JeroslawWang::literal_measure(clause.active_lits))
-            } else {
-                None
+        let values: Vec<_> = clauses
+            .iter()
+            .map(|clause| {
+                if clause.satisfied.is_none() {
+                    Some(JeroslawWang::literal_measure(clause.active_lits))
+                } else {
+                    None
+                }
             })
             .collect();
 
-        variables.iter()
+        variables
+            .iter()
             .enumerate()
             .filter(|(_, var)| var.value == VarValue::Free)
             .map(|(id, var)| {
                 let pos = JeroslawWang::compute(&var.pos_occ, &values);
                 let neg = JeroslawWang::compute(&var.neg_occ, &values);
-                if pos < neg { (neg, false, id) }
-                else { (pos, true, id) }
-            }).max_by(|(v1, _, _), (v2, _, _)| v1.partial_cmp(v2).unwrap_or(Ordering::Equal))
-                .map(|(_, sign, id)| CNFVar::new(id, sign))
+                if pos < neg {
+                    (neg, false, id)
+                } else {
+                    (pos, true, id)
+                }
+            })
+            .max_by(|(v1, _, _), (v2, _, _)| v1.partial_cmp(v2).unwrap_or(Ordering::Equal))
+            .map(|(_, sign, id)| CNFVar::new(id, sign))
     }
 }
 
@@ -147,9 +157,8 @@ impl JeroslawWang {
     #[inline]
     fn compute(occ: &Vec<usize>, values: &[Option<f32>]) -> f32 {
         occ.iter()
-            .filter_map(|clause_index| {
-                unsafe { *values.get_unchecked(*clause_index) }
-            }).sum()
+            .filter_map(|clause_index| unsafe { *values.get_unchecked(*clause_index) })
+            .sum()
     }
 }
 
@@ -159,27 +168,26 @@ pub struct MOM;
 
 impl BranchingStrategy for MOM {
     fn pick_branching_variable(&self, variables: &Variables, clauses: &Clauses) -> Option<CNFVar> {
-        let min_clause_width = usize::max(2,
-            clauses.iter()
-            .map(|c| c.active_lits)
-            .min()?);
+        let min_clause_width = usize::max(2, clauses.iter().map(|c| c.active_lits).min()?);
 
-        variables.iter()
+        variables
+            .iter()
             .enumerate()
             .filter(|(_, var)| var.value == VarValue::Free)
-            .max_by_key(
-                |(_, v)| {
-                    let hp =
-                        v.pos_occ.iter()
-                            .filter(|c| clauses[**c].active_lits == min_clause_width)
-                            .count();
-                    let hn =
-                        v.neg_occ.iter()
-                            .filter(|c| clauses[**c].active_lits == min_clause_width)
-                            .count();
+            .max_by_key(|(_, v)| {
+                let hp = v
+                    .pos_occ
+                    .iter()
+                    .filter(|c| clauses[**c].active_lits == min_clause_width)
+                    .count();
+                let hn = v
+                    .neg_occ
+                    .iter()
+                    .filter(|c| clauses[**c].active_lits == min_clause_width)
+                    .count();
 
-                    (hp + hn) * clauses.len()^2 + hp * hn
-                }
-            ).map(|(i, _)| CNFVar::pos(i))
+                (hp + hn) * clauses.len() ^ 2 + hp * hn
+            })
+            .map(|(i, _)| CNFVar::pos(i))
     }
 }

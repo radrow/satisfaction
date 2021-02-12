@@ -1,9 +1,9 @@
-use std::{collections::HashSet, path::Path};
 use std::error::Error;
+use std::{collections::HashSet, path::Path};
 
-use itertools::Itertools;
 use super::sat_conversion;
-use solver::{Solver, CadicalSolver, CNFVar, CNFClause, CNF, SATSolution};
+use itertools::Itertools;
+use solver::{CNFClause, CNFVar, CadicalSolver, SATSolution, Solver, CNF};
 
 use tokio::fs::read_to_string;
 
@@ -135,7 +135,7 @@ pub enum CellType {
 }
 
 /// Representation of the whole puzzle
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct Field {
     pub cells: Vec<Vec<CellType>>,
     pub row_counts: Vec<usize>,
@@ -225,7 +225,7 @@ impl Field {
 
     /// Async function to read a file and parse it into the Field-Datatype.
     /// Returns a Result that contains a filled out Field.
-    /// 
+    ///
     /// # Arguments
     ///
     /// * `path` - The path to the file that should get parsed.
@@ -282,7 +282,7 @@ impl Field {
     /// Function for getting the size of the tents puzzle.
     /// Returns a tuple with the width first and the height second.
     ///
-    /// # Arguments 
+    /// # Arguments
     ///
     /// * `line` - The line of a parsed file, that holds the information of width and height.
     fn parse_size(line: &str) -> Result<(usize, usize), FieldParserError> {
@@ -308,7 +308,7 @@ impl Field {
     /// Parse a row of the puzzle field containing
     /// trees, Meadows and row counts.
     ///
-    /// # Arguments 
+    /// # Arguments
     /// * `line` - Line that should be parsed.
     /// * `line_number` - The number of the current line, used for error message.
     /// * `width` - The expected width, i.e. number of trees and meadows.
@@ -341,14 +341,14 @@ impl Field {
             .into());
         }
 
-        let row = cells.chars()
-            .map(|c| {
-                match c {
-                    'T' => Ok(CellType::Tree),
-                    '.' => Ok(CellType::Meadow),
-                    _   => Err(FieldParserError::InvalidCharacter(c)),
-                }
-            }).collect::<Result<Vec<CellType>, FieldParserError>>()?;
+        let row = cells
+            .chars()
+            .map(|c| match c {
+                'T' => Ok(CellType::Tree),
+                '.' => Ok(CellType::Meadow),
+                _ => Err(FieldParserError::InvalidCharacter(c)),
+            })
+            .collect::<Result<Vec<CellType>, FieldParserError>>()?;
 
         Ok((row, row_count))
     }
@@ -357,7 +357,7 @@ impl Field {
     /// Returns a Result with a Vector of integers of the column tent counts.
     ///
     /// # Arguments
-    /// 
+    ///
     /// * `line` - The line in which the column counts are represented.
     /// * `line_number` - The line number in which the column counts apeard.
     /// * `width` - The width of the puzzle indicating the amount of columns.
@@ -388,9 +388,9 @@ impl Field {
 
     /// Checks if the puzzle has been solved
     pub fn is_solved(&self) -> bool {
-        return self.count_constraint_holds() &&
-            self.neighbour_constraint_holds() &&
-            self.correspondence_constraint_holds()
+        return self.count_constraint_holds()
+            && self.neighbour_constraint_holds()
+            && self.correspondence_constraint_holds();
     }
 
     /// Check if count constraints are satisfied
@@ -399,14 +399,15 @@ impl Field {
         let mut row_counts = vec![0; self.height];
         let mut column_counts = vec![0; self.width];
 
-        for (row, col) in possible_tents.iter()
-            .filter(|(row,col)|  self.get_cell(*row, *col) == CellType::Tent) {
-                row_counts[*row] += 1;
-                column_counts[*col] += 1;
-            }
+        for (row, col) in possible_tents
+            .iter()
+            .filter(|(row, col)| self.get_cell(*row, *col) == CellType::Tent)
+        {
+            row_counts[*row] += 1;
+            column_counts[*col] += 1;
+        }
 
-        self.row_counts.eq(&row_counts) &&
-            self.column_counts.eq(&column_counts)
+        self.row_counts.eq(&row_counts) && self.column_counts.eq(&column_counts)
     }
 
     /// Check if neighbour constraints are satisfied
@@ -418,27 +419,26 @@ impl Field {
             .all(|c| c != CellType::Tent)
     }
 
-
     /// Check if correspondence constraints are satisfied
     pub fn correspondence_constraint_holds(&self) -> bool {
         let id_mapping = sat_conversion::make_id_mapping(self);
 
         let (assg_formula, _) = sat_conversion::make_correspondence_constraints(self, &id_mapping);
 
-        let mut force_formula: CNF = id_mapping.iter()
-            .filter_map(|((x, y), i)|
-                 match self.get_cell(*x, *y) {
-                     CellType::Tent => Some(CNFClause::single(CNFVar::pos(*i))),
-                     CellType::Meadow => Some(CNFClause::single(CNFVar::neg(*i))),
-                     _ => None
-                 })
+        let mut force_formula: CNF = id_mapping
+            .iter()
+            .filter_map(|((x, y), i)| match self.get_cell(*x, *y) {
+                CellType::Tent => Some(CNFClause::single(CNFVar::pos(*i))),
+                CellType::Meadow => Some(CNFClause::single(CNFVar::neg(*i))),
+                _ => None,
+            })
             .collect();
 
         force_formula.extend(assg_formula);
 
         match CadicalSolver.solve(&force_formula) {
             SATSolution::Satisfiable(_) => true,
-            _ => false
+            _ => false,
         }
     }
 
@@ -456,21 +456,21 @@ impl Field {
 
     /// Returns a vector of eligible places for a tent.
     pub fn neighbour_coordinates(&self, row: usize, col: usize) -> Vec<CellType> {
-        let rows = row.checked_sub(1)
-            .unwrap_or(row)..row+1;
+        let rows = row.checked_sub(1).unwrap_or(row)..row + 1;
 
-        let columns = col.checked_sub(1)
-            .unwrap_or(col)..col+1;
+        let columns = col.checked_sub(1).unwrap_or(col)..col + 1;
 
         rows.cartesian_product(columns)
             .filter_map(|coord| {
                 if coord != (row, col) {
-                    self.cells.get(coord.0)
+                    self.cells
+                        .get(coord.0)
                         .and_then(|row| row.get(coord.1).cloned())
                 } else {
                     None
                 }
-            }).collect()
+            })
+            .collect()
     }
 
     /// Returns a vector of eligible places for a tent

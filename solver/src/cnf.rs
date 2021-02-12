@@ -1,10 +1,10 @@
+use itertools::Itertools;
+use std::collections::HashSet;
 use std::fmt;
 use std::iter::FromIterator;
-use std::collections::HashSet;
-use itertools::Itertools;
 
-use rayon::iter::*;
 use dimacs::parse_dimacs;
+use rayon::iter::*;
 
 /// Type used for referencing logical variables
 pub type VarId = usize;
@@ -14,7 +14,7 @@ pub type VarId = usize;
 #[derive(Clone, Debug)]
 pub struct CNF {
     /// Vector of inner clauses
-    pub clauses : Vec<CNFClause>,
+    pub clauses: Vec<CNFClause>,
     pub num_variables: usize,
 }
 
@@ -22,7 +22,7 @@ pub struct CNF {
 #[derive(Clone, Debug)]
 pub struct CNFClause {
     /// Vector of inner variables
-    pub vars : Vec<CNFVar>
+    pub vars: Vec<CNFVar>,
 }
 
 /// Logical variable
@@ -38,7 +38,7 @@ impl CNF {
     /// Creates an empty CNF formula
     #[inline]
     pub fn empty() -> CNF {
-        CNF{
+        CNF {
             clauses: Vec::new(),
             num_variables: 0,
         }
@@ -46,7 +46,7 @@ impl CNF {
 
     /// Creates a singleton CNF formula out of a single clause
     #[inline]
-    pub fn single(clause : CNFClause) -> CNF {
+    pub fn single(clause: CNFClause) -> CNF {
         CNF {
             num_variables: clause.max_variable_id(),
             clauses: vec![clause],
@@ -61,10 +61,12 @@ impl CNF {
     }
 
     pub fn extend(&mut self, c: CNF) {
-        if let Some(max_variable_id) = c.clauses
+        if let Some(max_variable_id) = c
+            .clauses
             .iter()
-                .map(|clause| clause.max_variable_id())
-                .max() {
+            .map(|clause| clause.max_variable_id())
+            .max()
+        {
             self.num_variables = self.num_variables.max(max_variable_id);
             self.clauses.extend(c.clauses)
         }
@@ -79,7 +81,8 @@ impl CNF {
     /// Collects all variable identifiers that appear in the formula
     #[inline]
     pub fn vars(&self) -> HashSet<VarId> {
-        self.clauses.iter()
+        self.clauses
+            .iter()
             .flat_map(|clause| clause.vars.iter().map(CNFVar::id))
             .unique()
             .collect()
@@ -87,7 +90,7 @@ impl CNF {
 
     /// Prints formula in DIMACS compatible form
     pub fn to_dimacs(&self) -> String {
-        let mut out : String = String::from("");
+        let mut out: String = String::from("");
 
         let distinct = self.vars();
 
@@ -108,25 +111,29 @@ impl CNF {
     }
 
     /// Parse DIMACS string into CNF structure
-    pub fn from_dimacs(input : &str) -> Result<CNF, String> {
+    pub fn from_dimacs(input: &str) -> Result<CNF, String> {
         let inst = parse_dimacs(input);
 
         match inst {
-            Ok(dimacs::Instance::Cnf{clauses, num_vars}) => {
-                let clauses = clauses.iter()
+            Ok(dimacs::Instance::Cnf { clauses, num_vars }) => {
+                let clauses = clauses
+                    .iter()
                     .map(|clause| {
-                        clause.lits()
+                        clause
+                            .lits()
                             .iter()
                             .map(|lit| CNFVar {
                                 id: lit.var().to_u64() as VarId,
                                 sign: lit.sign() == dimacs::Sign::Pos,
-                            }).collect()
-                    }).collect();
+                            })
+                            .collect()
+                    })
+                    .collect();
                 Ok(CNF {
                     clauses,
                     num_variables: num_vars as usize,
                 })
-            },
+            }
             Ok(_) => Err("Only CNF formulae are supported".to_string()),
             Err(_) => Err("Parse error".to_string()),
         }
@@ -134,10 +141,10 @@ impl CNF {
 }
 
 impl FromParallelIterator<CNFClause> for CNF {
-    fn from_par_iter<I : IntoParallelIterator<Item=CNFClause>>(iter: I) -> Self {
-        let clauses = iter.into_par_iter()
-                .collect::<Vec<CNFClause>>();
-        let num_variables = clauses.iter()
+    fn from_par_iter<I: IntoParallelIterator<Item = CNFClause>>(iter: I) -> Self {
+        let clauses = iter.into_par_iter().collect::<Vec<CNFClause>>();
+        let num_variables = clauses
+            .iter()
             .map(|clause| clause.max_variable_id())
             .max()
             .unwrap_or(0);
@@ -159,11 +166,11 @@ impl IntoParallelIterator for CNF {
 }
 
 impl FromIterator<CNFClause> for CNF {
-    fn from_iter<I: IntoIterator<Item=CNFClause>>(iter: I) -> Self {
-        let clauses = iter.into_iter()
-                .collect::<Vec<CNFClause>>();
+    fn from_iter<I: IntoIterator<Item = CNFClause>>(iter: I) -> Self {
+        let clauses = iter.into_iter().collect::<Vec<CNFClause>>();
 
-        let num_variables = clauses.iter()
+        let num_variables = clauses
+            .iter()
             .map(|clause| clause.max_variable_id())
             .max()
             .unwrap_or(0);
@@ -188,20 +195,20 @@ impl CNFClause {
     /// Creates an empty CNF clause
     #[inline]
     pub fn new() -> CNFClause {
-        CNFClause{vars: vec![]}
+        CNFClause { vars: vec![] }
     }
 
     /// Creates a CNF clause containing a single variable
     #[inline]
-    pub fn single(var : CNFVar) -> CNFClause {
-        CNFClause{vars: vec![var]}
+    pub fn single(var: CNFVar) -> CNFClause {
+        CNFClause { vars: vec![var] }
     }
 
     /// Adds a single variable into the clause
     #[inline]
-    pub fn push(&mut self, v : CNFVar) {
+    pub fn push(&mut self, v: CNFVar) {
         match self.vars.binary_search(&v) {
-            Ok(_) => {}  // we could check for contradiction here
+            Ok(_) => {} // we could check for contradiction here
             Err(pos) => self.vars.insert(pos, v),
         }
     }
@@ -209,15 +216,12 @@ impl CNFClause {
     /// Returns the greatest variablie identifier used in the clause
     #[inline]
     pub fn max_variable_id(&self) -> usize {
-        self.vars.iter()
-            .map(|lit| lit.id)
-            .max()
-            .unwrap_or(0)
+        self.vars.iter().map(|lit| lit.id).max().unwrap_or(0)
     }
 
     /// Concatenates clauses
     #[inline]
-    pub fn extend(&mut self, c : CNFClause) {
+    pub fn extend(&mut self, c: CNFClause) {
         self.vars.reserve(self.len() + c.len());
         for v in c {
             self.push(v)
@@ -232,8 +236,10 @@ impl CNFClause {
 }
 
 impl FromIterator<CNFVar> for CNFClause {
-    fn from_iter<I: IntoIterator<Item=CNFVar>>(iter: I) -> Self {
-        CNFClause{vars: iter.into_iter().collect()}
+    fn from_iter<I: IntoIterator<Item = CNFVar>>(iter: I) -> Self {
+        CNFClause {
+            vars: iter.into_iter().collect(),
+        }
     }
 }
 
@@ -250,19 +256,19 @@ impl CNFVar {
     /// Creates variable with given identifier and positivity
     #[inline]
     pub fn new(id: VarId, sign: bool) -> CNFVar {
-        CNFVar{id, sign}
+        CNFVar { id, sign }
     }
 
     /// Creates a positive variable with given identifier
     #[inline]
     pub fn pos(id: VarId) -> CNFVar {
-        CNFVar{id, sign: true}
+        CNFVar { id, sign: true }
     }
 
     /// Creates a negative variable with given identifier
     #[inline]
-    pub fn neg(id: VarId) -> CNFVar{
-        CNFVar{id, sign: false}
+    pub fn neg(id: VarId) -> CNFVar {
+        CNFVar { id, sign: false }
     }
 
     /// Gets the identifier of a variable
@@ -297,7 +303,6 @@ impl std::ops::Neg for CNFVar {
         self
     }
 }
-
 
 impl fmt::Display for CNF {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
