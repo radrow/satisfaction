@@ -1,6 +1,6 @@
 use crate::sat_solver::*;
-use crate::{CNF, SATSolution};
-use std::time::{Instant, Duration};
+use crate::{SATSolution, CNF};
+use std::time::{Duration, Instant};
 
 /// A wrapper for another solver which exposes time performance
 /// measurement
@@ -17,10 +17,9 @@ impl<S: Solver> Solver for TimedSolver<S> {
 impl<S> TimedSolver<S> {
     /// Wraps a boxed solver in a `TimedSolver`
     pub fn new(solver: S) -> Self {
-        TimedSolver{solver}
+        TimedSolver { solver }
     }
 }
-
 
 impl<S: Solver> TimedSolver<S> {
     /// Solves a given formula but measures time additionally

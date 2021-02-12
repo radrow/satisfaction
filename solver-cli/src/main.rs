@@ -91,9 +91,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("No input file specified. Reading from standard input...");
             get_input(&mut io::stdin())
         }
-        Some(file) => {
-            get_input(&mut File::open(&file)?)
-        }
+        Some(file) => get_input(&mut File::open(&file)?),
     }?;
 
     let formula = CNF::from_dimacs(&input)?;

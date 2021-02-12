@@ -29,8 +29,7 @@ pub enum Message {
 
     /// If the user changes the size setting for the random puzzle creation,
     /// this message orders the program to change the respective widget.
-    GridSizeInputChanged{width: usize, height: usize},
-
+    GridSizeInputChanged { width: usize, height: usize },
 
     /// A field button was pressed put or remove a tent at specified position
     FieldButtonPressed(usize, usize),

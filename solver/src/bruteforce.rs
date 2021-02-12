@@ -1,10 +1,10 @@
 use crate::sat_solver::*;
-use crate::{CNF, SATSolution, Valuation};
+use crate::{SATSolution, Valuation, CNF};
 
 /// A simple CNF solver that naively checks all possible
 /// valuations in order to ensure satisfiability
 pub enum Bruteforce {
-    Bruteforce
+    Bruteforce,
 }
 
 impl Solver for Bruteforce {
