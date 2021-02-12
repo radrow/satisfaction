@@ -12,6 +12,9 @@ use iced::{
 use crate::message::Message;
 use super::util::NumberInput;
 
+/// A random creation widget that enables
+/// the user to specify the size of a puzzle
+/// to be created randomly.
 pub struct RandomCreationWidget  {
     width_input: NumberInput,
     height_input: NumberInput,

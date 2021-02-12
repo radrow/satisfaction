@@ -1,8 +1,17 @@
 #[macro_use] extern crate lazy_static;
 
 mod field;
+/// The game module contains the actual application,
+/// i.e. combining view and model, handling user input
+/// and events from asynchronous computations
 mod game;
+/// All widgets for the graphical representation of the Tents game
+/// and user interaction
+/// are gathered in this module.
 mod widgets;
+/// Messages are used to handle asynchronous computations
+/// and user interaction.
+/// Any important events that can appear are abstracted by this module.
 mod message;
 
 use iced::{Settings, Application, Length};
@@ -11,6 +20,7 @@ use solver::solvers::InterruptibleSolver;
 use solver::{SatisfactionSolver, DLCS, DLIS, JeroslawWang, MOM, CadicalSolver};
 use std::collections::HashMap;
 
+#[doc(hidden)]
 fn main() -> iced::Result {
     // Prepare all available solvers
     let mut solvers = HashMap::<&'static str, Box<dyn InterruptibleSolver>>::new();

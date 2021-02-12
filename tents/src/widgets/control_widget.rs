@@ -6,13 +6,18 @@ use crate::{
 
 use iced::{Length, HorizontalAlignment, Element, Button, Text, Column, pick_list, PickList, button};
 
+/// Widget that gathers user input possibilities that are not directly related to field
+/// manipulation, e.g. order start a solver and create a new field.
 pub struct ControlWidget {
+    /// A list containing the names of choosable solvers.
     solver_names: Vec<String>,
+
     pub selected_solver: String,
 
     pub field_creation_widget: RandomCreationWidget,
 
     solve_puzzle_button: button::State,
+
     solver_choice_list: pick_list::State<String>,
 
     spacing: u16,
@@ -35,7 +40,11 @@ impl ControlWidget {
         }
     }
 
-
+    ///  All user input possibilities are ordered vertically:
+    ///  * Solver list
+    ///  * Specification of random puzzle size
+    ///  * Button to create a random puzzle
+    ///  * If a field is available: Button to solve a puzzle.
     pub fn view(&mut self, state: &GameState) -> Element<Message> {
         let mut control = Column::new()
             .spacing(self.spacing)
@@ -44,7 +53,9 @@ impl ControlWidget {
                     &self.solver_names,
                     Some(self.selected_solver.clone()),
                     |new_solver| Message::ChangedSolver{new_solver},
+
             ).width(Length::Fill))
+
             .push(self.field_creation_widget.view());
 
         match state {
@@ -65,6 +76,7 @@ impl ControlWidget {
     }
 
     
+    /// Creates the button to solve a puzzle
     fn button<'a>(state: &'a mut button::State, text: &str, message: Message) -> Button<'a, Message> {
         Button::new(state, 
             Text::new(text)

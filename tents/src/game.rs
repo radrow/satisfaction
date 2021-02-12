@@ -25,8 +25,10 @@ use crate::{
 };
 
 
+/// A list of named solvers that can be used to solve the Tents puzzle.
 pub type SolverList = HashMap<&'static str, Box<dyn InterruptibleSolver>>;
 
+/// Gathers various values that define how the program looks.
 pub struct Config {
     pub cell_size: Length,
     pub cell_spacing: u16,
@@ -72,8 +74,22 @@ pub enum GameState {
     Empty,
 }
 
+/// A `CancelHandle` is necessary to make long lasting computations
+/// like solving or tent creation abortable.
+/// At first the used futures have to be abortable,
+/// there must also be a possibility to ignore results of asynchronous computations
+/// that are not valid anymore.
+/// For example, if one starts a solver, 
+/// creates a new tent
+/// and starts a new solving process for this,
+/// the first one must be ignored.
 struct CancelHandle {
+    /// A handle to the newest asynchronous computation.
     abort_handle: Option<AbortHandle>,
+    /// Currently valid id.
+    /// It is necessary to check old computations that
+    /// finished before being aborted.
+    /// Only the the newest task is accepted.
     current_task_id: usize,
 }
 
@@ -85,16 +101,25 @@ impl CancelHandle {
         }
     }
 
+    /// Registers a future to make it abortable
     fn register<F: Future>(&mut self, future: F) -> (Abortable<F>, usize) {
+        // Make future abortable
         let (abortable_future, handle) = abortable(future);
+        // Abort old futures and save new one
         if let Some(old_handle) = self.abort_handle.take() {
             old_handle.abort();
         }
         self.abort_handle = Some(handle);
+        // Invalidate old futures that might have finished and
+        // could thus not be aborted.
         self.current_task_id = self.current_task_id.wrapping_add(1);
         (abortable_future, self.current_task_id)
     }
 
+    /// A asynchronous computation with id `task_id` finishes without being
+    /// aborted. If the `task_id` is still valid,
+    /// it is the newest task and `true` is returned
+    /// otherwise `false`.
     fn finish_task(&mut self, task_id: usize) -> bool {
         if self.current_task_id == task_id {
             self.abort_handle = None;
@@ -107,7 +132,6 @@ impl CancelHandle {
 
 /// Entry point of the whole Tents-application
 /// Speaking in Elm's parlance, it is the model of the program.
-///
 pub struct Game {
     solvers: Arc<RwLock<SolverList>>,
     
@@ -239,9 +263,11 @@ impl Application for Game {
                                 }
                             );
 
+                            // Get selected solver
                             let solvers = self.solvers.clone();
                             let solver_name = self.control_widget.selected_solver.clone();
 
+                            // Register abortable future
                             let (fut, task_id) = self.cancel_handle.register(async move {
                                 let solvers = solvers.read()
                                     .await;
@@ -252,6 +278,7 @@ impl Application for Game {
                                 field_to_cnf(old_field, &solver).await
                             });
 
+                            // Send command to perform solving in background.
                             cmd = Command::perform(fut, move |result| match result {
                                 Ok(Some(new_field)) => 
                                     Message::SolutionFound{field: new_field, task_id},

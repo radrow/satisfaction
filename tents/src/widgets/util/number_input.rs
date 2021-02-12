@@ -5,6 +5,8 @@ use iced::{
 };
 use crate::message::Message;
 
+/// A wrapper to the number input,
+/// to prohibit non-number input.
 pub struct NumberInput {
     state: State,
     pub value: usize,
@@ -32,6 +34,7 @@ impl NumberInput {
                     .filter(|c| c.is_digit(10))
                     .collect::<String>()
                     .parse::<usize>()
+                    // If input is invalid, reset text box to default value.
                     .unwrap_or(default_value);
                 on_change(new_value)
         }).into()

@@ -36,6 +36,8 @@ impl FieldWidget {
 
 
 impl FieldWidget {
+    /// Draws a single tile/cell of a Tent field,
+    /// i.e. a Tent, Tree or Meadow.
     fn draw_cell(&self, cell: &CellType) -> Element<Message> {
         match cell {
             CellType::Tent => TENT_SVG.clone(),
@@ -45,6 +47,8 @@ impl FieldWidget {
             .height(self.cell_size)
             .into()
     }
+
+    /// Draws the number for the row/column counts.
     fn draw_number(&self, number: usize) -> Element<Message> {
         Text::new(number.to_string())
             .width(self.cell_size)
@@ -55,20 +59,25 @@ impl FieldWidget {
             .into()
     }
 
+    /// A field is simply a grid of SVGs.
     pub fn view(&self, field: &Field) -> Element<Message> {
         Column::with_children(
             field.cells.iter()
                 .zip(field.row_counts.iter())
                 .map(|(rows, row_count)| {
                     Row::with_children(
+                    // Stack the cells of each row to a horizontal bar
                         rows.iter()
                             .map(|cell| self.draw_cell(cell))
                             .collect()
+
+                    // Append row count
                     ).spacing(self.cell_spacing)
                         .push(self.draw_number(*row_count))
                         .into()
                 }).collect()
         ).push(
+            // Append column counts
             Row::with_children(
                 field.column_counts.iter()
                     .map(|number| self.draw_number(*number))
