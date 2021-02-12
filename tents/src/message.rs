@@ -10,14 +10,14 @@ pub enum Message {
     FileDropped(PathBuf),
     /// A field that was ordered to be loaded from a file,
     /// is now available as [`Field`].
-    /// The game's state changes to 
+    /// The game's state changes to
     /// [`FieldAvailable`](crate::game::GameState::FieldAvailable).
-    FieldLoaded{field: Field, task_id: usize},
+    FieldLoaded { field: Field, task_id: usize },
 
     /// The user has ordered the program to create a random [`Field`]
     /// of specified size.
     /// The game's changes to state [`Creating`](crate::game::GameState::Creating).
-    CreateRandomPuzzle{width: usize, height: usize},
+    CreateRandomPuzzle { width: usize, height: usize },
     /// The user has ordered the program to solve the current puzzle.
     /// A SAT solver is started asynchronously.
     /// The field's state changes to [`Solving`](crate::game::FieldState::Solving).
@@ -25,20 +25,27 @@ pub enum Message {
     /// If the SAT-solver has finished its computation,
     /// it sends this message to inform the program and submit a solve [`Field`].
     /// The field's state changes to [`Solved`](crate::game::FieldState::Solved).
-    SolutionFound{field: Field, task_id: usize},
+    SolutionFound { field: Field, task_id: usize },
 
     /// If the user changes the size setting for the random puzzle creation,
     /// this message orders the program to change the respective widget.
     GridSizeInputChanged{width: usize, height: usize},
-    ChangedSolver{new_solver: String},
+
+
+    /// A field button was pressed put or remove a tent at specified position
     FieldButtonPressed(usize, usize),
+
+    /// If the user changes solver,
+    /// this message orders the program to change the respective widget.
+    ChangedSolver { new_solver: String },
 
     /// If an error occurres during the program execution,
     /// e.g. a file wasn't found, a puzzle is unsolvable,
     /// the user is notified via this message.
     ErrorOccurred(String),
 
-
+    /// A sink message that is sent
+    /// if an execution was aborted and its output should be ignored.
     AbortedExecution,
 }
 
