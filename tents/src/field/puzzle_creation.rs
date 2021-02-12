@@ -284,8 +284,8 @@ mod tests {
     fn calc_ten_random_puzzle_sizes() {
         for _ in 0..10 {
             let mut rng: ThreadRng = rand::thread_rng();
-            let width: usize = rng.gen_range(5, 40);
-            let height: usize = rng.gen_range(5, 40);
+            let width: usize = rng.gen_range(5, 30);
+            let height: usize = rng.gen_range(5, 30);
 
             calc_puzzle(width, height);
         }
