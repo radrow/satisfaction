@@ -248,7 +248,7 @@ impl Field {
 
     }
 
-    pub fn count_constrain_holds(&self) -> bool {
+    pub fn count_constraint_holds(&self) -> bool {
         unimplemented!()
     }
 
@@ -256,7 +256,7 @@ impl Field {
         unimplemented!()
     }
 
-    pub fn correspondence_constrain_holds(&self) -> bool {
+    pub fn correspondence_constraint_holds(&self) -> bool {
         unimplemented!()
     }
 
