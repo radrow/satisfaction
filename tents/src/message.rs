@@ -30,6 +30,9 @@ pub enum Message {
     /// If the user changes the size setting for the random puzzle creation,
     /// this message orders the program to change the respective widget.
     GridSizeInputChanged{width: usize, height: usize},
+
+    /// If the user changes solver,
+    /// this message orders the program to change the respective widget.
     ChangedSolver{new_solver: String},
 
     /// If an error occurres during the program execution,
@@ -38,6 +41,8 @@ pub enum Message {
     ErrorOccurred(String),
 
 
+    /// A sink message that is sent 
+    /// if an execution was aborted and its output should be ignored.
     AbortedExecution,
 }
 

@@ -12,6 +12,7 @@ use solver::{SatisfactionSolver, DLCS, DLIS, JeroslawWang, MOM, CadicalSolver};
 use std::collections::HashMap;
 
 fn main() -> iced::Result {
+    // Prepare all available solvers
     let mut solvers = HashMap::<&'static str, Box<dyn InterruptibleSolver>>::new();
     solvers.insert("DLIS", Box::new(SatisfactionSolver::new(DLIS)));
     solvers.insert("DLCS", Box::new(SatisfactionSolver::new(DLCS)));
@@ -19,6 +20,7 @@ fn main() -> iced::Result {
     solvers.insert("JeroslawWang", Box::new(SatisfactionSolver::new(JeroslawWang)));
     solvers.insert("CadicalSolver", Box::new(CadicalSolver));
 
+    // Fundamental configuration for gui
     let config = Config {
         cell_size: Length::Units(15),
         cell_spacing: 2,

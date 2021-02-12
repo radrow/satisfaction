@@ -9,37 +9,57 @@ const MIN_HEIGHT: usize = 2;
 const MAX_HEIGHT: usize = 35;
 
 
-/// Coordignates of a tree
+/// Coordinates of a tree
 pub type TentPlace = (usize, usize);
 
+/// Enum giving detail information about
+/// what went wrong during parsing.
 #[derive(Debug)]
 enum FieldParserError {
-    WidthNotSpecified,
+    /// The height in the Tent game file is missing.
     HeightNotSpecified,
+    /// The width in the Tent game file is missing.
+    WidthNotSpecified,
+    /// A line specifying a row of the Tents field has not row count.
     MissingRowCount(usize),
+    /// There are less or more cells specified in a row than expected.
+    ///
+    /// # Arguments
+    /// * `expected` - The number of cells that was expected, i.e. specified by the file header.
+    /// * `found` - The number of cells found.
+    /// * `line` - The line of interest.
     WrongNumberOfCells{expected: usize, found: usize, line: usize},
+    /// In the last line there are less or more column count specified than expected.
+    ///
+    /// # Arguments
+    /// * `expected` - The count of numbers expected, i.e. specified by the file header.
+    /// * `expected` - The count of numbers found.
     MissingColumnCounts{expected: usize, found: usize},
+    /// Only numbers and characters 'T' (= Tree) and . (= Meadow/Nothing) are allow.
+    /// If a strange character it is noted to the user.
     InvalidCharacter(char),
-    ParsingFailed(usize),
+    /// If a number was expected but could not be found,
+    /// the user is informed with the respective line number.
+    ParsingNumberFailed(usize),
 }
 
 impl std::fmt::Display for FieldParserError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
             FieldParserError::WidthNotSpecified =>
-                "A width was expected but not found".to_string(),
+                "A width was expected but not found.".to_string(),
             FieldParserError::HeightNotSpecified =>
-                "A height was expected but not found".to_string(),
+                "A height was expected but not found.".to_string(),
             FieldParserError::MissingRowCount(line) =>
-                format!("In line {} no tent count was specified", line),
+                format!("In line {} no tent count was specified.", line),
             FieldParserError::WrongNumberOfCells{line, expected, found} =>
-                format!("Not enough cells were specified in line {}: Expected {} but found {}", line, expected, found),
+                format!("Not enough cells were specified in line {}: Expected {} but found {}.", line, expected, found),
             FieldParserError::MissingColumnCounts{expected, found} =>
-                format!("Could not find enough column counts in last line: Expected {} but found {}", expected, found),
+                format!("Could not find enough column counts in last line: Expected {} but found {}.", expected, found),
             FieldParserError::InvalidCharacter(character) =>
-                format!("Encountered an invalid character {}", character),
-            FieldParserError::ParsingFailed(line) =>
-                format!("Parsing failed in line {}", line),
+                format!("Encountered an invalid character {}.", character),
+            FieldParserError::ParsingNumberFailed(line) =>
+                format!("Parsing failed in line {}.", line),
         })
     }
 }
@@ -149,15 +169,18 @@ impl Field {
 
     pub async fn from_file(path: impl AsRef<Path>) -> Result<Field, Box<dyn std::error::Error>> {
         let contents: String = read_to_string(path).await?;
+        Field::from_string(contents)
+    }
 
+    pub fn from_string(input: String) -> Result<Field, Box<dyn std::error::Error>> {
         // Only numbers, 'T', '.' and space are allowed.
-        if let Some(c) = contents.chars()
+        if let Some(c) = input.chars()
             .filter(|c| !(c.is_ascii_whitespace() || c.is_numeric() || *c == 'T' || *c == '.'))
             .next() {
             return Err(FieldParserError::InvalidCharacter(c).into());
         };
 
-        let mut lines = contents.lines();
+        let mut lines = input.lines();
         
         let (width, height) = Field::parse_size(
             lines.next()
@@ -187,13 +210,13 @@ impl Field {
             .ok_or(FieldParserError::HeightNotSpecified)?
             .parse::<usize>()
             .ok()
-            .ok_or(FieldParserError::ParsingFailed(1))?;
+            .ok_or(FieldParserError::ParsingNumberFailed(1))?;
 
         let width: usize = split.next()
             .ok_or(FieldParserError::WidthNotSpecified)?
             .parse::<usize>()
             .ok()
-            .ok_or(FieldParserError::ParsingFailed(1))?;
+            .ok_or(FieldParserError::ParsingNumberFailed(1))?;
 
         Ok((width, height))
     }
@@ -208,7 +231,7 @@ impl Field {
             .ok_or(FieldParserError::MissingRowCount(line_number))?
             .parse::<usize>()
             .ok()
-            .ok_or(FieldParserError::ParsingFailed(line_number))?;
+            .ok_or(FieldParserError::ParsingNumberFailed(line_number))?;
 
         if cells.len() != width {
             return Err(FieldParserError::WrongNumberOfCells{expected: width, found: cells.len(), line: line_number}.into());
@@ -219,7 +242,6 @@ impl Field {
                 match c {
                     'T' => Ok(CellType::Tree),
                     '.' => Ok(CellType::Meadow),
-                    // TODO: More precise location
                     _   => Err(FieldParserError::InvalidCharacter(c)),
                 }
             }).collect::<Result<Vec<CellType>, FieldParserError>>()?;
@@ -232,7 +254,7 @@ impl Field {
             .map(|number| {
                 number.parse::<usize>()
                     .ok()
-                    .ok_or(FieldParserError::ParsingFailed(line_number))
+                    .ok_or(FieldParserError::ParsingNumberFailed(line_number))
             }).collect::<Result<Vec<usize>, FieldParserError>>()
             .and_then(|vec|{
                 if vec.len() == width { Ok(vec) }
@@ -286,4 +308,108 @@ impl Field {
         tents_by_trees
     }
 
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn compare_messages<T: std::fmt::Debug,E: std::error::Error>(result: Result<T, Box<dyn std::error::Error>>, expected: E) {
+        let error = result.unwrap_err();
+        assert!(error.to_string() == expected.to_string(), error.to_string());
+    }
+
+    #[test]
+    fn missing_height() {
+        let input = "";
+        compare_messages(
+            Field::from_string(input.to_string()),
+            FieldParserError::HeightNotSpecified,
+        );
+    }
+
+    #[test]
+    fn missing_width() {
+        let input = 
+r"3
+.T. 1
+... 0
+.T. 1
+1 0 1";
+        compare_messages(
+            Field::from_string(input.to_string()),
+            FieldParserError::WidthNotSpecified,
+        );
+    }
+
+    #[test]
+    fn missing_row_count() {
+        let input =
+r"3 3
+.T.
+... 0
+.T. 1
+1 0 1";
+        compare_messages(
+            Field::from_string(input.to_string()),
+            FieldParserError::MissingRowCount(1)
+        );
+    }
+
+    #[test]
+    fn wrong_number_of_cells() {
+        let input =
+r"3 3
+.T. 1
+.. 0
+.T. 1
+1 0";
+        compare_messages(
+            Field::from_string(input.to_string()),
+            FieldParserError::WrongNumberOfCells{expected: 3, found: 2, line: 2}
+        );
+    }
+
+    #[test]
+    fn missing_column_counts() {
+        let input =
+r"3 3
+.T. 1
+... 0
+.T. 1
+1";
+        compare_messages(
+            Field::from_string(input.to_string()),
+            FieldParserError::MissingColumnCounts{expected: 3, found: 1}
+        );
+    }
+
+    #[test]
+    fn invalid_character_x() {
+        let input =
+r"3 3
+.T. x
+... 0
+.T. 1
+1 0 1";
+        compare_messages(
+            Field::from_string(input.to_string()),
+            FieldParserError::InvalidCharacter('x')
+        );
+    }
+
+    #[test]
+    fn parsing_number_failed() {
+        let input =
+r"T 
+.T. 1
+... 0
+.T. 1
+1 0 1";
+        compare_messages(
+            Field::from_string(input.to_string()),
+            FieldParserError::ParsingNumberFailed(1)
+        );
+    }
 }

@@ -8,12 +8,16 @@ use crate::{
 
 use crate::game::Config;
 
+// For each type a Tents tile can have an SVG is loaded.
+// This is done during compilation so the necessary resources cannot lack.
 lazy_static!{
     static ref TENT_SVG: Svg   = Svg::new(Handle::from_memory(include_bytes!("../../images/tent.svg").to_vec()));
     static ref TREE_SVG: Svg   = Svg::new(Handle::from_memory(include_bytes!("../../images/tree.svg").to_vec()));
     static ref MEADOW_SVG: Svg = Svg::new(Handle::from_memory(include_bytes!("../../images/meadow.svg").to_vec()));
 }
 
+/// A widget that gathers parameters
+/// that determine the way a field should be drawn.
 pub struct FieldWidget {
     cell_size: Length,
     cell_spacing: u16,
