@@ -10,7 +10,7 @@ const MAX_LITERALS_PER_LINE: usize = 8;
 ///     (index 0) to the variable with the maximal ID).
 /// * `Unsatisfiable` - The formula is not satisfiable i.e. to assignment makes the formula true.
 /// * `Unknown` - A satisfying assignment could not be found, however, there still could be one. 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum SATSolution {
     Satisfiable(Valuation),
     Unsatisfiable,

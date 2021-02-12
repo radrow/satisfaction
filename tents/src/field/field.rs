@@ -91,7 +91,7 @@ pub enum CellType {
     Meadow,
 }
 
-#[derive(Debug,Clone)] // TODO: Write a appropriate debug printing
+#[derive(Debug,Clone)]
 /// Representation of the whole puzzle
 pub struct Field {
     pub cells: Vec<Vec<CellType>>,
@@ -152,6 +152,12 @@ impl Field {
         Field::new(cells, row_counts, column_counts)
     }
 
+    /// Async function to read a file and parse it into the Field-Datatype.
+    /// Returns a Result that contains a filled out Field.
+    /// 
+    /// # Arguments
+    ///
+    /// * `path` - The path to the file that should get parsed.
     pub async fn from_file(path: impl AsRef<Path>) -> Result<Field, Box<dyn std::error::Error>> {
         let contents: String = read_to_string(path).await?;
 
@@ -185,6 +191,12 @@ impl Field {
             .map_err(FieldCreationError::into)
     }
 
+    /// Function for getting the size of the tents puzzle.
+    /// Returns a tuple with the width first and the height second.
+    ///
+    /// # Arguments 
+    ///
+    /// * `line` - The line of a parsed file, that holds the information of width and height.
     fn parse_size(line: &str) -> Result<(usize, usize), FieldParserError> {
         let mut split = line.split(' ');
 
@@ -224,7 +236,6 @@ impl Field {
                 match c {
                     'T' => Ok(CellType::Tree),
                     '.' => Ok(CellType::Meadow),
-                    // TODO: More precise location
                     _   => Err(FieldParserError::InvalidCharacter(c)),
                 }
             }).collect::<Result<Vec<CellType>, FieldParserError>>()?;
@@ -232,6 +243,14 @@ impl Field {
         Ok((row, row_count))
     }
 
+    /// Function for parsing the counters, that are couting the amount of tents in each column.
+    /// Returns a Result with a Vector of integers of the column tent counts.
+    ///
+    /// # Arguments
+    /// 
+    /// * `line` - The line in which the column counts are represented.
+    /// * `line_number` - The line number in which the column counts apeard.
+    /// * `width` - The width of the puzzle indicating the amount of columns.
     fn parse_column_counts(line: &str, line_number: usize, width: usize) -> Result<Vec<usize>, FieldParserError> {
         line.split(' ')
             .map(|number| {
@@ -308,6 +327,7 @@ impl Field {
         &mut self.cells[row][column]
     }
 
+    /// Returns a vector of eligible places for a tent.
     pub fn neighbour_coordinates(&self, row: usize, col: usize) -> Vec<CellType> {
         let rows = row.checked_sub(1)
             .unwrap_or(row)..row+1;
