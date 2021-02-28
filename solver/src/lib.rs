@@ -17,6 +17,7 @@ pub mod sat_solver;
 /// A module which offers some additional solver,
 /// for one that can be interrupted or timed.
 pub mod solvers;
+mod cdcl;
 
 pub use branching_strategy::{BranchingStrategy, JeroslawWang, NaiveBranching, DLCS, DLIS, MOM};
 pub use bruteforce::Bruteforce;
