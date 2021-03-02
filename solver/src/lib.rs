@@ -6,6 +6,7 @@ mod branching_strategy;
 pub mod bruteforce;
 /// Module containing the reference solver cadical.
 mod cadical_solver;
+mod cdcl;
 /// The CNF representation of a formula
 pub mod cnf;
 /// Module that contains the custom DPLL solver
@@ -17,7 +18,6 @@ pub mod sat_solver;
 /// A module which offers some additional solver,
 /// for one that can be interrupted or timed.
 pub mod solvers;
-mod cdcl;
 
 pub use branching_strategy::{BranchingStrategy, JeroslawWang, NaiveBranching, DLCS, DLIS, MOM};
 pub use bruteforce::Bruteforce;
