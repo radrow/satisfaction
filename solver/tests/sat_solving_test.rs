@@ -9,34 +9,45 @@ const MAX_NUM_VARIABLES: usize = 50;
 const MAX_NUM_LITERALS: usize = 10;
 const MAX_NUM_CLAUSES: usize = 50;
 
-fn setup_custom_solver() -> Vec<Box<dyn Solver>> {
-    let mut solvers: Vec<Box<dyn Solver>> = Vec::new();
-    solvers.push(Box::new(SatisfactionSolver::new(NaiveBranching)));
-    solvers.push(Box::new(SatisfactionSolver::new(JeroslawWang)));
-    solvers.push(Box::new(SatisfactionSolver::new(DLIS)));
-    solvers.push(Box::new(SatisfactionSolver::new(DLCS)));
-    solvers.push(Box::new(SatisfactionSolver::new(MOM)));
+fn setup_custom_solver() -> Vec<(&'static str, Box<dyn Solver>)> {
+    let mut solvers: Vec<(&'static str, Box<dyn Solver>)> = Vec::new();
+    solvers.push(("NaiveBranching", Box::new(SatisfactionSolver::new(NaiveBranching))));
+    solvers.push(("JeroslawWang", Box::new(SatisfactionSolver::new(JeroslawWang))));
+    solvers.push(("DLIS", Box::new(SatisfactionSolver::new(DLIS))));
+    solvers.push(("DLCS", Box::new(SatisfactionSolver::new(DLCS))));
+    solvers.push(("MOM", Box::new(SatisfactionSolver::new(MOM))));
     solvers
 }
 
-fn solve_custom_solvers(formula: &CNF, solvers: Vec<Box<dyn Solver>>) -> SATSolution {
-    let mut sat_solution: SATSolution = SATSolution::Unknown;
-    let solutions: Vec<bool> = solvers
-        .iter()
-        .map(|solver| {
-            sat_solution = solver.solve(formula);
-            match sat_solution {
-                SATSolution::Satisfiable(_) => true,
-                SATSolution::Unsatisfiable => false,
-                SATSolution::Unknown => panic!("Could not solve puzzle in time"),
+fn solve_custom_solvers(formula: &CNF, solvers: Vec<(&'static str, Box<dyn Solver>)>) -> SATSolution {
+    let mut solutions: Vec<SATSolution> = solvers.iter()
+        .map(|(name, solver)| {
+            println!("Testing {}", *name);
+            let solution = solver.solve(formula);
+            match solution.clone() {
+                SATSolution::Satisfiable(assignment) => assert!(is_satisfied(formula.clauses.iter().cloned(), assignment), *name),
+                _ => {},
             }
-        })
-        .collect();
-    let first = solutions[0].clone();
-    if !solutions.iter().all(|solution| *solution == first) {
-        assert!(false);
-    }
-    solvers[0].solve(formula)
+            solution
+        }).collect();
+
+
+    let result = solutions.iter()
+        .zip(solvers.iter().map(|(name, _)| name))
+        .skip(1)
+        .try_fold(
+            solutions[0].is_sat(),
+            |acc, (solution, name)| {
+                if solution.is_sat() == acc { Ok(acc) }
+                else { Err(*name) }
+            });
+
+    match result {
+        Ok(_) => {},
+        Err(name) => panic!(format!("Branching strategy {} differs in satisfiability", name)),
+    };
+
+    solutions.pop().unwrap()
 }
 
 fn execute_solvers(formula: &CNF) -> (SATSolution, SATSolution) {
@@ -112,7 +123,7 @@ fn failed_proptest_instance() {
     };
     let (custom, reference) = execute_solvers(&formula);
 
-    assert_eq!(custom, reference);
+    assert_eq!(custom.is_sat(), reference.is_sat());
 }
 
 proptest! {
