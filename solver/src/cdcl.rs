@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use std::collections::{HashSet, VecDeque};
+use std::{cmp::min_by, collections::{HashSet, VecDeque}};
 
 use crate::{CNFClause, CNFVar, SATSolution, Solver, CNF};
 
@@ -77,6 +77,8 @@ impl ExecutionState {
                 })
             {
                 return SATSolution::Unsatisfiable;
+            } else if self.is_satisfied() {
+                break;
             }
         }
 
@@ -93,7 +95,7 @@ impl ExecutionState {
     }
 
     fn unit_propagation(&mut self) -> Option<ClauseId> {
-        while let Some(literal) = self.unit_queue.pop_front() {
+        while let Some(literal) = self.unit_queue.pop_back() {
             let empty_clause = self.set_variable(literal, true);
             if empty_clause.is_some() {
                 return empty_clause;
@@ -137,7 +139,47 @@ impl ExecutionState {
         self.unit_propagation()
             .map_or(false, |empty_clause| self.backtracking(empty_clause, learning_scheme))
     }
+
+    fn is_satisfied(&self) -> bool {
+        true
+    }
 }
+
+struct RealSAT;
+
+impl LearningScheme for RealSAT {
+    fn find_conflict_clause(&self, conflict_clause: ClauseId, branching_depth: usize, clauses: &Clauses, variables: &Variables) -> (Clause, usize) {
+        // TODO: Optimize preallocation
+        let mut literal_queue: VecDeque<CNFVar> = clauses[conflict_clause].literals
+            .iter()
+            .cloned()
+            .collect();
+
+        let mut conflict_literals = Vec::with_capacity(literal_queue.len());
+
+        let mut assertion_level = 0;
+        while let Some(literal) = literal_queue.pop_back() {
+            let variable = &variables[literal.id];
+            match variable.assignment {
+                Some(Assignment{branching_level, reason: AssignmentType::Forced(reason), ..}) if branching_level == branching_depth => { 
+                    conflict_literals.extend(clauses[reason].literals.iter())
+                },
+                Some(Assignment{sign, branching_level, reason: AssignmentType::Branching}) => {
+                    conflict_literals.push(CNFVar::new(literal.id, !sign));
+                    if branching_level != branching_depth {
+                        assertion_level = std::cmp::max(assertion_level, branching_level);
+                    }
+                }
+                _ => {},
+            }
+        }
+
+        todo!()
+    }
+}
+
+
+
 
 struct CDCLSolver<B: BranchingStrategy, L: LearningScheme, C: ClauseDeletionStrategy> {
     branching_strategy: B,
