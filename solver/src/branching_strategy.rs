@@ -1,8 +1,10 @@
 use crate::{cnf, dpll};
 use auto_impl::auto_impl;
-use cnf::CNFVar;
-use dpll::{Clauses, VarValue, Variables};
+use cnf::{VarId, CNFVar};
+use dpll::{Clauses, Clause, VarValue, Variables, Variable};
 use std::cmp::Ordering;
+use std::collections::HashMap;
+use std::collections::linked_list::{LinkedList, Cursor, CursorMut};
 
 /// A trait to choose the next variable to set during DPLL algorithm.
 /// Often a variable must have a specific boolean value
@@ -190,4 +192,119 @@ impl BranchingStrategy for MOM {
             })
             .map(|(i, _)| CNFVar::pos(i))
     }
+}
+
+#[auto_impl(&mut, Box)]
+pub trait CDCLBranchingStrategy {
+    fn pick_branching_variable(&mut self,
+                               variables: &Variables,
+                               clauses: &Clauses
+    ) -> Option<CNFVar>;
+
+    fn learn_clause_hook(&mut self, clause: &Clause);
+
+    fn branch_hook(&mut self);
+
+    fn assign_var_hook(&mut self, id: VarId);
+
+    fn unassign_var_hook(&mut self, id: VarId);
+}
+
+pub struct VSIDS {
+    resort_period: u32,
+    search_index: usize,
+    branchings: u32,
+    scores: Vec<u32>,
+    counters: Vec<u32>,
+    queue: Vec<VarId>,
+    coqueue: Vec<usize>
+}
+
+impl VSIDS {
+    pub fn new(resort_period: u32, vars: &Variables, clauses: &Clauses) -> VSIDS {
+        let mut scores: Vec<u32> = (0..vars.len() as u32).collect();
+        let counters = std::iter::repeat(0).take(vars.len()).collect();
+
+        for (i, v) in vars.iter().enumerate() {
+            let hp = v.pos_occ.len();
+
+            scores[i] = hp as u32;
+        }
+
+        let mut queue: Vec<VarId> = vars.iter().map(|v| v.index).collect();
+        queue.sort_by_key(|x| scores[*x]);
+        let mut coqueue: Vec<usize> = (0..vars.len()).collect();
+        for i in 0..queue.len() {
+            coqueue[queue[i]] = i;
+        }
+
+        VSIDS {
+            resort_period: resort_period,
+            search_index: vars.len() - 1,
+            branchings: 0,
+            scores: scores,
+            counters: counters,
+            queue: queue,
+            coqueue: coqueue,
+        }
+    }
+}
+
+impl CDCLBranchingStrategy for VSIDS {
+    fn pick_branching_variable(&mut self, variables: &Variables, _clauses: &Clauses) -> Option<CNFVar> {
+        while self.search_index < self.queue.len() { // Actually, > 0 but overflow
+            if variables[self.queue[self.search_index]].value == VarValue::Free {
+                self.search_index -= 1;
+                return Some(CNFVar::pos(self.queue[self.search_index]))
+            }
+            self.search_index -= 1;
+        }
+        None
+    }
+
+    fn learn_clause_hook(&mut self, clause: &Clause) {
+        for v in &clause.literals {
+            self.counters[v.id] += 1;
+        }
+    }
+
+    fn branch_hook(&mut self) {
+        self.branchings += 1;
+        if self.branchings == self.resort_period {
+            self.branchings = 0;
+
+            for i in 0..self.queue.len() {
+                self.scores[i] /= 2;
+                self.scores[i] += self.counters[i];
+                self.counters[i] = 0;
+            }
+
+            let scores = &self.scores;
+            self.queue.sort_by_key(|x| scores[*x]);
+            for i in 0..self.queue.len() {
+                self.coqueue[self.queue[i]] = i;
+            }
+            self.search_index = self.queue.len() - 1;
+        }
+    }
+
+    fn assign_var_hook(&mut self, _var: VarId) {}
+
+    fn unassign_var_hook(&mut self, var: VarId) {
+        if self.search_index < self.coqueue[var] {
+            self.search_index = self.coqueue[var]
+        }
+    }
+}
+
+// http://fmv.jku.at/papers/BiereFroehlich-SAT15.pdf
+pub struct VMTF<'a> {
+    scores: HashMap<VarId, usize>,
+    queue: LinkedList<Variable>,
+    last_search: CursorMut<'a, Variable>,
+    enqueue_count: u32,
+}
+
+impl VMTF<'_> {
+
 }
