@@ -1,3 +1,4 @@
+#![feature(linked_list_cursors)]
 #[macro_use]
 extern crate async_trait;
 
