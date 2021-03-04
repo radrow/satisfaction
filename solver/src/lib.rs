@@ -3,6 +3,7 @@ extern crate async_trait;
 
 /// Branching heuristics one can choose from to customize the [`SatisfactionSolver`].
 mod branching_strategy;
+mod deletion_strategy;
 pub mod bruteforce;
 /// Module containing the reference solver cadical.
 mod cadical_solver;
