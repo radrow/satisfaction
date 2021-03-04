@@ -1,4 +1,4 @@
-use std::collections::{HashSet, VecDeque};
+use std::{collections::{HashSet, VecDeque}, iter::FromIterator};
 use crate::{CNF, CNFClause, CNFVar, SATSolution, Solver};
 
 pub struct CDCLSat;
@@ -35,6 +35,7 @@ struct Assignment {
 #[derive(Debug, Clone)]
 struct Variable {
     watched_occ: HashSet<ClauseId>,
+    debug_vector: Vec<ClauseId>,
     assignment: Option<Assignment>,
 }
 
@@ -67,6 +68,18 @@ impl Variable {
                     }
                     return None;
                 }).collect(),
+            debug_vector: cnf.clauses
+                .iter()
+                .enumerate()
+                .filter_map(|(index, clause)| {
+                    if clause.vars.first()?.id == var_num {
+                        return Some(index);
+                    }
+                    if clause.vars.last()?.id == var_num {
+                        return Some(index);
+                    }
+                    return None;
+                }).collect(),
             assignment 
         };
 
@@ -76,10 +89,12 @@ impl Variable {
 
     fn add_watched_occ(&mut self, index: ClauseId) {
         self.watched_occ.insert(index);
+        self.debug_vector = Vec::from_iter(self.watched_occ.clone());
     }
 
     fn remove_watched_occ(&mut self, index: ClauseId) {
         self.watched_occ.remove(&index);
+        self.debug_vector = Vec::from_iter(self.watched_occ.clone());
     }
 }
 
@@ -222,7 +237,11 @@ impl DataStructures {
     }
 
     fn find_new_watched(&mut self, var_index: usize) -> bool {
-        for clause_index in self.variables[var_index].watched_occ.clone() {
+        // needs to be cloned before cause watched_occ will change its size while loop is happening 
+        // due to removing and adding new occ
+        let watched_occ: HashSet<ClauseId> = self.variables[var_index].watched_occ.clone();
+
+        'clauses: for clause_index in watched_occ {
             let clause: &mut Clause = &mut self.clauses[clause_index];
             let literals: &Vec<CNFVar> = &clause.literals;
             let watched_literals: (CNFVar, CNFVar) = clause.get_watched_lits();
@@ -234,7 +253,19 @@ impl DataStructures {
                 move_index = 1;
             }
 
-            let mut no_unit = false;
+            // check if the clause is satisfied over a watched literal already
+            let first = match self.variables[literals[watched_index[0]].id].assignment {
+                Some(assign) => assign.sign == literals[watched_index[0]].sign,
+                None => false
+            };
+            let second = match self.variables[literals[watched_index[1]].id].assignment {
+                Some(assign) => assign.sign == literals[watched_index[1]].sign,
+                None => false
+            };
+            if first || second {
+                continue 'clauses;
+            }
+
             let mut no_unassign: bool = true;
             // find new literal
             for lit_index in 0..literals.len() {
@@ -244,8 +275,7 @@ impl DataStructures {
                         // check if clause is satisfied
                         if assign.sign == literals[lit_index].sign {
                             // clause is satisfied there is no need to find a new literal
-                            no_unit = true;
-                            break;
+                            continue 'clauses;
                         } 
                     },
 
@@ -261,38 +291,60 @@ impl DataStructures {
                             clause.watched_literals[move_index] = lit_index;
                             self.variables[literals[lit_index].id].add_watched_occ(clause_index);
                             self.variables[var_index].remove_watched_occ(clause_index);
-                            no_unit = true;
-                            break;
+                            continue 'clauses;
                         }
                     }
                 }
             }
-            // if clause isnt satisfied look for units or conflicts
-            if !no_unit {
-                if no_unassign {
-                    // report conflict 
-                    return false;
-                } else {
-                    // unassigned variable is the other watched literal which means it is a unit variable
-                    match self.variables[watched_literals.0.id].assignment {
-                        Some(_) => {
-                            if !self.unit_queue.contains(&watched_literals.1) {
-                                self.unit_queue.push_back(watched_literals.1)
-                            }
-                        },
-                        None => {
-                            if !self.unit_queue.contains(&watched_literals.0) {
-                                self.unit_queue.push_back(watched_literals.0)
-                            }
-                        }
-                    }
-                } 
-            }
+            if no_unassign {
+                // report conflict 
+                return false;
+            } else {
+                // unassigned variable is the other watched literal which means it is a unit variable
+                self.enqueue_unit(watched_literals);
+            } 
         }
         true
     }
 
+    /// Method to check if one of the watched literals that has an assinged value also satisfies the 
+    /// Clause.
+    fn check_watched_lit_satisfied(&self, clause_index: usize) -> bool {
+        let watched_index: [usize; 2] = self.clauses[clause_index].watched_literals;
+        let literals: &Vec<CNFVar> = &self.clauses[clause_index].literals;
+
+        let first = match self.variables[literals[watched_index[0]].id].assignment {
+            Some(assign) => assign.sign == literals[watched_index[0]].sign,
+            None => false
+        };
+        let second = match self.variables[literals[watched_index[1]].id].assignment {
+            Some(assign) => assign.sign == literals[watched_index[1]].sign,
+            None => false
+        };
+        first || second
+    }
+
+    fn enqueue_unit(&mut self, watched_literals: (CNFVar, CNFVar)) {
+        match self.variables[watched_literals.0.id].assignment {
+            Some(_) => {
+                if !self.unit_queue.contains(&watched_literals.1) {
+                    self.unit_queue.push_back(watched_literals.1)
+                }
+            },
+            None => {
+                if !self.unit_queue.contains(&watched_literals.0) {
+                    self.unit_queue.push_back(watched_literals.0)
+                }
+            }
+        }
+
+    }
+
+
     fn backtracking(&mut self) -> bool {
+        // clear unit queue cause we are setting state back to last branching
+        self.unit_queue.clear();
+
         while let Some(assign) = self.assignment_stack.pop() {
             self.variables[assign.literal.id].assignment = None;
             if assign.assignment.reason == AssignmentType::Branching {
