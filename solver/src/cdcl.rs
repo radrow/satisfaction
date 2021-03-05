@@ -253,6 +253,7 @@ impl DataStructures {
                 move_index = 1;
             }
 
+            // todo -> into function
             // check if the clause is satisfied over a watched literal already
             let first = match self.variables[literals[watched_index[0]].id].assignment {
                 Some(assign) => assign.sign == literals[watched_index[0]].sign,
@@ -287,6 +288,7 @@ impl DataStructures {
                         // check if variable is not one of the watched variables
                         if lit_index != watched_index[0] && lit_index != watched_index[1] {
 
+                            // todo -> into function
                             // change watched variables and clauses to new ones
                             clause.watched_literals[move_index] = lit_index;
                             self.variables[literals[lit_index].id].add_watched_occ(clause_index);
@@ -307,6 +309,7 @@ impl DataStructures {
         true
     }
 
+    // todo -> use as function (maybe with unsafe)
     /// Method to check if one of the watched literals that has an assinged value also satisfies the 
     /// Clause.
     fn check_watched_lit_satisfied(&self, clause_index: usize) -> bool {
