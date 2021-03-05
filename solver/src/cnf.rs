@@ -195,7 +195,12 @@ impl CNFClause {
     /// Creates an empty CNF clause
     #[inline]
     pub fn new() -> CNFClause {
-        CNFClause { vars: vec![] }
+        CNFClause { vars: Vec::new() }
+    }
+
+    #[inline]
+    pub fn with_capacity(capacity: usize) -> CNFClause {
+        CNFClause { vars: Vec::with_capacity(capacity) }
     }
 
     /// Creates a CNF clause containing a single variable
@@ -301,6 +306,18 @@ impl std::ops::Neg for CNFVar {
     fn neg(mut self) -> Self::Output {
         self.sign = !self.sign;
         self
+    }
+}
+
+impl From<CNFVar> for (VarId, bool) {
+    fn from(lit: CNFVar) -> Self {
+        (lit.id, lit.sign)
+    }
+}
+
+impl From<&CNFVar> for (VarId, bool) {
+    fn from(lit: &CNFVar) -> Self {
+        (lit.id, lit.sign)
     }
 }
 

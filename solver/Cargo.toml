@@ -17,6 +17,9 @@ dimacs = "0.2.0"
 async-trait = "0.1.42"
 async-std = "1.9.0"
 auto_impl = "0.4.1"
+rustc-hash = "1.1.0"
+tinyset = "0.4.4"
+indexmap = "1.6.1"
 
 [dev-dependencies]
 proptest = "0.10.1"

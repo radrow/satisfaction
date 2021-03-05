@@ -1,5 +1,7 @@
 use itertools::Itertools;
-use std::{cmp::min_by, collections::{HashSet, VecDeque}};
+use std::{collections::{HashSet, VecDeque}, ops::Not};
+
+type IndexSet<V> = indexmap::IndexSet<V, std::hash::BuildHasherDefault<rustc_hash::FxHasher>>;
 
 use crate::{CNFClause, CNFVar, SATSolution, Solver, CNF};
 
@@ -31,16 +33,23 @@ struct Clause {
     watched_literals: [CNFVar; 2],
 }
 
+impl Clause {
+    /// Creates a new clause given an iterator of literals
+    /// that is assumed to contain at least two elements.
+    fn new(iter: impl Iterator<Item=CNFVar>, variables: &mut Variables) -> Clause {
+        todo!()
+    }
+}
+
 type Variables = Vec<Variable>;
 type Clauses = Vec<Clause>;
-
 
 trait BranchingStrategy {
     fn pick_literal(&self, clauses: &Clauses, variables: &Variables) -> Option<CNFVar>;
 }
 
 trait LearningScheme {
-    fn find_conflict_clause(&self, conflict_clause: ClauseId, branching_depth: usize, clauses: &Clauses, variables: &Variables) -> (Clause, usize);
+    fn find_conflict_clause(&self, empty_clause: ClauseId, branching_depth: usize, clauses: &Clauses, variables: &Variables) -> (CNFClause, usize);
 }
 
 trait ClauseDeletionStrategy {
@@ -55,6 +64,10 @@ struct ExecutionState {
 }
 
 impl ExecutionState {
+    fn new(formula: &CNF) -> ExecutionState {
+        unimplemented!()
+    }
+
     fn cdcl(
         mut self,
         branching_strategy: &impl BranchingStrategy,
@@ -111,9 +124,10 @@ impl ExecutionState {
     ) -> bool {
         let (conflict_clause, assertion_level) = learning_scheme.find_conflict_clause(empty_clause, self.branching_depth, &self.clauses, &self.variables);
 
-        // TODO: Handle watched_literals
+        let conflict_clause = Clause::new(conflict_clause.into_iter(), &mut self.variables);
         self.clauses.push(conflict_clause);
-        // TODO: More efficient 
+
+        // TODO: More efficient: e.g. Stack + dropWhile
         for variable in self.variables.iter_mut() {
             match variable.assignment {
                 Some(assign) if assign.branching_level > assertion_level => {
@@ -141,31 +155,35 @@ impl ExecutionState {
     }
 
     fn is_satisfied(&self) -> bool {
-        true
+        unimplemented!()
     }
 }
+
 
 struct RealSAT;
 
 impl LearningScheme for RealSAT {
-    fn find_conflict_clause(&self, conflict_clause: ClauseId, branching_depth: usize, clauses: &Clauses, variables: &Variables) -> (Clause, usize) {
+    fn find_conflict_clause(&self, empty_clause: ClauseId, branching_depth: usize, clauses: &Clauses, variables: &Variables) -> (CNFClause, usize) {
         // TODO: Optimize preallocation
-        let mut literal_queue: VecDeque<CNFVar> = clauses[conflict_clause].literals
+        // Start with vertices that are connected to the conflict clause
+        let mut literal_queue: IndexSet<usize> = clauses[empty_clause].literals
             .iter()
-            .cloned()
+            .map(|lit| lit.id)
             .collect();
 
-        let mut conflict_literals = Vec::with_capacity(literal_queue.len());
+        let mut clause = CNFClause::with_capacity(literal_queue.len());
 
         let mut assertion_level = 0;
-        while let Some(literal) = literal_queue.pop_back() {
-            let variable = &variables[literal.id];
+        while let Some(id) = literal_queue.pop() {
+            let variable = &variables[id];
             match variable.assignment {
+                // For each forced literal of current branching_level
+                // append connected vertices to literal queue
                 Some(Assignment{branching_level, reason: AssignmentType::Forced(reason), ..}) if branching_level == branching_depth => { 
-                    conflict_literals.extend(clauses[reason].literals.iter())
+                    literal_queue.extend(clauses[reason].literals.iter().map(|lit| lit.id))
                 },
-                Some(Assignment{sign, branching_level, reason: AssignmentType::Branching}) => {
-                    conflict_literals.push(CNFVar::new(literal.id, !sign));
+                Some(Assignment{sign, branching_level, ..}) => {
+                    clause.push(CNFVar::new(id, sign.not()));
                     if branching_level != branching_depth {
                         assertion_level = std::cmp::max(assertion_level, branching_level);
                     }
@@ -174,11 +192,9 @@ impl LearningScheme for RealSAT {
             }
         }
 
-        todo!()
+        (clause, assertion_level)
     }
 }
-
-
 
 
 struct CDCLSolver<B: BranchingStrategy, L: LearningScheme, C: ClauseDeletionStrategy> {
@@ -194,6 +210,7 @@ where
     C: ClauseDeletionStrategy,
 {
     fn solve(&self, formula: &CNF) -> SATSolution {
-        todo!()
+        let execution_state = ExecutionState::new(formula);
+        execution_state.cdcl(&self.branching_strategy, &self.learning_scheme, &self.clause_deletion_strategy)
     }
 }
