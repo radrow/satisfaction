@@ -28,6 +28,17 @@ pub struct Variable {
     pub assignment: Option<Assignment>,
 }
 
+fn order_formula(cnf: CNF) -> CNF {
+    let mut order_cnf: CNF = CNF {clauses: Vec::new(), num_variables: cnf.num_variables};
+    for cnf_clause in cnf.clauses {
+        let mut cnf_variables = cnf_clause.vars.clone();
+        cnf_variables.sort();
+        cnf_variables.dedup();
+        order_cnf.clauses.push(CNFClause {vars: cnf_variables});
+    }
+    order_cnf
+}
+
 impl Variable {
     fn new(cnf: &CNF, var_num: usize) -> Variable {
         // default assignment if the variable is not contained in any clause and is empty
@@ -97,8 +108,6 @@ impl Clause {
     fn new(cnf_clause: &CNFClause) -> Clause {
         // remove douplicated variables for active_lit, because they count as only 1 active literal
         let mut cnf_variables = cnf_clause.vars.clone();
-        cnf_variables.sort();
-        cnf_variables.dedup();
         cnf_variables.iter_mut().for_each(|var| var.id -= 1);
 
         // assign the first and the last literal as watched literals
@@ -180,14 +189,16 @@ where B: BranchingStrategy,
       C: ClauseDeletionStrategy {
 
     fn new(formula: &CNF) -> ExecutionState<B, L, C> {
-        let variables = (1..=formula.num_variables)
-            .map(|index| Variable::new(formula, index))
-            .collect();
+        // TODO: Avoid cloning
+        let ordered_cnf: CNF = order_formula(formula.clone());
+        let variables = (1..=ordered_cnf.num_variables)
+                .map(|index| Variable::new(&ordered_cnf, index))
+                .collect();
 
-        let clauses = formula.clauses
-            .iter()
-            .map(|cnf_clause| Clause::new(cnf_clause))
-            .collect();
+        let clauses = ordered_cnf.clauses
+                .iter()
+                .map(|cnf_clause| Clause::new(cnf_clause))
+                .collect(); 
 
         let unit_queue = IndexMap::with_capacity_and_hasher(formula.num_variables, BuildHasherDefault::default());
         let assignment_stack= Vec::with_capacity(formula.num_variables);
