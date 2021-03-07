@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use std::{borrow::BorrowMut, cell::RefCell, collections::{HashSet, VecDeque}, marker::PhantomData, ops::Not, rc::Rc};
+use std::{cell::RefCell, collections::{HashSet, HashMap, VecDeque}, marker::PhantomData, ops::Not, rc::Rc};
 
 type IndexSet<V> = indexmap::IndexSet<V, std::hash::BuildHasherDefault<rustc_hash::FxHasher>>;
 
@@ -66,7 +66,7 @@ trait LearningScheme: Initialisation+Update {
 }
 
 trait ClauseDeletionStrategy: Initialisation+Update {
-    fn delete_clause(&mut self, clauses: &mut Clauses, variables: &mut Variables);
+    fn delete_clause(&mut self, clauses: &mut Clauses, variables: &mut Variables) -> Vec<ClauseId>;
 }
 
 
@@ -285,5 +285,55 @@ where
     fn solve(&self, formula: &CNF) -> SATSolution {
         let execution_state = ExecutionState::<B, L, C>::new(formula);
         execution_state.cdcl()
+    }
+}
+
+
+struct BerkMin {
+    activity: HashMap<ClauseId, usize>,
+    threshold: usize,
+}
+
+impl Initialisation for BerkMin {
+    fn initialise(_clauses: &Clauses, _variables: &Variables) -> Self where Self: Sized {
+        BerkMin {
+            activity: HashMap::new(),
+            threshold: 60,
+        }
+    }
+}
+
+impl Update for BerkMin {
+    fn on_learn(&mut self, _learned_clause: &Clause, _clauses: &Clauses, _variables: &Variables) {
+        self.activity.entry(self.activity.len()).or_insert(0);
+    }
+
+    fn on_conflict(&mut self, empty_clause: ClauseId, _clauses: &Clauses, _variables: &Variables) {
+        self.activity.entry(empty_clause).and_modify(|x| *x += 1).or_insert(1);
+    }
+}
+
+impl ClauseDeletionStrategy for BerkMin {
+    fn delete_clause(&mut self, clauses: &mut Clauses, _variables: &mut Variables) -> Vec<ClauseId> {
+        let young = &clauses[0..&clauses.len() / 16];
+        let old = &clauses[&clauses.len() / 16..clauses.len()];
+
+        let (young_out, young_in) : (Vec<(usize, &Clause)>, Vec<(usize, &Clause)>) = young
+            .iter()
+            .enumerate()
+            .partition(|(i, c)| c.literals.len() > 42 && self.activity[i] < 7);
+        let (old_out, old_in) : (Vec<(usize, &Clause)>, Vec<(usize, &Clause)>) = old
+            .iter()
+            .enumerate()
+            .partition(|(i, c)| c.literals.len() > 8 && self.activity[i] < self.threshold);
+
+        self.threshold += 1;
+
+        self.activity = old_in.iter().chain(young_in.iter())
+            .enumerate()
+            .map(|(new_i, (i, _))| (new_i, self.activity[i]))
+            .collect();
+
+        old_out.iter().chain(young_out.iter()).map(|(i, _)| *i).collect()
     }
 }

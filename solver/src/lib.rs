@@ -3,7 +3,6 @@ extern crate async_trait;
 
 /// Branching heuristics one can choose from to customize the [`SatisfactionSolver`].
 mod branching_strategy;
-mod deletion_strategy;
 pub mod bruteforce;
 /// Module containing the reference solver cadical.
 mod cadical_solver;
@@ -20,6 +19,7 @@ pub mod sat_solver;
 /// for one that can be interrupted or timed.
 pub mod solvers;
 //pub mod learning_schemes;
+//pub mod deletion_strategies;
 
 pub use branching_strategy::{BranchingStrategy, JeroslawWang, NaiveBranching, DLCS, DLIS, MOM};
 pub use bruteforce::Bruteforce;
