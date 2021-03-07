@@ -24,7 +24,6 @@ pub struct Assignment {
 #[derive(Debug, Clone)]
 pub struct Variable {
     pub watched_occ: HashSet<ClauseId>,
-    debug_vector: Vec<ClauseId>,
     pub assignment: Option<Assignment>,
 }
 
@@ -55,7 +54,8 @@ impl Variable {
                 }
             }
         });
-        let variable = Variable {
+
+        Variable {
             watched_occ: cnf.clauses
                 .iter()
                 .enumerate()
@@ -68,33 +68,16 @@ impl Variable {
                     }
                     return None;
                 }).collect(),
-            debug_vector: cnf.clauses
-                .iter()
-                .enumerate()
-                .filter_map(|(index, clause)| {
-                    if clause.vars.first()?.id == var_num {
-                        return Some(index);
-                    }
-                    if clause.vars.last()?.id == var_num {
-                        return Some(index);
-                    }
-                    return None;
-                }).collect(),
             assignment 
-        };
-
-
-        variable
+        }
     }
 
     fn add_watched_occ(&mut self, index: ClauseId) {
         self.watched_occ.insert(index);
-        self.debug_vector = Vec::from_iter(self.watched_occ.clone());
     }
 
     fn remove_watched_occ(&mut self, index: ClauseId) {
         self.watched_occ.remove(&index);
-        self.debug_vector = Vec::from_iter(self.watched_occ.clone());
     }
 }
 
@@ -106,7 +89,7 @@ pub struct Clause {
 
 impl Clause {
     fn new(cnf_clause: &CNFClause) -> Clause {
-        // remove douplicated variables for active_lit, because they count as only 1 active literal
+        // decrement the variables by 1 to get a 0 offset
         let mut cnf_variables = cnf_clause.vars.clone();
         cnf_variables.iter_mut().for_each(|var| var.id -= 1);
 
@@ -501,7 +484,6 @@ impl LearningScheme for RealSAT {
                 _ => {},
             }
         }
-
         (clause, assertion_literal.unwrap(), assertion_level)
     }
 }
