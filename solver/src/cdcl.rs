@@ -231,10 +231,7 @@ impl DataStructures {
         let watched_occ: HashSet<ClauseId> = self.variables[var_index].watched_occ.clone();
 
         'clauses: for clause_index in watched_occ {
-            let clause: &mut Clause = &mut self.clauses[clause_index];
-            let literals: &Vec<CNFVar> = &clause.literals;
-            let watched_literals: (CNFVar, CNFVar) = clause.get_watched_lits();
-            let watched_index: [usize; 2] = clause.watched_literals;
+            let watched_literals: (CNFVar, CNFVar) = self.clauses[clause_index].get_watched_lits();
 
             // index of the watched variable that has been assigned a value
             let mut move_index: usize = 0;
@@ -242,28 +239,18 @@ impl DataStructures {
                 move_index = 1;
             }
 
-            // todo -> into function
-            // check if the clause is satisfied over a watched literal already
-            let first = match self.variables[literals[watched_index[0]].id].assignment {
-                Some(assign) => assign.sign == literals[watched_index[0]].sign,
-                None => false
-            };
-            let second = match self.variables[literals[watched_index[1]].id].assignment {
-                Some(assign) => assign.sign == literals[watched_index[1]].sign,
-                None => false
-            };
-            if first || second {
+            if self.check_watched_lit_satisfied(clause_index) {
                 continue 'clauses;
             }
 
             let mut no_unassign: bool = true;
             // find new literal
-            for lit_index in 0..literals.len() {
-                match self.variables[literals[lit_index].id].assignment {
+            for lit_index in 0..self.clauses[clause_index].literals.len() {
+                match self.variables[self.clauses[clause_index].literals[lit_index].id].assignment {
                     // Variable is assigned to a value already
                     Some(assign) => {
                         // check if clause is satisfied
-                        if assign.sign == literals[lit_index].sign {
+                        if assign.sign == self.clauses[clause_index].literals[lit_index].sign {
                             // clause is satisfied there is no need to find a new literal
                             continue 'clauses;
                         } 
@@ -274,14 +261,7 @@ impl DataStructures {
                         // unassigned variable found
                         no_unassign = false;
 
-                        // check if variable is not one of the watched variables
-                        if lit_index != watched_index[0] && lit_index != watched_index[1] {
-
-                            // todo -> into function
-                            // change watched variables and clauses to new ones
-                            clause.watched_literals[move_index] = lit_index;
-                            self.variables[literals[lit_index].id].add_watched_occ(clause_index);
-                            self.variables[var_index].remove_watched_occ(clause_index);
+                        if self.change_watched_lists(lit_index, clause_index, move_index, var_index) {
                             continue 'clauses;
                         }
                     }
@@ -298,7 +278,21 @@ impl DataStructures {
         true
     }
 
-    // todo -> use as function (maybe with unsafe)
+    fn change_watched_lists(&mut self, lit_index: usize, clause_index: usize, move_index: usize, var_index: usize) -> bool {
+        let clause: &mut Clause = &mut self.clauses[clause_index];
+        let literals: &Vec<CNFVar> = &clause.literals;
+        let watched_index: [usize; 2] = clause.watched_literals;
+
+
+        if lit_index != watched_index[0] && lit_index != watched_index[1] {
+            clause.watched_literals[move_index] = lit_index;
+            self.variables[literals[lit_index].id].add_watched_occ(clause_index);
+            self.variables[var_index].remove_watched_occ(clause_index);
+            return true
+        }
+        false
+    }
+
     /// Method to check if one of the watched literals that has an assinged value also satisfies the 
     /// Clause.
     fn check_watched_lit_satisfied(&self, clause_index: usize) -> bool {
