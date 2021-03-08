@@ -1,7 +1,9 @@
 use std::{cell::RefCell, collections::{HashSet, VecDeque}, marker::PhantomData, ops::Not, rc::Rc, hash::BuildHasherDefault, iter::FromIterator};
 use crate::{CNFClause, CNFVar, SATSolution, Solver, CNF};
 use itertools::Itertools;
+use tinyset::SetUsize;
 
+#[allow(dead_code)]
 type IndexSet<V> = indexmap::IndexSet<V, BuildHasherDefault<rustc_hash::FxHasher>>;
 type IndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<rustc_hash::FxHasher>>;
 
@@ -319,7 +321,7 @@ where B: BranchingStrategy,
         empty_clause: ClauseId,
     ) -> bool {
         self.updates.iter()
-            .for_each(|up| up.as_ref().borrow_mut().on_conflict(empty_clause, &self.clauses, &self.variables));
+            .for_each(|up| up.borrow_mut().on_conflict(empty_clause, &self.clauses, &self.variables));
 
 
         let (conflict_clause, assertion_literal, assertion_level) = match {
@@ -469,7 +471,7 @@ impl LearningScheme for RelSAT {
             .iter()
             .map(|lit| lit.id)
             .collect();
-        let mut visited: HashSet<VariableId> = literal_queue
+        let mut visited: SetUsize = literal_queue
             .iter()
             .cloned()
             .collect();
