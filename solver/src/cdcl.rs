@@ -15,12 +15,6 @@ pub enum AssignmentType {
     Known,
 }
 
-#[derive(Debug, Clone)]
-struct PrevAssignment {
-    literal: CNFVar,
-    assignment: Assignment
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct Assignment {
     pub sign: bool,
@@ -216,9 +210,6 @@ where B: BranchingStrategy,
     }
 
     fn cdcl(mut self) -> SATSolution {
-        println!("{:?}", self.variables.iter().map(|v| v.assignment.map(|a| (a.sign,a.branching_level))).collect_vec());
-        println!("{:?}\n", self.clauses);
-
         if self.inital_unit_propagation() {
             return SATSolution::Unsatisfiable;
         }
@@ -239,8 +230,9 @@ where B: BranchingStrategy,
                 })
             {
                 return SATSolution::Unsatisfiable;
+
+            // TODO: Probably redundant
             } else if self.is_satisfied() {
-                println!("Exiting");
                 break;
             }
         }
@@ -254,7 +246,6 @@ where B: BranchingStrategy,
     }
 
     fn set_variable(&mut self, literal: CNFVar, assign_type: AssignmentType) -> Option<ClauseId> {
-        println!("{:?}\t{:?}", literal, assign_type);
         // set the variable and remember the assignment
         let assignment = Assignment {
             sign: literal.sign,
@@ -263,22 +254,18 @@ where B: BranchingStrategy,
         };
 
         self.variables[literal.id].assignment = Some(assignment);
-        println!("{:?}", self.variables.iter().map(|v| v.assignment.map(|a| (a.sign,a.branching_level))).collect_vec());
         self.assignment_stack.push(literal.id);
 
 
         if self.variables[literal.id].watched_occ.len() > 0 {
             // when a set literal is also watched find a new literal to be watched
-            let x = self.find_new_watched(literal.id);
-            println!("{:?}", x);
-            return x;
+            return self.find_new_watched(literal.id);
         }
         
         None
     }
 
     fn unit_propagation(&mut self) -> Option<ClauseId> {
-        println!("Unit queue {:?}", self.unit_queue);
         while let Some((id, (sign, reason))) = self.unit_queue.pop() {
             let empty_clause = self.set_variable(CNFVar::new(id, sign), AssignmentType::Forced(reason));
             if empty_clause.is_some() {
@@ -331,7 +318,6 @@ where B: BranchingStrategy,
         &mut self,
         empty_clause: ClauseId,
     ) -> bool {
-        println!("Backtracking");
         self.updates.iter()
             .for_each(|up| up.as_ref().borrow_mut().on_conflict(empty_clause, &self.clauses, &self.variables));
 
@@ -344,7 +330,6 @@ where B: BranchingStrategy,
             Some(t) => t,
             None => return true,
         };
-        println!("{:?}", conflict_clause);
 
         let index = self.add_clause(conflict_clause);
         self.updates.iter()
@@ -363,7 +348,6 @@ where B: BranchingStrategy,
             }
         }
 
-        println!("Assertion level {:?}", assertion_level);
         self.branching_depth = assertion_level;
         self.unit_queue.clear();
         self.unit_queue.insert(assertion_literal.id, (assertion_literal.sign, index));
@@ -422,7 +406,6 @@ where B: BranchingStrategy,
                 // unassigned variable is the other watched literal which means it is a unit variable
                 let literal = self.variables[watched_literals.0.id].assignment
                     .map_or(watched_literals.0, |_| watched_literals.1);
-                println!("Unit {:?}", literal);
 
                 if self.add_to_unit_queue(literal, clause_index) { return Some(clause_index) }
             } 
@@ -491,14 +474,12 @@ impl LearningScheme for RelSAT {
             .cloned()
             .collect();
 
-        println!("{:?}", literal_queue);
 
         let mut clause = CNFClause::with_capacity(literal_queue.len());
         let mut assertion_literal = None;
         let mut assertion_level = 0;
 
         while let Some(id) = literal_queue.pop_front() {
-            println!("{:?}", literal_queue);
             let variable = &variables[id];
             match variable.assignment {
                 // For each forced literal of current branching_level
@@ -522,7 +503,6 @@ impl LearningScheme for RelSAT {
                 _ => {},
             }
         }
-        println!("{:?}", variables.iter().map(|v| v.assignment.map(|a| (a.sign,a.branching_level))).collect_vec());
         assertion_literal.map(|literal| (clause, literal, assertion_level))
     }
 }
