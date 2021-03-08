@@ -230,13 +230,7 @@ where B: BranchingStrategy,
                 .map_or(false, |conflict_clause| {
                     self.backtracking(conflict_clause)
                 })
-            {
-                return SATSolution::Unsatisfiable;
-
-            // TODO: Probably redundant
-            } else if self.is_satisfied() {
-                break;
-            }
+            { return SATSolution::Unsatisfiable; }
         }
 
         SATSolution::Satisfiable(
@@ -445,11 +439,6 @@ where B: BranchingStrategy,
             None => false
         };
         first || second
-    }
-
-    fn is_satisfied(&mut self) -> bool {
-        self.variables.iter()
-            .all(|var| var.assignment.is_some() || var.watched_occ.is_empty())
     }
 }
 
