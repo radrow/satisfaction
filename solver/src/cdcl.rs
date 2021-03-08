@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashSet, marker::PhantomData, ops::Not, rc::Rc, hash::BuildHasherDefault, iter::FromIterator};
+use std::{cell::RefCell, collections::{HashSet, VecDeque}, marker::PhantomData, ops::Not, rc::Rc, hash::BuildHasherDefault, iter::FromIterator};
 use crate::{CNFClause, CNFVar, SATSolution, Solver, CNF};
 use itertools::Itertools;
 
@@ -12,6 +12,7 @@ pub type ClauseId = usize;
 pub enum AssignmentType {
     Forced(ClauseId),
     Branching,
+    Known,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -44,7 +45,7 @@ impl Variable {
         let mut assignment: Option<Assignment> = Some(Assignment {
             sign: false,
             branching_level: 0,
-            reason: AssignmentType::Branching,
+            reason: AssignmentType::Known,
         });
         // if variable is contained in any clause set it to unassigned first
         cnf.clauses.iter().for_each(|clause| {
@@ -81,7 +82,7 @@ impl Variable {
     }
 }
 
-
+#[derive(Debug)]
 pub struct Clause {
     literals: Vec<CNFVar>,
     watched_literals: [usize; 2],
@@ -140,7 +141,7 @@ pub trait BranchingStrategy: Initialisation+Update {
 }
 
 pub trait LearningScheme: Initialisation+Update {
-    fn find_conflict_clause(&mut self, empty_clause: ClauseId, branching_depth: usize, clauses: &Clauses, variables: &Variables) -> (CNFClause, CNFVar, usize);
+    fn find_conflict_clause(&mut self, empty_clause: ClauseId, branching_depth: usize, clauses: &Clauses, variables: &Variables) -> Option<(CNFClause, CNFVar, usize)>;
 }
 
 pub trait ClauseDeletionStrategy: Initialisation+Update {
@@ -210,6 +211,9 @@ where B: BranchingStrategy,
     }
 
     fn cdcl(mut self) -> SATSolution {
+        println!("{:?}", self.variables.iter().map(|v| v.assignment.map(|a| (a.sign,a.branching_level))).collect_vec());
+        println!("{:?}\n", self.clauses);
+
         if self.inital_unit_propagation() {
             return SATSolution::Unsatisfiable;
         }
@@ -218,6 +222,7 @@ where B: BranchingStrategy,
             let mut bs = self.branching_strategy.borrow_mut();
             bs.pick_literal(&self.clauses, &self.variables)
         } {
+            self.branching_depth += 1;
             // Try to set a variable or receive the conflict clause it was not possible
             if self
                 .set_variable(literal, AssignmentType::Branching)
@@ -230,6 +235,7 @@ where B: BranchingStrategy,
             {
                 return SATSolution::Unsatisfiable;
             } else if self.is_satisfied() {
+                println!("Exiting");
                 break;
             }
         }
@@ -243,11 +249,7 @@ where B: BranchingStrategy,
     }
 
     fn set_variable(&mut self, literal: CNFVar, assign_type: AssignmentType) -> Option<ClauseId> {
-        //increase branching level
-        if assign_type == AssignmentType::Branching {
-            self.branching_depth += 1;
-        }
-
+        println!("{:?}\t{:?}", literal, assign_type);
         // set the variable and remember the assignment
         let assignment = Assignment {
             sign: literal.sign,
@@ -256,17 +258,22 @@ where B: BranchingStrategy,
         };
 
         self.variables[literal.id].assignment = Some(assignment);
+        println!("{:?}", self.variables.iter().map(|v| v.assignment.map(|a| (a.sign,a.branching_level))).collect_vec());
         self.assignment_stack.push(literal.id);
+
 
         if self.variables[literal.id].watched_occ.len() > 0 {
             // when a set literal is also watched find a new literal to be watched
-            return self.find_new_watched(literal.id);
+            let x = self.find_new_watched(literal.id);
+            println!("{:?}", x);
+            return x;
         }
         
         None
     }
 
     fn unit_propagation(&mut self) -> Option<ClauseId> {
+        println!("Unit queue {:?}", self.unit_queue);
         while let Some((id, (sign, reason))) = self.unit_queue.pop() {
             let empty_clause = self.set_variable(CNFVar::new(id, sign), AssignmentType::Forced(reason));
             if empty_clause.is_some() {
@@ -292,18 +299,23 @@ where B: BranchingStrategy,
 
     fn add_to_unit_queue(&mut self, literal: CNFVar, reason: ClauseId) -> bool {
         self.unit_queue.insert(literal.id, (literal.sign, reason))
-            .map_or(false, |(sign, _)| sign == literal.sign)
+            .map_or(false, |(sign, _)| sign != literal.sign)
     }
 
     fn add_clause(&mut self, literals: CNFClause) -> usize {
         let index = self.clauses.len();
+        let watched_literals = match literals.len() {
+            0 => unreachable!(),
+            1 => [0,0],
+            _ => [0,1],
+        };
         for lit in literals.vars.iter() {
             self.variables[lit.id].add_watched_occ(index);
         }
 
         let clause = Clause {
             literals: literals.vars,
-            watched_literals: [0,1],
+            watched_literals,
         };
 
         self.clauses.push(clause);
@@ -314,23 +326,30 @@ where B: BranchingStrategy,
         &mut self,
         empty_clause: ClauseId,
     ) -> bool {
+        println!("Backtracking");
         self.updates.iter()
             .for_each(|up| up.as_ref().borrow_mut().on_conflict(empty_clause, &self.clauses, &self.variables));
 
-        let (conflict_clause, assertion_literal, assertion_level) = {
-            let mut ls = self.learning_scheme.as_ref().borrow_mut();
+
+        let (conflict_clause, assertion_literal, assertion_level) = match {
+            let mut ls = self.learning_scheme.borrow_mut();
             ls.find_conflict_clause(empty_clause, self.branching_depth, &self.clauses, &self.variables)
+        } {
+            Some((_,_,l)) if l == self.branching_depth => return true,
+            Some(t) => t,
+            None => return true,
         };
+        println!("{:?}", conflict_clause);
 
         let index = self.add_clause(conflict_clause);
         self.updates.iter()
-            .for_each(|up| up.as_ref().borrow_mut().on_learn(index, &self.clauses, &self.variables));
+            .for_each(|up| up.borrow_mut().on_learn(index, &self.clauses, &self.variables));
 
         while let Some(id) = self.assignment_stack.pop() {
             match self.variables[id].assignment {
                 Some(assign) if assign.branching_level > assertion_level => {
                     self.variables[id].assignment = None;
-                    self.updates.iter().for_each(|up| up.as_ref().borrow_mut().on_unassign(id, &self.clauses, &self.variables));
+                    self.updates.iter().for_each(|up| up.borrow_mut().on_unassign(id, &self.clauses, &self.variables));
                 },
                 _ => {
                     self.assignment_stack.push(id);
@@ -339,6 +358,7 @@ where B: BranchingStrategy,
             }
         }
 
+        println!("Assertion level {:?}", assertion_level);
         self.branching_depth = assertion_level;
         self.unit_queue.clear();
         self.unit_queue.insert(assertion_literal.id, (assertion_literal.sign, index));
@@ -389,13 +409,15 @@ where B: BranchingStrategy,
                     }
                 }
             }
+
             if no_unassign {
                 // report conflict 
                 return Some(clause_index);
             } else {
                 // unassigned variable is the other watched literal which means it is a unit variable
                 let literal = self.variables[watched_literals.0.id].assignment
-                    .map_or(watched_literals.1, |_| watched_literals.0);
+                    .map_or(watched_literals.0, |_| watched_literals.1);
+                println!("Unit {:?}", literal);
 
                 if self.add_to_unit_queue(literal, clause_index) { return Some(clause_index) }
             } 
@@ -436,41 +458,52 @@ where B: BranchingStrategy,
     }
 
     fn is_satisfied(&mut self) -> bool {
-        true
+        self.variables.iter()
+            .all(|var| var.assignment.is_some() || var.watched_occ.is_empty())
     }
 }
 
 
-struct RealSAT;
+pub struct RelSAT;
 
-impl Initialisation for RealSAT {
+impl Initialisation for RelSAT {
     fn initialise(_clauses: &Clauses, _variables: &Variables) -> Self where Self: Sized {
-        RealSAT
+        RelSAT
     }
 }
-impl Update for RealSAT {}
+impl Update for RelSAT {}
 
 
-impl LearningScheme for RealSAT {
-    fn find_conflict_clause(&mut self, empty_clause: ClauseId, branching_depth: usize, clauses: &Clauses, variables: &Variables) -> (CNFClause, CNFVar, usize) {
-        // TODO: Optimize preallocation
+impl LearningScheme for RelSAT {
+    fn find_conflict_clause(&mut self, empty_clause: ClauseId, branching_depth: usize, clauses: &Clauses, variables: &Variables) -> Option<(CNFClause, CNFVar, usize)> {
         // Start with vertices that are connected to the conflict clause
-        let mut literal_queue: IndexSet<VariableId> = clauses[empty_clause].literals
+        let mut literal_queue: VecDeque<VariableId> = clauses[empty_clause].literals
             .iter()
             .map(|lit| lit.id)
             .collect();
+        let mut visited: HashSet<VariableId> = literal_queue
+            .iter()
+            .cloned()
+            .collect();
+
+        println!("{:?}", literal_queue);
 
         let mut clause = CNFClause::with_capacity(literal_queue.len());
         let mut assertion_literal = None;
         let mut assertion_level = 0;
 
-        while let Some(id) = literal_queue.pop() {
+        while let Some(id) = literal_queue.pop_front() {
+            println!("{:?}", literal_queue);
             let variable = &variables[id];
             match variable.assignment {
                 // For each forced literal of current branching_level
                 // append connected vertices to literal queue
                 Some(Assignment{branching_level, reason: AssignmentType::Forced(reason), ..}) if branching_level == branching_depth => { 
-                    literal_queue.extend(clauses[reason].literals.iter().map(|lit| lit.id))
+                    for lit in clauses[reason].literals.iter() {
+                        if visited.insert(lit.id) {
+                            literal_queue.push_back(lit.id);
+                        }
+                    }
                 },
                 Some(Assignment{sign, branching_level, ..}) => {
                     let literal = CNFVar::new(id, sign.not());
@@ -484,11 +517,12 @@ impl LearningScheme for RealSAT {
                 _ => {},
             }
         }
-        (clause, assertion_literal.unwrap(), assertion_level)
+        println!("{:?}", variables.iter().map(|v| v.assignment.map(|a| (a.sign,a.branching_level))).collect_vec());
+        assertion_literal.map(|literal| (clause, literal, assertion_level))
     }
 }
 
-struct IdentityDeletionStrategy;
+pub struct IdentityDeletionStrategy;
 impl Initialisation for IdentityDeletionStrategy {
     fn initialise(_clauses: &Clauses, _variables: &Variables) -> Self where Self: Sized { IdentityDeletionStrategy }
 }
@@ -508,12 +542,26 @@ where B: BranchingStrategy,
     clause_deletion_strategy: PhantomData<C>,
 }
 
+impl<B,L,C> CDCLSolver<B,L,C>
+where B: 'static+BranchingStrategy,
+      L: 'static+LearningScheme,
+      C: 'static+ClauseDeletionStrategy {
+    pub fn new() -> CDCLSolver<B,L,C> {
+        CDCLSolver {
+            branching_strategy: PhantomData,
+            learning_scheme: PhantomData,
+            clause_deletion_strategy: PhantomData,
+        }
+    }
+}
+
+
 impl<B,L,C> Solver for CDCLSolver<B,L,C>
 where B: 'static+BranchingStrategy,
       L: 'static+LearningScheme,
       C: 'static+ClauseDeletionStrategy {
-    fn solve(&self, formula: &CNF) -> SATSolution {
-        let execution_state = ExecutionState::<B, L, C>::new(formula);
-        execution_state.cdcl()
-    }
+          fn solve(&self, formula: &CNF) -> SATSolution {
+              let execution_state = ExecutionState::<B,L,C>::new(formula);
+              execution_state.cdcl()
+          }
 }
