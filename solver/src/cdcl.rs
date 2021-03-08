@@ -15,6 +15,12 @@ pub enum AssignmentType {
     Known,
 }
 
+#[derive(Debug, Clone)]
+struct PrevAssignment {
+    literal: CNFVar,
+    assignment: Assignment
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Assignment {
     pub sign: bool,
@@ -109,7 +115,7 @@ impl Clause {
     fn get_watched_lits(&self) -> (CNFVar, CNFVar) {
         (self.literals[self.watched_literals[0]], self.literals[self.watched_literals[1]])
     }
-    
+
     fn get_first_watched(&self) -> CNFVar {
         self.literals[self.watched_literals[0]]
     }
@@ -122,7 +128,6 @@ impl Clause {
 
 pub type Clauses = Vec<Clause>;
 pub type Variables = Vec<Variable>;
-
 
 pub trait Update {
     fn on_assign(&mut self, variable: VariableId, clauses: &Clauses, variables: &Variables) {}
