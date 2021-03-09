@@ -21,6 +21,8 @@ rustc-hash = "1.1.0"
 tinyset = "0.4.4"
 indexmap = "1.6.2"
 stable-vec = "0.4.0"
+priority-queue = "1.0.5"
+take_mut = "0.2.2"
 
 [dev-dependencies]
 proptest = "0.10.1"
