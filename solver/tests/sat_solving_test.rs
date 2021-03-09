@@ -3,6 +3,7 @@ use solver::{
     CNFClause, CNFVar, CadicalSolver, JeroslawWang, NaiveBranching, SATSolution,
     SatisfactionSolver, Solver, CNF, DLCS, DLIS, MOM,
 };
+use solver::cdcl::{CDCLSolver, IdentityDeletionStrategy, RelSAT};
 use std::path::PathBuf;
 
 const MAX_NUM_VARIABLES: usize = 50;
@@ -11,6 +12,7 @@ const MAX_NUM_CLAUSES: usize = 50;
 
 fn setup_custom_solver() -> Vec<(&'static str, Box<dyn Solver>)> {
     let mut solvers: Vec<(&'static str, Box<dyn Solver>)> = Vec::new();
+    solvers.push(("CDCLSolver", Box::new(CDCLSolver::<NaiveBranching, RelSAT, IdentityDeletionStrategy>::new())));
     solvers.push(("NaiveBranching", Box::new(SatisfactionSolver::new(NaiveBranching))));
     solvers.push(("JeroslawWang", Box::new(SatisfactionSolver::new(JeroslawWang))));
     solvers.push(("DLIS", Box::new(SatisfactionSolver::new(DLIS))));
@@ -22,7 +24,7 @@ fn setup_custom_solver() -> Vec<(&'static str, Box<dyn Solver>)> {
 fn solve_custom_solvers(formula: &CNF, solvers: Vec<(&'static str, Box<dyn Solver>)>) -> SATSolution {
     let mut solutions: Vec<SATSolution> = solvers.iter()
         .map(|(name, solver)| {
-            println!("Testing {}", *name);
+            println!("\nTesting {}\n", *name);
             let solution = solver.solve(formula);
             match solution.clone() {
                 SATSolution::Satisfiable(assignment) => assert!(is_satisfied(formula.clauses.iter().cloned(), assignment), *name),
@@ -110,17 +112,11 @@ fn prescribed_instances() {
 
 #[test]
 fn failed_proptest_instance() {
-    let formula = CNF {
-        clauses: vec![
-            CNFClause {
-                vars: vec![CNFVar::new(37, false), CNFVar::new(39, false)],
-            },
-            CNFClause {
-                vars: vec![CNFVar::new(37, false), CNFVar::new(39, true)],
-            },
-        ],
-        num_variables: 39,
-    };
+    let formula = CNF::from_dimacs(
+r"
+p cnf 3 1
+2 -1 3
+").unwrap();
     let (custom, reference) = execute_solvers(&formula);
 
     assert_eq!(custom.is_sat(), reference.is_sat());
