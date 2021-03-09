@@ -1,11 +1,14 @@
-use std::{cell::RefCell, collections::{HashSet, VecDeque}, marker::PhantomData, ops::Not, rc::Rc, hash::BuildHasherDefault, iter::FromIterator};
+use std::{cell::RefCell, cmp::Reverse, collections::{HashSet, VecDeque, BinaryHeap}, iter::FromIterator, marker::PhantomData, ops::{Not, Index, IndexMut}, rc::Rc};
 use crate::{CNFClause, CNFVar, SATSolution, Solver, CNF};
 use itertools::Itertools;
 use tinyset::SetUsize;
+use stable_vec::StableVec;
+
+type BuildHasher = std::hash::BuildHasherDefault<rustc_hash::FxHasher>;
 
 #[allow(dead_code)]
-type IndexSet<V> = indexmap::IndexSet<V, BuildHasherDefault<rustc_hash::FxHasher>>;
-type IndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<rustc_hash::FxHasher>>;
+type IndexSet<V> = indexmap::IndexSet<V, BuildHasher>;
+type IndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasher>;
 
 pub type VariableId = usize;
 pub type ClauseId = usize;
@@ -122,7 +125,89 @@ impl Clause {
     }
 }
 
-pub type Clauses = Vec<Clause>;
+pub struct Clauses {
+    formula: Vec<Clause>,
+    additional_clauses: StableVec<Clause>,
+    used_indices: BinaryHeap<Reverse<usize>>,
+}
+
+impl Clauses {
+    pub fn new(formula: Vec<Clause>) -> Clauses {
+        Clauses {
+            formula,
+            additional_clauses: StableVec::new(),
+            used_indices: BinaryHeap::new(),
+        }
+    }
+
+    /// Expects that the first literal in clause is free.
+    pub fn push(&mut self, clause: CNFClause) -> usize {
+        let mut watched_literals: [usize; 2] = [0, 0];
+        if clause.len() > 0 {
+            watched_literals = [0, clause.len() - 1];
+        }
+
+        let clause = Clause {
+            literals: clause.vars,
+            watched_literals,
+        };
+
+        self.formula.len() + if let Some(Reverse(index)) = self.used_indices.pop() {
+            self.additional_clauses[index] = clause;
+            index
+        } else {
+            self.additional_clauses.push(clause)
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.formula.len() + self.additional_clauses.num_elements()
+    }
+
+    pub fn remove(&mut self, index: usize) -> (CNFVar, CNFVar) {
+        let index = index.checked_sub(self.formula.len())
+            .expect("Cannot remove clauses from the original formula!");
+
+        self.used_indices.push(Reverse(index));
+
+        self.additional_clauses.remove(index)
+            .expect("Clause to delete was already deleted!")
+            .get_watched_lits()
+    }
+}
+
+impl Index<ClauseId> for Clauses {
+    type Output = Clause;
+    fn index(&self, index: ClauseId) -> &Self::Output {
+
+        if index < self.formula.len() {
+            &self.formula[index]
+        } else {
+            &self.additional_clauses[index-self.formula.len()]
+        }
+    }
+}
+
+impl IndexMut<ClauseId> for Clauses {
+    fn index_mut(&mut self, index: ClauseId) -> &mut Self::Output {
+        if index < self.formula.len() {
+            &mut self.formula[index]
+        } else {
+            let l = self.formula.len();
+            &mut self.additional_clauses[index-l]
+        }
+    }
+}
+
+impl FromIterator<Clause> for Clauses {
+    fn from_iter<T: IntoIterator<Item=Clause>>(iter: T) -> Self {
+        Clauses::new(iter.into_iter().collect())
+    }
+}
+
+
+
+
 pub type Variables = Vec<Variable>;
 
 pub trait Update {
@@ -186,7 +271,7 @@ where B: BranchingStrategy,
                 .map(|cnf_clause| Clause::new(cnf_clause))
                 .collect(); 
 
-        let unit_queue = IndexMap::with_capacity_and_hasher(formula.num_variables, BuildHasherDefault::default());
+        let unit_queue = IndexMap::with_capacity_and_hasher(formula.num_variables, BuildHasher::default());
         let assignment_stack= Vec::with_capacity(formula.num_variables);
 
         let branching_strategy = Rc::new(RefCell::new(B::initialise(&clauses, &variables)));
@@ -292,27 +377,14 @@ where B: BranchingStrategy,
     }
 
     fn add_clause(&mut self, literals: CNFClause) -> usize {
-        let index = self.clauses.len();
+        let unit = literals.len() == 1;
+        let index = self.clauses.push(literals);
 
-        let watched_literals = match literals.len() {
-            0 => unreachable!(),
-            1 => {
-                self.variables[literals.vars[0].id].add_watched_occ(index);
-                [0,0]
-            },
-            _ => {
-                self.variables[literals.vars[0].id].add_watched_occ(index);
-                self.variables[literals.vars[1].id].add_watched_occ(index);
-                [0,1]
-            },
-        };
+        self.variables[self.clauses[index].get_first_watched().id].add_watched_occ(index);
+        if !unit {
+            self.variables[self.clauses[index].get_second_watched().id].add_watched_occ(index);
+        }
 
-        let clause = Clause {
-            literals: literals.vars,
-            watched_literals,
-        };
-
-        self.clauses.push(clause);
         index
     }
 
