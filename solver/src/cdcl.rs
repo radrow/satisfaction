@@ -142,6 +142,7 @@ pub trait BranchingStrategy: Initialisation+Update {
 }
 
 pub trait LearningScheme: Initialisation+Update {
+    /// Finds the a cut in the implication graph.
     fn find_conflict_clause(&mut self, empty_clause: ClauseId, branching_depth: usize, clauses: &Clauses, variables: &Variables) -> Option<(CNFClause, CNFVar, usize)>;
 }
 
@@ -292,14 +293,19 @@ where B: BranchingStrategy,
 
     fn add_clause(&mut self, literals: CNFClause) -> usize {
         let index = self.clauses.len();
+
         let watched_literals = match literals.len() {
             0 => unreachable!(),
-            1 => [0,0],
-            _ => [0,1],
+            1 => {
+                self.variables[literals.vars[0].id].add_watched_occ(index);
+                [0,0]
+            },
+            _ => {
+                self.variables[literals.vars[0].id].add_watched_occ(index);
+                self.variables[literals.vars[1].id].add_watched_occ(index);
+                [0,1]
+            },
         };
-        for lit in literals.vars.iter() {
-            self.variables[lit.id].add_watched_occ(index);
-        }
 
         let clause = Clause {
             literals: literals.vars,
@@ -322,7 +328,6 @@ where B: BranchingStrategy,
             let mut ls = self.learning_scheme.borrow_mut();
             ls.find_conflict_clause(empty_clause, self.branching_depth, &self.clauses, &self.variables)
         } {
-            Some((_,_,l)) if l == self.branching_depth => return true,
             Some(t) => t,
             None => return true,
         };
@@ -488,6 +493,8 @@ impl LearningScheme for RelSAT {
                     if branching_level != branching_depth {
                         assertion_level = std::cmp::max(assertion_level, branching_level);
                     } else {
+                        let last_index = clause.len()-1;
+                        clause.vars.swap(0, last_index);
                         assertion_literal = Some(literal);
                     }
                 }
