@@ -19,6 +19,7 @@ pub mod sat_solver;
 /// for one that can be interrupted or timed.
 pub mod solvers;
 //pub mod learning_schemes;
+//pub mod deletion_strategies;
 
 pub use branching_strategy::{BranchingStrategy, JeroslawWang, NaiveBranching, DLCS, DLIS, MOM};
 pub use bruteforce::Bruteforce;

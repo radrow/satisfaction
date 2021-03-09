@@ -1,4 +1,4 @@
-use std::{cell::RefCell, cmp::Reverse, collections::{HashSet, VecDeque, BinaryHeap}, iter::FromIterator, marker::PhantomData, ops::{Not, Index, IndexMut}, rc::Rc};
+use std::{cell::RefCell, cmp::Reverse, collections::{HashSet, VecDeque, BinaryHeap, HashMap}, iter::FromIterator, marker::PhantomData, ops::{Not, Index, IndexMut}, rc::Rc};
 use crate::{CNFClause, CNFVar, SATSolution, Solver, CNF};
 use itertools::Itertools;
 use tinyset::SetUsize;
@@ -153,7 +153,7 @@ impl Clauses {
         };
 
         self.formula.len() + if let Some(Reverse(index)) = self.used_indices.pop() {
-            self.additional_clauses[index] = clause;
+            self.additional_clauses.insert(index, clause);
             index
         } else {
             self.additional_clauses.push(clause)
@@ -162,6 +162,10 @@ impl Clauses {
 
     pub fn len(&self) -> usize {
         self.formula.len() + self.additional_clauses.num_elements()
+    }
+
+    pub fn len_formula(&self) -> usize {
+        self.formula.len()
     }
 
     pub fn remove(&mut self, index: usize) -> (CNFVar, CNFVar) {
@@ -179,7 +183,6 @@ impl Clauses {
 impl Index<ClauseId> for Clauses {
     type Output = Clause;
     fn index(&self, index: ClauseId) -> &Self::Output {
-
         if index < self.formula.len() {
             &self.formula[index]
         } else {
@@ -207,7 +210,6 @@ impl FromIterator<Clause> for Clauses {
 
 
 
-
 pub type Variables = Vec<Variable>;
 
 pub trait Update {
@@ -232,7 +234,7 @@ pub trait LearningScheme: Initialisation+Update {
 }
 
 pub trait ClauseDeletionStrategy: Initialisation+Update {
-    fn delete_clause(&mut self, clauses: &mut Clauses, variables: &mut Variables);
+    fn delete_clause(&mut self, clauses: &Clauses, variables: &Variables) -> Vec<ClauseId>;
 }
 
 
@@ -317,6 +319,16 @@ where B: BranchingStrategy,
                     self.backtracking(conflict_clause)
                 })
             { return SATSolution::Unsatisfiable; }
+
+            let to_delete = self.clause_deletion_strategy.borrow_mut()
+                .delete_clause(&self.clauses, &self.variables);
+
+            for clause in to_delete {
+                let w = self.clauses.remove(clause);
+
+                self.variables[w.0.id].remove_watched_occ(clause);
+                self.variables[w.1.id].remove_watched_occ(clause);
+            }
         }
 
         SATSolution::Satisfiable(
@@ -392,8 +404,10 @@ where B: BranchingStrategy,
         &mut self,
         empty_clause: ClauseId,
     ) -> bool {
-        self.updates.iter()
-            .for_each(|up| up.borrow_mut().on_conflict(empty_clause, &self.clauses, &self.variables));
+        if empty_clause >= self.clauses.len_formula() {
+            self.updates.iter()
+                .for_each(|up| up.borrow_mut().on_conflict(empty_clause, &self.clauses, &self.variables));
+        }
 
 
         let (conflict_clause, assertion_literal, assertion_level) = match {
@@ -583,7 +597,7 @@ impl Initialisation for IdentityDeletionStrategy {
 }
 impl Update for IdentityDeletionStrategy {}
 impl ClauseDeletionStrategy for IdentityDeletionStrategy {
-    fn delete_clause(&mut self, _clauses: &mut Clauses, _variables: &mut Variables) {}
+    fn delete_clause(&mut self, _clauses: &Clauses, _variables: &Variables) -> Vec<ClauseId> { Vec::new() }
 }
 
 
@@ -610,7 +624,6 @@ where B: 'static+BranchingStrategy,
     }
 }
 
-
 impl<B,L,C> Solver for CDCLSolver<B,L,C>
 where B: 'static+BranchingStrategy,
       L: 'static+LearningScheme,
@@ -619,4 +632,57 @@ where B: 'static+BranchingStrategy,
               let execution_state = ExecutionState::<B,L,C>::new(formula);
               execution_state.cdcl()
           }
+}
+
+
+pub struct BerkMin {
+    activity: HashMap<ClauseId, usize, BuildHasher>,
+    insertion_order: VecDeque<ClauseId>,
+    threshold: usize,
+}
+
+impl Initialisation for BerkMin {
+    fn initialise(_clauses: &Clauses, _variables: &Variables) -> Self where Self: Sized {
+        BerkMin {
+            activity: HashMap::default(),
+            insertion_order: VecDeque::new(),
+            threshold: 60,
+        }
+    }
+}
+
+impl Update for BerkMin {
+    fn on_learn(&mut self, learned_clause: ClauseId, _clauses: &Clauses, _variables: &Variables) {
+        self.insertion_order.push_back(learned_clause);
+        self.activity.insert(learned_clause, 0);
+    }
+
+    fn on_conflict(&mut self, empty_clause: ClauseId, _clauses: &Clauses, _variables: &Variables) {
+        *self.activity.get_mut(&empty_clause)
+            .expect("Empty clause was not registered!") +=1;
+    }
+}
+
+impl ClauseDeletionStrategy for BerkMin {
+    fn delete_clause(&mut self, clauses: &Clauses, variables: &Variables) -> Vec<ClauseId> {
+        let pct = clauses.len() / 16;
+        let unassigned = self.insertion_order.iter()
+            .cloned()
+            .filter(|c| {
+                clauses[*c].watched_literals.iter().all(|i| { variables[clauses[*c].literals[*i].id].assignment.is_none() })
+            });
+
+        let young = unassigned.clone().take(pct);
+        let old = unassigned.skip(pct);
+        
+        let to_be_deleted: SetUsize= young.filter(|id| 42 < clauses[*id].literals.len() && self.activity[id] < 7)
+            .chain(old.filter(|id| 8 < clauses[*id].literals.len() && self.activity[id] < self.threshold)).collect();
+
+        self.activity.retain(|k,_| !to_be_deleted.contains(*k));
+        self.insertion_order.retain(|k| !to_be_deleted.contains(*k));
+
+        self.threshold += 1;
+
+        to_be_deleted.into_iter().collect_vec()
+    }
 }
