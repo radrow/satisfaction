@@ -6,7 +6,7 @@ mod branching_strategy;
 pub mod bruteforce;
 /// Module containing the reference solver cadical.
 mod cadical_solver;
-mod cdcl;
+pub mod cdcl;
 /// The CNF representation of a formula
 pub mod cnf;
 /// Module that contains the custom DPLL solver
