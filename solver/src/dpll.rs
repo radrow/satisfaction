@@ -1,4 +1,4 @@
-use crate::cnf::{CNFClause, CNFVar, CNF, VarId};
+use crate::cnf::{CNFClause, CNFVar, CNF};
 use crate::solvers::InterruptibleSolver;
 use crate::{BranchingStrategy, SATSolution, Solver};
 use async_std::task::yield_now;
@@ -111,7 +111,6 @@ impl From<bool> for VarValue {
 /// * `pos_occ` - describes the positive occurrences of a variable in a clause. The clause is referenced with index given in the vector.
 /// * `neg_occ` - same as pos_occ, but for negated variables
 pub struct Variable {
-    pub index: VarId,
     pub value: VarValue,
     pub pos_occ: Vec<usize>,
     pub neg_occ: Vec<usize>,
@@ -143,7 +142,7 @@ impl Variable {
     /// #Attributes
     ///
     /// * `cnf` - A CNF-Object, which contains a CNF-Forumla
-    /// * `index` - The variable number in the CNF-Object
+    /// * `var_num` - The variable number in the CNF-Object
     ///
     /// # Example
     ///
@@ -152,9 +151,8 @@ impl Variable {
     /// let variable_1: Variable = Variable::new(cnf, 1);
     /// let variable_2: Variable = Variable::new(cnf, 2);
     /// ```
-    fn new(cnf: &CNF, index: VarId) -> Variable {
+    fn new(cnf: &CNF, var_num: usize) -> Variable {
         let mut v = Variable {
-            index: index,
             value: VarValue::Free,
             neg_occ: cnf
                 .clauses
@@ -162,7 +160,7 @@ impl Variable {
                 .enumerate()
                 .filter_map(|(index, clause)| {
                     if clause.vars.contains(&CNFVar {
-                        id: index,
+                        id: var_num,
                         sign: false,
                     }) {
                         Some(index)
@@ -177,7 +175,7 @@ impl Variable {
                 .enumerate()
                 .filter_map(|(index, clause)| {
                     if clause.vars.contains(&CNFVar {
-                        id: index,
+                        id: var_num,
                         sign: true,
                     }) {
                         Some(index)
@@ -586,3 +584,4 @@ impl DataStructures {
         println!("");
     }
 }
+
