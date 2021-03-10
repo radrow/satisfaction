@@ -255,8 +255,34 @@ fn preprocessing() {
 
 }
 
-fn find_unit_clauses() {
+fn find_unit_clauses(cnf: &mut CNF, unit_queue: &mut IndexMap<VariableId, (bool, ClauseId)>) -> bool{
+    let mut no_error = true;
+    cnf.clauses = cnf.clauses.iter().enumerate().filter_map(|(i, clause)| {
+        if clause.vars.len() == 1 {
+            let variable: CNFVar = clause.vars[0].clone();
+            if unit_queue.contains_key(&(variable.id-1)) {
+                if let Some(var) = unit_queue.get_key_value(&(variable.id-1)) {
+                    if var.1.0 != variable.sign {
+                        no_error = false;
+                    }
+                }
 
+            }
+            unit_queue.insert(variable.id-1, (variable.sign, i));
+        }       
+        if clause.vars.len() == 1 {
+            None
+        } else {
+            Some(clause.clone())
+        }
+    }).collect();
+    no_error 
+}
+
+fn mark_units_as_none(variables: &mut Variables, unit_queue: &mut IndexMap<VariableId, (bool, ClauseId)>) {
+    for unit_var in unit_queue {
+        variables[*unit_var.0].assignment = None;
+    }
 }
 
 
@@ -265,26 +291,32 @@ where B: BranchingStrategy,
       L: LearningScheme,
       C: ClauseDeletionStrategy {
 
-    fn new(formula: &CNF) -> ExecutionState<B, L, C> {
-        // TODO: Avoid cloning
-        let ordered_cnf: CNF = order_formula(formula);
-        let variables = (1..=ordered_cnf.num_variables)
+    fn new(formula: &CNF) -> Option<ExecutionState<B, L, C>> {
+        let mut unit_queue = IndexMap::with_capacity_and_hasher(formula.num_variables, BuildHasher::default());
+
+        let mut ordered_cnf: CNF = order_formula(formula);
+        if !find_unit_clauses(&mut ordered_cnf, &mut unit_queue) {
+            return None;
+        }
+
+        let mut variables = (1..=ordered_cnf.num_variables)
                 .map(|index| Variable::new(&ordered_cnf, index))
                 .collect();
+
+        mark_units_as_none(&mut variables, &mut unit_queue);
 
         let clauses = ordered_cnf.clauses
                 .iter()
                 .map(|cnf_clause| Clause::new(cnf_clause))
                 .collect(); 
 
-        let unit_queue = IndexMap::with_capacity_and_hasher(formula.num_variables, BuildHasher::default());
         let assignment_stack= Vec::with_capacity(formula.num_variables);
 
         let branching_strategy = Rc::new(RefCell::new(B::initialise(&clauses, &variables)));
         let learning_scheme = Rc::new(RefCell::new(L::initialise(&clauses, &variables)));
         let clause_deletion_strategy = Rc::new(RefCell::new(C::initialise(&clauses, &variables)));
 
-        ExecutionState {
+        Some(ExecutionState {
             clauses,
             variables,
             branching_depth: 0,
@@ -300,11 +332,11 @@ where B: BranchingStrategy,
             branching_strategy,
             learning_scheme,
             clause_deletion_strategy,
-        }
+        })
     }
 
     fn cdcl(mut self) -> SATSolution {
-        if self.inital_unit_propagation() {
+        if self.unit_propagation().is_some() {
             return SATSolution::Unsatisfiable;
         }
 
@@ -622,7 +654,10 @@ where B: 'static+BranchingStrategy,
       L: 'static+LearningScheme,
       C: 'static+ClauseDeletionStrategy {
           fn solve(&self, formula: &CNF) -> SATSolution {
-              let execution_state = ExecutionState::<B,L,C>::new(formula);
-              execution_state.cdcl()
+              if let Some(execution_state) = ExecutionState::<B,L,C>::new(formula) {
+                  execution_state.cdcl()
+              } else {
+                  return SATSolution::Unsatisfiable;
+              }
           }
 }
