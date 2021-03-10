@@ -33,9 +33,9 @@ pub struct Variable {
     pub assignment: Option<Assignment>,
 }
 
-fn order_formula(cnf: CNF) -> CNF {
+fn order_formula(cnf: &CNF) -> CNF {
     let mut order_cnf: CNF = CNF {clauses: Vec::new(), num_variables: cnf.num_variables};
-    for cnf_clause in cnf.clauses {
+    for cnf_clause in &cnf.clauses {
         let mut cnf_variables = cnf_clause.vars.clone();
         cnf_variables.sort();
         cnf_variables.dedup();
@@ -205,9 +205,6 @@ impl FromIterator<Clause> for Clauses {
     }
 }
 
-
-
-
 pub type Variables = Vec<Variable>;
 
 pub trait Update {
@@ -254,6 +251,15 @@ where B: 'static+BranchingStrategy,
     updates: Vec<Rc<RefCell<dyn Update>>>,
 }
 
+fn preprocessing() {
+
+}
+
+fn find_unit_clauses() {
+
+}
+
+
 impl<B,L,C> ExecutionState<B,L,C>
 where B: BranchingStrategy,
       L: LearningScheme,
@@ -261,7 +267,7 @@ where B: BranchingStrategy,
 
     fn new(formula: &CNF) -> ExecutionState<B, L, C> {
         // TODO: Avoid cloning
-        let ordered_cnf: CNF = order_formula(formula.clone());
+        let ordered_cnf: CNF = order_formula(formula);
         let variables = (1..=ordered_cnf.num_variables)
                 .map(|index| Variable::new(&ordered_cnf, index))
                 .collect();
