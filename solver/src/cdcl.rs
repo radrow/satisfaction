@@ -3,6 +3,8 @@ use crate::{CNFClause, CNFVar, SATSolution, Solver, CNF};
 use itertools::Itertools;
 use tinyset::SetUsize;
 use stable_vec::StableVec;
+use crate::solvers::{InterruptibleSolver, FlagWaiter};
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 
 type BuildHasher = std::hash::BuildHasherDefault<rustc_hash::FxHasher>;
 
@@ -238,11 +240,7 @@ pub trait ClauseDeletionStrategy: Initialisation+Update {
 }
 
 
-struct ExecutionState<B,L,C>
-where B: 'static+BranchingStrategy,
-      L: 'static+LearningScheme,
-      C: 'static+ClauseDeletionStrategy {
-
+struct ExecutionState<B,L,C> {
     clauses: Clauses,
     variables: Variables,
     branching_depth: usize,
@@ -256,10 +254,13 @@ where B: 'static+BranchingStrategy,
     updates: Vec<Rc<RefCell<dyn Update>>>,
 }
 
+unsafe impl<B,L,C> Sync for ExecutionState<B,L,C> {}
+unsafe impl<B,L,C> Send for ExecutionState<B,L,C> {}
+
 impl<B,L,C> ExecutionState<B,L,C>
-where B: BranchingStrategy,
-      L: LearningScheme,
-      C: ClauseDeletionStrategy {
+where B: 'static+BranchingStrategy,
+      L: 'static+LearningScheme,
+      C: 'static+ClauseDeletionStrategy {
 
     fn new(formula: &CNF) -> ExecutionState<B, L, C> {
         // TODO: Avoid cloning
@@ -330,6 +331,53 @@ where B: BranchingStrategy,
                 self.variables[w.1.id].remove_watched_occ(clause);
             }
         }
+
+        SATSolution::Satisfiable(
+            self.variables
+                .into_iter()
+                .map(|var| var.assignment.map(|a| a.sign).unwrap_or(false))
+                .collect_vec(),
+        )
+    }
+
+    fn interruptible_cdcl(mut self, flag: Arc<AtomicBool>) -> SATSolution {
+        if self.inital_unit_propagation() {
+            flag.store(true, Ordering::Relaxed);
+            return SATSolution::Unsatisfiable;
+        }
+
+        while let Some(literal) = { 
+            let mut bs = self.branching_strategy.borrow_mut();
+            bs.pick_literal(&self.clauses, &self.variables)
+        } {
+            self.branching_depth += 1;
+            // Try to set a variable or receive the conflict clause it was not possible
+            if self
+                .set_variable(literal, AssignmentType::Branching)
+                // If there was no conflict, eliminate unit clauses
+                .or(self.unit_propagation())
+                // If there was a conflict backtrack; return true if backtracking failed
+                .map_or(false, |conflict_clause| {
+                    self.backtracking(conflict_clause)
+                }) { 
+                    flag.store(true, Ordering::Relaxed);
+                    return SATSolution::Unsatisfiable;
+            }
+
+            if !flag.load(Ordering::Relaxed) { return SATSolution::Unknown }
+
+            let to_delete = self.clause_deletion_strategy.borrow_mut()
+                .delete_clause(&self.clauses, &self.variables);
+
+            for clause in to_delete {
+                let w = self.clauses.remove(clause);
+
+                self.variables[w.0.id].remove_watched_occ(clause);
+                self.variables[w.1.id].remove_watched_occ(clause);
+            }
+        }
+
+        flag.store(true, Ordering::Relaxed);
 
         SATSolution::Satisfiable(
             self.variables
@@ -631,6 +679,19 @@ where B: 'static+BranchingStrategy,
           fn solve(&self, formula: &CNF) -> SATSolution {
               let execution_state = ExecutionState::<B,L,C>::new(formula);
               execution_state.cdcl()
+          }
+}
+
+#[async_trait]
+impl<B,L,C> InterruptibleSolver for CDCLSolver<B,L,C>
+where B: 'static+Send+Sync+BranchingStrategy,
+      L: 'static+Send+Sync+LearningScheme,
+      C: 'static+Send+Sync+ClauseDeletionStrategy {
+          async fn solve_interruptible(&self, formula: &CNF) -> SATSolution {
+              let execution_state = ExecutionState::<B,L,C>::new(formula);
+              FlagWaiter::start(move |flag| {
+                  execution_state.interruptible_cdcl(flag)
+              }).await
           }
 }
 

@@ -6,7 +6,8 @@ use config::Config;
 use plotting::plot_runtimes;
 use solver::{
     solvers::{InterruptibleSolver, TimeLimitedSolver, TimedSolver},
-    SATSolution, SatisfactionSolver, CNF,
+    SATSolution, SatisfactionSolver, CNF, NaiveBranching,
+    cdcl::{CDCLSolver, BerkMin, RelSAT},
 };
 use std::{
     collections::HashMap,
@@ -65,6 +66,10 @@ fn make_config<'a>() -> Config {
         (
             "Jeroslaw-Wang".to_string(),
             Box::new(SatisfactionSolver::new(solver::JeroslawWang)),
+        ),
+        (
+            "CDCLSolver".to_string(),
+            Box::new(CDCLSolver::<NaiveBranching, RelSAT, BerkMin>::new()),
         ),
     ];
 
