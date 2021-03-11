@@ -235,8 +235,11 @@ pub trait ClauseDeletionStrategy: Initialisation+Update {
 
 /// function to remove the case (a v !b) and (!a v b)
 fn equivalent_substitution(cnf: &mut CNF) {
+    // only look at clauses that are relevant and have size of 2
     let small_clauses: Vec<(usize, &CNFClause)> = cnf.clauses.iter().enumerate().filter(|(i, clause)| clause.len() == 2).collect();
     let mut remove_indices: HashSet<usize> = HashSet::new();
+    
+    // compare each small clause with the other small clauses if they can be removed
     for orign_clause in &small_clauses {
         for comp_clause in &small_clauses {
             if (orign_clause.1.vars[0].id == comp_clause.1.vars[0].id && orign_clause.1.vars[0].sign != comp_clause.1.vars[0].sign)
@@ -244,6 +247,8 @@ fn equivalent_substitution(cnf: &mut CNF) {
 
                 if (orign_clause.1.vars[1].id == comp_clause.1.vars[0].id && orign_clause.1.vars[1].sign != comp_clause.1.vars[0].sign)
                     || (orign_clause.1.vars[1].id == comp_clause.1.vars[1].id && orign_clause.1.vars[1].sign != comp_clause.1.vars[1].sign){
+
+                    // add to the clauses that can be removed
                     remove_indices.insert(orign_clause.0);
                     remove_indices.insert(comp_clause.0);
                 }
@@ -253,6 +258,7 @@ fn equivalent_substitution(cnf: &mut CNF) {
     // dont remove clauses if all the clauses would get lost
     if remove_indices.len() != cnf.clauses.len() {
 
+        // remove the unnessersary clauses
         cnf.clauses = cnf.clauses.iter().enumerate().filter_map(|(index, clause)| {
             if remove_indices.contains(&index) {
                 return None;
