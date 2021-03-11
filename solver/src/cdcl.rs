@@ -233,26 +233,37 @@ pub trait ClauseDeletionStrategy: Initialisation+Update {
 }
 
 
-struct ExecutionState<B,L,C>
-where B: 'static+BranchingStrategy,
-      L: 'static+LearningScheme,
-      C: 'static+ClauseDeletionStrategy {
+/// function to remove the case (a v !b) and (!a v b)
+fn equivalent_substitution(cnf: &mut CNF) {
+    let small_clauses: Vec<(usize, &CNFClause)> = cnf.clauses.iter().enumerate().filter(|(i, clause)| clause.len() == 2).collect();
+    let mut remove_indices: HashSet<usize> = HashSet::new();
+    for orign_clause in &small_clauses {
+        for comp_clause in &small_clauses {
+            if (orign_clause.1.vars[0].id == comp_clause.1.vars[0].id && orign_clause.1.vars[0].sign != comp_clause.1.vars[0].sign)
+                || (orign_clause.1.vars[0].id == comp_clause.1.vars[1].id && orign_clause.1.vars[0].sign != comp_clause.1.vars[1].sign) {
 
-    clauses: Clauses,
-    variables: Variables,
-    branching_depth: usize,
-    assignment_stack: Vec<VariableId>,
-    unit_queue: IndexMap<VariableId, (bool, ClauseId)>,
+                if (orign_clause.1.vars[1].id == comp_clause.1.vars[0].id && orign_clause.1.vars[1].sign != comp_clause.1.vars[0].sign)
+                    || (orign_clause.1.vars[1].id == comp_clause.1.vars[1].id && orign_clause.1.vars[1].sign != comp_clause.1.vars[1].sign){
+                    remove_indices.insert(orign_clause.0);
+                    remove_indices.insert(comp_clause.0);
+                }
+            }
+        }
+    }
+    // dont remove clauses if all the clauses would get lost
+    if remove_indices.len() != cnf.clauses.len() {
 
-    branching_strategy: Rc<RefCell<B>>,
-    learning_scheme: Rc<RefCell<L>>,
-    clause_deletion_strategy: Rc<RefCell<C>>,
-
-    updates: Vec<Rc<RefCell<dyn Update>>>,
+        cnf.clauses = cnf.clauses.iter().enumerate().filter_map(|(index, clause)| {
+            if remove_indices.contains(&index) {
+                return None;
+            }
+            return Some(clause.clone());
+        }).collect();
+    }
 }
 
-fn preprocessing() {
-
+fn preprocessing(cnf: &mut CNF) {
+    equivalent_substitution(cnf);
 }
 
 fn find_unit_clauses(cnf: &mut CNF, unit_queue: &mut IndexMap<VariableId, (bool, ClauseId)>) -> bool{
@@ -285,6 +296,23 @@ fn mark_units_as_none(variables: &mut Variables, unit_queue: &mut IndexMap<Varia
     }
 }
 
+struct ExecutionState<B,L,C>
+where B: 'static+BranchingStrategy,
+      L: 'static+LearningScheme,
+      C: 'static+ClauseDeletionStrategy {
+
+    clauses: Clauses,
+    variables: Variables,
+    branching_depth: usize,
+    assignment_stack: Vec<VariableId>,
+    unit_queue: IndexMap<VariableId, (bool, ClauseId)>,
+
+    branching_strategy: Rc<RefCell<B>>,
+    learning_scheme: Rc<RefCell<L>>,
+    clause_deletion_strategy: Rc<RefCell<C>>,
+
+    updates: Vec<Rc<RefCell<dyn Update>>>,
+}
 
 impl<B,L,C> ExecutionState<B,L,C>
 where B: BranchingStrategy,
@@ -298,6 +326,7 @@ where B: BranchingStrategy,
         if !find_unit_clauses(&mut ordered_cnf, &mut unit_queue) {
             return None;
         }
+        preprocessing(&mut ordered_cnf);
 
         let mut variables = (1..=ordered_cnf.num_variables)
                 .map(|index| Variable::new(&ordered_cnf, index))
