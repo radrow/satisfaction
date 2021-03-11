@@ -4,6 +4,7 @@ mod plotting;
 use clap::{App, Arg};
 use config::Config;
 use plotting::plot_runtimes;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use solver::{
     solvers::{InterruptibleSolver, TimeLimitedSolver, TimedSolver},
     SATSolution, SatisfactionSolver, CNF, NaiveBranching,
@@ -140,7 +141,7 @@ fn run_benchmark(
     max_duration: Duration,
 ) -> HashMap<String, Vec<Duration>> {
     solvers
-        .into_iter()
+        .into_par_iter()
         .map(|(name, solver)| {
             println!("Started {}", &name);
             let result = run_tests(&formulae, solver, max_duration);
