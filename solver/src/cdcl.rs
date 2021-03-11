@@ -268,8 +268,29 @@ fn equivalent_substitution(cnf: &mut CNF) {
     }
 }
 
+fn sig(clause: CNFClause, num_vars: usize) -> usize {
+    let mut mask = 1;
+    let mut result = 0;
+    for i in 0..num_vars {
+        if clause.vars.contains(&CNFVar {id: i, sign: true}) || clause.vars.contains(&CNFVar {id: i, sign: false}) {
+            result = result | mask;
+        }
+        mask = mask << 1;
+    }
+    result
+}
+
+fn subsumtion_test(clause1: CNFClause, clause2: CNFClause, num_vars: usize) -> bool {
+    let first = sig(clause1, num_vars);
+    let second = !sig(clause2, num_vars);
+    if first & second != 0 {
+        return false;
+    }
+    true
+}
+
 fn preprocessing(cnf: &mut CNF) {
-    equivalent_substitution(cnf);
+    //equivalent_substitution(cnf);
 }
 
 fn find_unit_clauses(cnf: &mut CNF, unit_queue: &mut IndexMap<VariableId, (bool, ClauseId)>) -> bool{
