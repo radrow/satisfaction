@@ -3,7 +3,7 @@ use solver::{
     CNFClause, CNFVar, CadicalSolver, JeroslawWang, NaiveBranching, SATSolution,
     SatisfactionSolver, Solver, CNF, DLCS, DLIS, MOM,
 };
-use solver::cdcl::{CDCLSolver, IdentityDeletionStrategy, RelSAT};
+use solver::cdcl::{CDCLSolver, IdentityDeletionStrategy, RelSAT, RestartNever, RestartFixed, RestartGeom, RestartLuby};
 use std::path::PathBuf;
 
 const MAX_NUM_VARIABLES: usize = 50;
@@ -12,7 +12,11 @@ const MAX_NUM_CLAUSES: usize = 50;
 
 fn setup_custom_solver() -> Vec<(&'static str, Box<dyn Solver>)> {
     let mut solvers: Vec<(&'static str, Box<dyn Solver>)> = Vec::new();
-    solvers.push(("CDCLSolver", Box::new(CDCLSolver::<NaiveBranching, RelSAT, IdentityDeletionStrategy>::new())));
+    solvers.push(("CDCL-Never", Box::new(CDCLSolver::<NaiveBranching, RelSAT, IdentityDeletionStrategy, RestartNever>::new())));
+    solvers.push(("CDCL-Fixed", Box::new(CDCLSolver::<NaiveBranching, RelSAT, IdentityDeletionStrategy, RestartFixed>::new())));
+    solvers.push(("CDCL-Geom", Box::new(CDCLSolver::<NaiveBranching, RelSAT, IdentityDeletionStrategy, RestartGeom>::new())));
+    solvers.push(("CDCL-Luby", Box::new(CDCLSolver::<NaiveBranching, RelSAT, IdentityDeletionStrategy, RestartLuby>::new())));
+
     solvers.push(("NaiveBranching", Box::new(SatisfactionSolver::new(NaiveBranching))));
     solvers.push(("JeroslawWang", Box::new(SatisfactionSolver::new(JeroslawWang))));
     solvers.push(("DLIS", Box::new(SatisfactionSolver::new(DLIS))));

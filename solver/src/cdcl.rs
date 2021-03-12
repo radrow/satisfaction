@@ -654,18 +654,19 @@ pub trait RestartPolicy: Initialisation+Update {
     fn restart(&mut self) -> bool;
 }
 
-struct RestartNever;
+pub struct RestartNever;
 impl Initialisation for RestartNever {
     fn initialise(_clauses: &Clauses, _variables: &Variables) -> RestartNever {
         RestartNever
     }
 }
+
 impl Update for RestartNever {}
 impl RestartPolicy for RestartNever {
     fn restart(&mut self) -> bool {false}
 }
 
-struct RestartFixed { conflicts: u64, rate: u64 }
+pub struct RestartFixed { conflicts: u64, rate: u64 }
 impl RestartFixed {
     pub fn new(rate: u64) -> RestartFixed {
         RestartFixed{
@@ -693,7 +694,7 @@ impl Initialisation for RestartFixed {
     }
 }
 
-struct RestartGeom { conflicts: u64, rate: u64, factor_percent: u64 }
+pub struct RestartGeom { conflicts: u64, rate: u64, factor_percent: u64 }
 impl RestartGeom {
     pub fn new(rate: u64, factor_percent: u64) -> RestartGeom {
         RestartGeom{
@@ -726,7 +727,7 @@ impl RestartPolicy for RestartGeom {
 }
 
 
-struct RestartLuby { conflicts: u64, rate: u64, luby_state: (u64, u64, u64) }
+pub struct RestartLuby { conflicts: u64, rate: u64, luby_state: (u64, u64, u64) }
 impl RestartLuby {
     fn next_luby(&mut self) -> u64 {
         let (u, v, w) = self.luby_state;
