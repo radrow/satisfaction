@@ -343,7 +343,7 @@ where B: BranchingStrategy,
 
     fn restart(&mut self) {
         self.branching_depth = 0;
-        self.unit_queue = IndexMap::with_capacity_and_hasher(self.original_formula.num_variables, BuildHasher::default());
+        self.unit_queue.clear();
         self.assignment_stack = Vec::with_capacity(self.original_formula.num_variables);
         for id in 0..self.variables.len() {
             self.variables[id].assignment = None;
@@ -654,10 +654,10 @@ pub trait RestartPolicy: Initialisation+Update {
     fn restart(&mut self) -> bool;
 }
 
-struct RestartNever {}
+struct RestartNever;
 impl Initialisation for RestartNever {
     fn initialise(_clauses: &Clauses, _variables: &Variables) -> RestartNever {
-        RestartNever{}
+        RestartNever
     }
 }
 impl Update for RestartNever {}
@@ -665,12 +665,12 @@ impl RestartPolicy for RestartNever {
     fn restart(&mut self) -> bool {false}
 }
 
-struct RestartFixed { conflicts: u64, ratio: u64 }
+struct RestartFixed { conflicts: u64, rate: u64 }
 impl RestartFixed {
-    pub fn new(ratio: u64) -> RestartFixed {
+    pub fn new(rate: u64) -> RestartFixed {
         RestartFixed{
             conflicts: 0,
-            ratio: ratio,
+            rate: rate,
         }
     }
 }
@@ -685,7 +685,7 @@ impl Initialisation for RestartFixed {
     }
 }impl RestartPolicy for RestartFixed {
     fn restart(&mut self) -> bool {
-        if self.conflicts > self.ratio {
+        if self.conflicts > self.rate {
             self.conflicts = 0;
             return true
         }
@@ -693,12 +693,12 @@ impl Initialisation for RestartFixed {
     }
 }
 
-struct RestartGeom { conflicts: u64, ratio: u64, factor_percent: u64 }
+struct RestartGeom { conflicts: u64, rate: u64, factor_percent: u64 }
 impl RestartGeom {
-    pub fn new(ratio: u64, factor_percent: u64) -> RestartGeom {
+    pub fn new(rate: u64, factor_percent: u64) -> RestartGeom {
         RestartGeom{
             conflicts: 0,
-            ratio: ratio,
+            rate: rate,
             factor_percent: factor_percent,
         }
     }
@@ -715,9 +715,9 @@ impl Initialisation for RestartGeom {
 }
 impl RestartPolicy for RestartGeom {
     fn restart(&mut self) -> bool {
-        if self.conflicts > self.ratio {
-            self.ratio *= self.factor_percent;
-            self.ratio /= 100;
+        if self.conflicts > self.rate {
+            self.rate *= self.factor_percent;
+            self.rate /= 100;
             self.conflicts = 0;
             return true
         }
@@ -726,7 +726,7 @@ impl RestartPolicy for RestartGeom {
 }
 
 
-struct RestartLuby { conflicts: u64, ratio: u64, luby_state: (u64, u64, u64) }
+struct RestartLuby { conflicts: u64, rate: u64, luby_state: (u64, u64, u64) }
 impl RestartLuby {
     fn next_luby(&mut self) -> u64 {
         let (u, v, w) = self.luby_state;
@@ -746,7 +746,7 @@ impl RestartLuby {
     pub fn new() -> RestartLuby {
         RestartLuby {
             conflicts: 0,
-            ratio: 1,
+            rate: 1,
             luby_state: (2, 1, 2), // first step already made
         }
     }
@@ -763,8 +763,8 @@ impl Initialisation for RestartLuby {
 }
 impl RestartPolicy for RestartLuby {
     fn restart(&mut self) -> bool {
-        if self.conflicts > self.ratio {
-            self.ratio = 32 * self.next_luby();
+        if self.conflicts > self.rate {
+            self.rate = 32 * self.next_luby();
             self.conflicts = 0;
             return true
         }
