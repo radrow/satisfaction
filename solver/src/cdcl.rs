@@ -323,6 +323,9 @@ where B: BranchingStrategy,
                 .or(self.unit_propagation())
                 // If there was a conflict backtrack; return true if backtracking failed
                 .map_or(false, |conflict_clause| {
+                    if self.restart_policy.borrow_mut().restart() {
+                        self.restart();
+                    }
                     self.backtracking(conflict_clause)
                 })
             { return SATSolution::Unsatisfiable; }
@@ -341,7 +344,11 @@ where B: BranchingStrategy,
     fn restart(&mut self) {
         self.branching_depth = 0;
         self.unit_queue = IndexMap::with_capacity_and_hasher(self.original_formula.num_variables, BuildHasher::default());
-        self.assignment_stack= Vec::with_capacity(self.original_formula.num_variables);
+        self.assignment_stack = Vec::with_capacity(self.original_formula.num_variables);
+        for id in 0..self.variables.len() {
+            self.variables[id].assignment = None;
+            self.updates.iter().for_each(|up| up.borrow_mut().on_unassign(id, &self.clauses, &self.variables));
+        }
     }
 
     fn set_variable(&mut self, literal: CNFVar, assign_type: AssignmentType) -> Option<ClauseId> {
