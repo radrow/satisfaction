@@ -762,6 +762,9 @@ pub struct VSIDS {
     counters: Vec<usize>
 }
 
+unsafe impl Sync for VSIDS {}
+unsafe impl Send for VSIDS {}
+
 impl VSIDS {
     #[inline]
     fn literal_to_index(literal: &CNFVar) -> usize {
