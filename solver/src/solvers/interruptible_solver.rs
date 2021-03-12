@@ -68,7 +68,7 @@ impl Drop for FlagWaiter {
 
 impl Future for FlagWaiter {
     type Output = SATSolution;
-    fn poll(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         if self.flag.load(Ordering::Relaxed) {
             Poll::Ready(self.handle
                 .take()
@@ -76,6 +76,7 @@ impl Future for FlagWaiter {
                 .join()
                 .unwrap())
         } else {
+            cx.waker().wake_by_ref();
             Poll::Pending
         }
     }
