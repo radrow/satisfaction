@@ -1,7 +1,7 @@
 use crate::{cnf, dpll};
 use auto_impl::auto_impl;
-use cnf::CNFVar;
-use dpll::{Clauses, VarValue, Variables};
+use cnf::{VarId, CNFVar};
+use dpll::{Clauses, Clause, VarValue, Variables};
 use std::cmp::Ordering;
 
 /// A trait to choose the next variable to set during DPLL algorithm.

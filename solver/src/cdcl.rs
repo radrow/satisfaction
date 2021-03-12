@@ -5,6 +5,7 @@ use tinyset::SetUsize;
 use stable_vec::StableVec;
 use crate::solvers::{InterruptibleSolver, FlagWaiter};
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use priority_queue::PriorityQueue;
 
 type BuildHasher = std::hash::BuildHasherDefault<rustc_hash::FxHasher>;
 
@@ -180,6 +181,10 @@ impl Clauses {
             .expect("Clause to delete was already deleted!")
             .get_watched_lits()
     }
+
+    pub fn iter(&self) -> impl std::iter::Iterator<Item=&Clause> {
+        self.formula.iter().chain(self.additional_clauses.values())
+    }
 }
 
 impl Index<ClauseId> for Clauses {
@@ -211,12 +216,11 @@ impl FromIterator<Clause> for Clauses {
 }
 
 
-
 pub type Variables = Vec<Variable>;
 
 pub trait Update {
     fn on_assign(&mut self, variable: VariableId, clauses: &Clauses, variables: &Variables) {}
-    fn on_unassign(&mut self, variable: VariableId, clauses: &Clauses, variables: &Variables) {}
+    fn on_unassign(&mut self, literal: CNFVar, clauses: &Clauses, variables: &Variables) {}
     fn on_learn(&mut self, learned_clause: ClauseId, clauses: &Clauses, variables: &Variables) {}
     fn on_conflict(&mut self, empty_clause: ClauseId, clauses: &Clauses, variables: &Variables) {}
     fn on_deletion(&mut self, deleted_clause: &Clause) {}
@@ -473,8 +477,10 @@ where B: 'static+BranchingStrategy,
         while let Some(id) = self.assignment_stack.pop() {
             match self.variables[id].assignment {
                 Some(assign) if assign.branching_level > assertion_level => {
-                    self.variables[id].assignment = None;
-                    self.updates.iter().for_each(|up| up.borrow_mut().on_unassign(id, &self.clauses, &self.variables));
+                    let literal = self.variables[id].assignment.take()
+                        .map(|assign| CNFVar::new(id, assign.sign))
+                        .unwrap();
+                    self.updates.iter().for_each(|up| up.borrow_mut().on_unassign(literal, &self.clauses, &self.variables));
                 },
                 _ => {
                     self.assignment_stack.push(id);
@@ -745,5 +751,104 @@ impl ClauseDeletionStrategy for BerkMin {
         self.threshold += 1;
 
         to_be_deleted.into_iter().collect_vec()
+    }
+}
+
+pub struct VSIDS {
+    resort_period: usize,
+    branchings: usize,
+    priority_queue: PriorityQueue<VariableId, *const usize, BuildHasher>,
+    scores: Vec<usize>,
+    counters: Vec<usize>
+}
+
+impl VSIDS {
+    #[inline]
+    fn literal_to_index(literal: &CNFVar) -> usize {
+        let mut index = 2*literal.id;
+        if literal.sign { index += 1; }
+        index
+    }
+    
+    fn index_to_literal(index: usize) -> CNFVar {
+        CNFVar {
+            id: index/2,
+            sign: index%2==1
+        }
+    }
+}
+
+impl Initialisation for VSIDS {
+    fn initialise(clauses: &Clauses, variables: &Variables) -> Self where Self: Sized {
+        let mut scores = std::iter::repeat(0)
+            .take(2*variables.len())
+            .collect_vec();
+        let counters = scores.clone();
+
+        for clause in clauses.iter() {
+            for lit in clause.literals.iter() {
+                scores[VSIDS::literal_to_index(lit)] += 1;
+            }
+        }
+
+
+        let priority_queue = scores
+            .iter()
+            .enumerate()
+            .map(|(id, p)| (id, p as *const usize))
+            .collect();
+
+        VSIDS {
+            resort_period: 255,
+            priority_queue,
+            branchings: 0,
+            scores,
+            counters,
+        }
+
+    }
+}
+
+impl Update for VSIDS {
+    fn on_learn(&mut self, learned_clause: ClauseId, clauses: &Clauses, _variables: &Variables) {
+        for lit in clauses[learned_clause].literals.iter() {
+            self.counters[VSIDS::literal_to_index(lit)] += 1;
+        }
+    }
+    fn on_unassign(&mut self, literal: CNFVar, _clauses: &Clauses, _variables: &Variables) {
+        let index = VSIDS::literal_to_index(&literal);
+        let p = &self.scores[index];
+        self.priority_queue.push(index, p as *const usize);
+    }
+}
+
+impl BranchingStrategy for VSIDS {
+    fn pick_literal(&mut self, _clauses: &Clauses, variables: &Variables) -> Option<CNFVar> {
+        self.branchings += 1;
+
+        if self.branchings >= self.resort_period {
+            self.branchings = 0;
+            self.scores.iter_mut()
+                .zip(self.counters.iter_mut())
+                .for_each(|(s, r)| {
+                    let new = *s/2 + *r;
+                    *s = new;
+                    *r = 0;
+                });
+
+            take_mut::take(&mut self.priority_queue, |pq| {
+                pq.into_iter()
+                    .map(std::convert::identity)
+                    .collect()
+            });
+        }
+
+        while let Some((index, _)) = self.priority_queue.pop() {
+            let lit = VSIDS::index_to_literal(index);
+            if variables[lit.id].assignment.is_none() {
+                return Some(lit);
+            }
+        }
+        None
     }
 }
