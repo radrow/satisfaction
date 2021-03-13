@@ -1,18 +1,26 @@
-use crate::cdcl::clause::Clauses;
-use crate::cdcl::restart_policies::restart_policy::RestartPolicy;
-use crate::cdcl::update::{Initialisation, Update};
-use crate::cdcl::variable::Variables;
+use super::{
+    RestartPolicy,
+    super::{
+        clause::Clauses,
+        update::Update,
+        variable::Variables,
+        abstract_factory::AbstractFactory,
+    },
+};
+
+pub struct RestartNeverInstance;
+
+impl Update for RestartNeverInstance {}
+
+impl RestartPolicy for RestartNeverInstance {
+    fn restart(&mut self) -> bool {false}
+}
 
 pub struct RestartNever;
 
-impl Initialisation for RestartNever {
-    fn initialise(_clauses: &Clauses, _variables: &Variables) -> RestartNever {
-        RestartNever
+impl AbstractFactory for RestartNever {
+    type Product = RestartNeverInstance;
+    fn create(&self, _clauses: &Clauses, _variables: &Variables) -> Self::Product {
+        RestartNeverInstance
     }
-}
-
-impl Update for RestartNever {}
-
-impl RestartPolicy for RestartNever {
-    fn restart(&mut self) -> bool {false}
 }

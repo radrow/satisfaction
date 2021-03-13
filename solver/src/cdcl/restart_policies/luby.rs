@@ -1,11 +1,16 @@
-use crate::cdcl::clause::{ClauseId, Clauses};
-use crate::cdcl::restart_policies::restart_policy::RestartPolicy;
-use crate::cdcl::update::{Initialisation, Update};
-use crate::cdcl::variable::Variables;
+use super::{
+    RestartPolicy,
+    super::{
+        clause::{ClauseId, Clauses},
+        update::Update,
+        variable::Variables,
+        abstract_factory::AbstractFactory,
+    },
+};
 
-pub struct RestartLuby { conflicts: u64, rate: u64, luby_state: (u64, u64, u64) }
+pub struct RestartLubyInstance { conflicts: u64, rate: u64, luby_state: (u64, u64, u64) }
 
-impl RestartLuby {
+impl RestartLubyInstance {
     fn next_luby(&mut self) -> u64 {
         let (u, v, w) = self.luby_state;
         self.luby_state =
@@ -20,29 +25,15 @@ impl RestartLuby {
             };
         v
     }
-
-    pub fn new() -> RestartLuby {
-        RestartLuby {
-            conflicts: 0,
-            rate: 1,
-            luby_state: (2, 1, 2), // first step already made
-        }
-    }
 }
 
-impl Update for RestartLuby {
+impl Update for RestartLubyInstance {
     fn on_conflict(&mut self, _empty_clause: ClauseId, _clauses: &Clauses, _variables: &Variables) {
         self.conflicts += 1;
     }
 }
 
-impl Initialisation for RestartLuby {
-    fn initialise(_clauses: &Clauses, _variables: &Variables) -> RestartLuby {
-        RestartLuby::new()
-    }
-}
-
-impl RestartPolicy for RestartLuby {
+impl RestartPolicy for RestartLubyInstance {
     fn restart(&mut self) -> bool {
         if self.conflicts > self.rate {
             self.rate = 32 * self.next_luby();
@@ -50,5 +41,24 @@ impl RestartPolicy for RestartLuby {
             return true
         }
         false
+    }
+}
+
+pub struct RestartLuby(u64);
+
+impl AbstractFactory for RestartLuby {
+    type Product = RestartLubyInstance;
+    fn create(&self, _clauses: &Clauses, _variables: &Variables) -> Self::Product {
+        RestartLubyInstance {
+            conflicts: 0,
+            rate: self.0,
+            luby_state: (2, 1, 2), // first step already made
+        }
+    }
+}
+
+impl Default for RestartLuby {
+    fn default() -> Self {
+        RestartLuby(1)
     }
 }

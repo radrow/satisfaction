@@ -1,33 +1,22 @@
-use crate::cdcl::clause::{ClauseId, Clauses};
-use crate::cdcl::restart_policies::restart_policy::RestartPolicy;
-use crate::cdcl::update::{Initialisation, Update};
-use crate::cdcl::variable::Variables;
+use super::{
+    RestartPolicy,
+    super::{
+        clause::{ClauseId, Clauses},
+        update::Update,
+        variable::Variables,
+        abstract_factory::AbstractFactory,
+    },
+};
 
-pub struct RestartGeom { conflicts: u64, rate: u64, factor_percent: u64 }
+pub struct RestartGeomInstance { conflicts: u64, rate: u64, factor_percent: u64 }
 
-impl RestartGeom {
-    pub fn new(rate: u64, factor_percent: u64) -> RestartGeom {
-        RestartGeom{
-            conflicts: 0,
-            rate,
-            factor_percent,
-        }
-    }
-}
-
-impl Update for RestartGeom {
+impl Update for RestartGeomInstance {
     fn on_conflict(&mut self, _empty_clause: ClauseId, _clauses: &Clauses, _variables: &Variables) {
         self.conflicts += 1;
     }
 }
 
-impl Initialisation for RestartGeom {
-    fn initialise(_clauses: &Clauses, _variables: &Variables) -> RestartGeom {
-        RestartGeom::new(100, 150)
-    }
-}
-
-impl RestartPolicy for RestartGeom {
+impl RestartPolicy for RestartGeomInstance {
     fn restart(&mut self) -> bool {
         if self.conflicts > self.rate {
             self.rate *= self.factor_percent;
@@ -36,5 +25,30 @@ impl RestartPolicy for RestartGeom {
             return true
         }
         false
+    }
+}
+
+pub struct RestartGeom {
+    rate: u64,
+    factor_percent: u64,
+}
+
+impl AbstractFactory for RestartGeom {
+    type Product = RestartGeomInstance;
+    fn create(&self, _clauses: &Clauses, _variables: &Variables) -> Self::Product {
+        RestartGeomInstance {
+            conflicts: 0,
+            rate: self.rate,
+            factor_percent: self.factor_percent,
+        }
+    }
+}
+
+impl Default for RestartGeom {
+    fn default() -> Self {
+        RestartGeom {
+            rate: 100,
+            factor_percent: 150,
+        }
     }
 }

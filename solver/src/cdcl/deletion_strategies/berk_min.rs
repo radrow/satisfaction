@@ -3,29 +3,24 @@ use std::collections::VecDeque;
 use itertools::Itertools;
 use tinyset::SetUsize;
 
-use crate::cdcl::clause::{ClauseId, Clauses};
-use crate::cdcl::deletion_strategies::deletion_strategy::ClauseDeletionStrategy;
-use crate::cdcl::update::{Initialisation, Update};
-use crate::cdcl::util::HashMap;
-use crate::cdcl::variable::Variables;
+use super::{
+    ClauseDeletionStrategy,
+    super::{
+        clause::{ClauseId, Clauses},
+        update::Update,
+        util::HashMap,
+        variable::Variables,
+        abstract_factory::AbstractFactory,
+    },
+};
 
-pub struct BerkMin {
+pub struct BerkMinInstance {
     activity: HashMap<ClauseId, usize>,
     insertion_order: VecDeque<ClauseId>,
     threshold: usize,
 }
 
-impl Initialisation for BerkMin {
-    fn initialise(_clauses: &Clauses, _variables: &Variables) -> Self where Self: Sized {
-        BerkMin {
-            activity: HashMap::default(),
-            insertion_order: VecDeque::new(),
-            threshold: 60,
-        }
-    }
-}
-
-impl Update for BerkMin {
+impl Update for BerkMinInstance {
     fn on_learn(&mut self, learned_clause: ClauseId, _clauses: &Clauses, _variables: &Variables) {
         self.insertion_order.push_back(learned_clause);
         self.activity.insert(learned_clause, 0);
@@ -37,7 +32,7 @@ impl Update for BerkMin {
     }
 }
 
-impl ClauseDeletionStrategy for BerkMin {
+impl ClauseDeletionStrategy for BerkMinInstance {
     fn delete_clause(&mut self, clauses: &Clauses, variables: &Variables) -> Vec<ClauseId> {
         let pct = clauses.len() / 16;
         let unassigned = self.insertion_order.iter()
@@ -58,5 +53,24 @@ impl ClauseDeletionStrategy for BerkMin {
         self.threshold += 1;
 
         to_be_deleted.into_iter().collect_vec()
+    }
+}
+
+pub struct BerkMin(usize);
+
+impl AbstractFactory for BerkMin {
+    type Product = BerkMinInstance;
+    fn create(&self, _clauses: &Clauses, _variables: &Variables) -> Self::Product {
+        BerkMinInstance {
+            activity: HashMap::default(),
+            insertion_order: VecDeque::new(),
+            threshold: self.0,
+        }
+    }
+}
+
+impl Default for BerkMin {
+    fn default() -> Self {
+        BerkMin(60)
     }
 }

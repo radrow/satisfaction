@@ -1,4 +1,4 @@
-use std::{cell::RefCell, marker::PhantomData, rc::Rc};
+use std::{cell::RefCell,rc::Rc};
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 
 use itertools::Itertools;
@@ -15,55 +15,92 @@ use super::{
     update::Update,
     util::{BuildHasher, HashSet, IndexMap},
     variable::{Assignment, AssignmentType, Variable, VariableId, Variables},
+    abstract_factory::AbstractFactory,
 };
 
 
-pub struct CDCLSolver<B,L,C,R> {
-    branching_strategy: PhantomData<B>,
-    learning_scheme: PhantomData<L>,
-    clause_deletion_strategy: PhantomData<C>,
-    restart_policy: PhantomData<R>,
+pub struct CDCLSolver<B,BF,L,LF,C,CF,R,RF>
+where BF: AbstractFactory<Product=B>,
+      LF: AbstractFactory<Product=L>,
+      CF: AbstractFactory<Product=C>,
+      RF: AbstractFactory<Product=R>,
+{
+    branching_strategy: BF,
+    learning_scheme: LF,
+    deletion_strategy: CF,
+    restart_policy: RF,
 }
 
-impl<B,L,C,R> CDCLSolver<B,L,C,R>
-    where B: 'static+BranchingStrategy,
-          L: 'static+LearningScheme,
-          C: 'static+ClauseDeletionStrategy,
-          R: 'static+RestartPolicy {
-    pub fn new() -> CDCLSolver<B,L,C,R> {
+impl<B,BF,L,LF,C,CF,R,RF> CDCLSolver<B,BF,L,LF,C,CF,R,RF>
+where B: BranchingStrategy,
+      L: LearningScheme,
+      C: ClauseDeletionStrategy,
+      R: RestartPolicy,
+
+      BF: AbstractFactory<Product=B>,
+      LF: AbstractFactory<Product=L>,
+      CF: AbstractFactory<Product=C>,
+      RF: AbstractFactory<Product=R>,
+{
+    pub fn new(branching_strategy: BF, learning_scheme: LF, deletion_strategy: CF, restart_policy: RF) -> CDCLSolver<B,BF,L,LF,C,CF,R,RF> {
         CDCLSolver {
-            branching_strategy: PhantomData,
-            learning_scheme: PhantomData,
-            clause_deletion_strategy: PhantomData,
-            restart_policy: PhantomData,
+            branching_strategy,
+            learning_scheme,
+            deletion_strategy,
+            restart_policy,
         }
     }
 }
 
-impl<B,L,C,R> Solver for CDCLSolver<B,L,C,R>
-    where B: 'static+BranchingStrategy,
-          L: 'static+LearningScheme,
-          C: 'static+ClauseDeletionStrategy,
-          R: 'static+RestartPolicy {
+impl<B,BF,L,LF,C,CF,R,RF> Solver for CDCLSolver<B,BF,L,LF,C,CF,R,RF>
+where B: 'static+BranchingStrategy,
+      L: 'static+LearningScheme,
+      C: 'static+ClauseDeletionStrategy,
+      R: 'static+RestartPolicy,
+
+      BF: AbstractFactory<Product=B>,
+      LF: AbstractFactory<Product=L>,
+      CF: AbstractFactory<Product=C>,
+      RF: AbstractFactory<Product=R>,
+{
     fn solve(&self, formula: &CNF) -> SATSolution {
-        let execution_state = ExecutionState::<B,L,C,R>::new(formula);
+        let execution_state = ExecutionState::new(
+            formula,
+            &self.branching_strategy,
+            &self.learning_scheme,
+            &self.deletion_strategy,
+            &self.restart_policy
+            );
         execution_state.cdcl()
     }
 }
 
 #[async_trait]
-impl<B,L,C,R> InterruptibleSolver for CDCLSolver<B,L,C,R>
-    where B: 'static+Send+Sync+BranchingStrategy,
-          L: 'static+Send+Sync+LearningScheme,
-          C: 'static+Send+Sync+ClauseDeletionStrategy,
-          R: 'static+Send+Sync+RestartPolicy {
+impl<B,BF,L,LF,C,CF,R,RF> InterruptibleSolver for CDCLSolver<B,BF,L,LF,C,CF,R,RF>
+where B: 'static+Send+Sync+BranchingStrategy,
+      L: 'static+Send+Sync+LearningScheme,
+      C: 'static+Send+Sync+ClauseDeletionStrategy,
+      R: 'static+Send+Sync+RestartPolicy,
+
+      BF: Send+Sync+AbstractFactory<Product=B>,
+      LF: Send+Sync+AbstractFactory<Product=L>,
+      CF: Send+Sync+AbstractFactory<Product=C>,
+      RF: Send+Sync+AbstractFactory<Product=R>,
+{
     async fn solve_interruptible(&self, formula: &CNF) -> SATSolution {
-        let execution_state = ExecutionState::<B,L,C,R>::new(formula);
+        let execution_state = ExecutionState::new(
+            formula,
+            &self.branching_strategy,
+            &self.learning_scheme,
+            &self.deletion_strategy,
+            &self.restart_policy
+            );
         FlagWaiter::start(move |flag| {
             execution_state.interruptible_cdcl(flag)
         }).await
     }
 }
+
 
 fn order_formula(cnf: CNF) -> CNF {
     let mut order_cnf: CNF = CNF {clauses: Vec::new(), num_variables: cnf.num_variables};
@@ -101,7 +138,13 @@ where B: 'static+BranchingStrategy,
       C: 'static+ClauseDeletionStrategy,
       R: 'static+RestartPolicy {
 
-    fn new(formula: &CNF) -> ExecutionState<B, L, C, R> {
+    fn new(
+        formula: &CNF,
+        branching_strategy: &impl AbstractFactory<Product=B>,
+        learning_scheme: &impl AbstractFactory<Product=L>,
+        deletion_strategy: &impl AbstractFactory<Product=C>,
+        restart_policy: &impl AbstractFactory<Product=R>,
+        ) -> ExecutionState<B, L, C, R> {
         // TODO: Avoid cloning
         let ordered_cnf: CNF = order_formula(formula.clone());
         let variables = (1..=ordered_cnf.num_variables)
@@ -116,10 +159,10 @@ where B: 'static+BranchingStrategy,
         let unit_queue = IndexMap::with_capacity_and_hasher(formula.num_variables, BuildHasher::default());
         let assignment_stack= Vec::with_capacity(formula.num_variables);
 
-        let branching_strategy = Rc::new(RefCell::new(B::initialise(&clauses, &variables)));
-        let learning_scheme = Rc::new(RefCell::new(L::initialise(&clauses, &variables)));
-        let clause_deletion_strategy = Rc::new(RefCell::new(C::initialise(&clauses, &variables)));
-        let restart_policy = Rc::new(RefCell::new(R::initialise(&clauses, &variables)));
+        let branching_strategy = Rc::new(RefCell::new(branching_strategy.create(&clauses, &variables)));
+        let learning_scheme = Rc::new(RefCell::new(learning_scheme.create(&clauses, &variables)));
+        let clause_deletion_strategy = Rc::new(RefCell::new(deletion_strategy.create(&clauses, &variables)));
+        let restart_policy = Rc::new(RefCell::new(restart_policy.create(&clauses, &variables)));
 
         ExecutionState {
             clauses,

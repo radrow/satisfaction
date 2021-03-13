@@ -21,3 +21,5 @@ Cargo.lock
 # Ignore output of proptest
 **/*.proptest-regressions
 
+# Intellij
+**/.idea

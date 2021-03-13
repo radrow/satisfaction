@@ -16,11 +16,8 @@ use solver::{
         CDCLSolver,
         branching_strategies::VSIDS,
         learning_schemes::RelSAT,
-        deletion_strategies::{BerkMin, IdentityDeletionStrategy},
-        restart_policies::{
-            RestartNever,
-            RestartFixed,
-        },
+        deletion_strategies::NoDeletion,
+        restart_policies::RestartFixed,
     },
     CNF, SatisfactionSolver, SATSolution,
     solvers::{InterruptibleSolver, TimedSolver, TimeLimitedSolver},
@@ -80,20 +77,8 @@ fn make_config<'a>() -> Config {
             Box::new(SatisfactionSolver::new(solver::JeroslawWang)),
         ),*/
         (
-            "CDCL-VSIDS-RelSAT-BerkMin-Fixed".to_string(),
-            Box::new(CDCLSolver::<VSIDS, RelSAT, BerkMin, RestartFixed>::new()),
-        ),
-        (
-            "CDCL-VSIDS-RelSAT-BerkMin-Never".to_string(),
-            Box::new(CDCLSolver::<VSIDS, RelSAT, BerkMin, RestartNever>::new()),
-        ),
-        (
-            "CDCL-VSIDS-RelSAT-IdentityDeletionStrategy-Fixed".to_string(),
-            Box::new(CDCLSolver::<VSIDS, RelSAT, IdentityDeletionStrategy, RestartFixed>::new()),
-        ),
-        (
-            "CDCL-VSIDS-RelSAT-IdentityDeletionStrategy-Never".to_string(),
-            Box::new(CDCLSolver::<VSIDS, RelSAT, IdentityDeletionStrategy, RestartNever>::new()),
+            "CDCL".to_string(),
+            Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartFixed(500))),
         ),
     ];
 

@@ -4,23 +4,19 @@ use super::{
     super::{
         variable::{VariableId, Variables, Assignment, AssignmentType},
         clause::{ClauseId, Clauses},
-        update::{Initialisation, Update},
+        update::Update,
+        abstract_factory::AbstractFactory,
     },
     learning_scheme::LearningScheme,
 };
 use crate::{CNFVar, CNFClause};
 
-pub struct RelSAT;
+pub struct RelSATInstance;
 
-impl Initialisation for RelSAT {
-    fn initialise(_clauses: &Clauses, _variables: &Variables) -> Self where Self: Sized {
-        RelSAT
-    }
-}
-impl Update for RelSAT {}
+impl Update for RelSATInstance {}
 
 
-impl LearningScheme for RelSAT {
+impl LearningScheme for RelSATInstance {
     fn find_conflict_clause(&mut self, empty_clause: ClauseId, branching_depth: usize, clauses: &Clauses, variables: &Variables) -> Option<(CNFClause, CNFVar, usize)> {
         // Start with vertices that are connected to the conflict clause
         let mut literal_queue: VecDeque<VariableId> = clauses[empty_clause].literals
@@ -64,5 +60,15 @@ impl LearningScheme for RelSAT {
             }
         }
         assertion_literal.map(|literal| (clause, literal, assertion_level))
+    }
+}
+
+pub struct RelSAT;
+
+impl AbstractFactory for RelSAT {
+    type Product = RelSATInstance;
+
+    fn create(&self, _clauses: &Clauses, _variables: &Variables) -> Self::Product {
+        RelSATInstance
     }
 }

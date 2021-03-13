@@ -1,5 +1,5 @@
-use crate::cdcl::update::{Initialisation, Update};
+use crate::cdcl::update::Update;
 
-pub trait RestartPolicy: Initialisation+Update {
+pub trait RestartPolicy: Update {
     fn restart(&mut self) -> bool;
 }
