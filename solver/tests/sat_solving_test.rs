@@ -7,13 +7,14 @@ use solver::{
     JeroslawWang, MOM, NaiveBranching, SatisfactionSolver, SATSolution, Solver,
 };
 use solver::cdcl::{
-    BerkMin, branching_strategies::VSIDS, CDCLSolver, learning_schemes::RelSAT,
+    branching_strategies::VSIDS, CDCLSolver, learning_schemes::RelSAT,
     restart_policies::{
         RestartFixed,
         RestartGeom,
         RestartLuby,
         RestartNever,
     },
+    deletion_strategies::BerkMin,
 };
 
 const MAX_NUM_VARIABLES: usize = 50;

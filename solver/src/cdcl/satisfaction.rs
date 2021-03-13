@@ -1,10 +1,10 @@
-use std::{cell::RefCell, collections::VecDeque, marker::PhantomData, rc::Rc};
+use std::{cell::RefCell, marker::PhantomData, rc::Rc};
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 
 use itertools::Itertools;
-use tinyset::SetUsize;
 
 use crate::{CNF, CNFClause, CNFVar, SATSolution, Solver};
+use crate::cdcl::deletion_strategies::ClauseDeletionStrategy;
 use crate::cdcl::restart_policies::RestartPolicy;
 use crate::solvers::{FlagWaiter, InterruptibleSolver};
 
@@ -12,10 +12,58 @@ use super::{
     branching_strategies::BranchingStrategy,
     clause::{Clause, ClauseId, Clauses},
     learning_schemes::LearningScheme,
-    update::{Initialisation, Update},
-    util::{BuildHasher, HashMap, HashSet, IndexMap},
+    update::Update,
+    util::{BuildHasher, HashSet, IndexMap},
     variable::{Assignment, AssignmentType, Variable, VariableId, Variables},
 };
+
+
+pub struct CDCLSolver<B,L,C,R> {
+    branching_strategy: PhantomData<B>,
+    learning_scheme: PhantomData<L>,
+    clause_deletion_strategy: PhantomData<C>,
+    restart_policy: PhantomData<R>,
+}
+
+impl<B,L,C,R> CDCLSolver<B,L,C,R>
+    where B: 'static+BranchingStrategy,
+          L: 'static+LearningScheme,
+          C: 'static+ClauseDeletionStrategy,
+          R: 'static+RestartPolicy {
+    pub fn new() -> CDCLSolver<B,L,C,R> {
+        CDCLSolver {
+            branching_strategy: PhantomData,
+            learning_scheme: PhantomData,
+            clause_deletion_strategy: PhantomData,
+            restart_policy: PhantomData,
+        }
+    }
+}
+
+impl<B,L,C,R> Solver for CDCLSolver<B,L,C,R>
+    where B: 'static+BranchingStrategy,
+          L: 'static+LearningScheme,
+          C: 'static+ClauseDeletionStrategy,
+          R: 'static+RestartPolicy {
+    fn solve(&self, formula: &CNF) -> SATSolution {
+        let execution_state = ExecutionState::<B,L,C,R>::new(formula);
+        execution_state.cdcl()
+    }
+}
+
+#[async_trait]
+impl<B,L,C,R> InterruptibleSolver for CDCLSolver<B,L,C,R>
+    where B: 'static+Send+Sync+BranchingStrategy,
+          L: 'static+Send+Sync+LearningScheme,
+          C: 'static+Send+Sync+ClauseDeletionStrategy,
+          R: 'static+Send+Sync+RestartPolicy {
+    async fn solve_interruptible(&self, formula: &CNF) -> SATSolution {
+        let execution_state = ExecutionState::<B,L,C,R>::new(formula);
+        FlagWaiter::start(move |flag| {
+            execution_state.interruptible_cdcl(flag)
+        }).await
+    }
+}
 
 fn order_formula(cnf: CNF) -> CNF {
     let mut order_cnf: CNF = CNF {clauses: Vec::new(), num_variables: cnf.num_variables};
@@ -26,10 +74,6 @@ fn order_formula(cnf: CNF) -> CNF {
         order_cnf.clauses.push(CNFClause {vars: cnf_variables});
     }
     order_cnf
-}
-
-pub trait ClauseDeletionStrategy: Initialisation+Update {
-    fn delete_clause(&mut self, clauses: &Clauses, variables: &Variables) -> Vec<ClauseId>;
 }
 
 
@@ -403,115 +447,5 @@ where B: 'static+BranchingStrategy,
             None => false
         };
         first || second
-    }
-}
-
-pub struct IdentityDeletionStrategy;
-impl Initialisation for IdentityDeletionStrategy {
-    fn initialise(_clauses: &Clauses, _variables: &Variables) -> Self where Self: Sized { IdentityDeletionStrategy }
-}
-impl Update for IdentityDeletionStrategy {}
-impl ClauseDeletionStrategy for IdentityDeletionStrategy {
-    fn delete_clause(&mut self, _clauses: &Clauses, _variables: &Variables) -> Vec<ClauseId> { Vec::new() }
-}
-
-
-pub struct CDCLSolver<B,L,C,R> {
-    branching_strategy: PhantomData<B>,
-    learning_scheme: PhantomData<L>,
-    clause_deletion_strategy: PhantomData<C>,
-    restart_policy: PhantomData<R>,
-}
-
-impl<B,L,C,R> CDCLSolver<B,L,C,R>
-where B: 'static+BranchingStrategy,
-      L: 'static+LearningScheme,
-      C: 'static+ClauseDeletionStrategy,
-      R: 'static+RestartPolicy {
-    pub fn new() -> CDCLSolver<B,L,C,R> {
-        CDCLSolver {
-            branching_strategy: PhantomData,
-            learning_scheme: PhantomData,
-            clause_deletion_strategy: PhantomData,
-            restart_policy: PhantomData,
-        }
-    }
-}
-
-impl<B,L,C,R> Solver for CDCLSolver<B,L,C,R>
-where B: 'static+BranchingStrategy,
-      L: 'static+LearningScheme,
-      C: 'static+ClauseDeletionStrategy,
-      R: 'static+RestartPolicy {
-          fn solve(&self, formula: &CNF) -> SATSolution {
-              let execution_state = ExecutionState::<B,L,C,R>::new(formula);
-              execution_state.cdcl()
-          }
-}
-
-#[async_trait]
-impl<B,L,C,R> InterruptibleSolver for CDCLSolver<B,L,C,R>
-where B: 'static+Send+Sync+BranchingStrategy,
-      L: 'static+Send+Sync+LearningScheme,
-      C: 'static+Send+Sync+ClauseDeletionStrategy,
-      R: 'static+Send+Sync+RestartPolicy {
-          async fn solve_interruptible(&self, formula: &CNF) -> SATSolution {
-              let execution_state = ExecutionState::<B,L,C,R>::new(formula);
-              FlagWaiter::start(move |flag| {
-                  execution_state.interruptible_cdcl(flag)
-              }).await
-          }
-}
-
-
-pub struct BerkMin {
-    activity: HashMap<ClauseId, usize>,
-    insertion_order: VecDeque<ClauseId>,
-    threshold: usize,
-}
-
-impl Initialisation for BerkMin {
-    fn initialise(_clauses: &Clauses, _variables: &Variables) -> Self where Self: Sized {
-        BerkMin {
-            activity: HashMap::default(),
-            insertion_order: VecDeque::new(),
-            threshold: 60,
-        }
-    }
-}
-
-impl Update for BerkMin {
-    fn on_learn(&mut self, learned_clause: ClauseId, _clauses: &Clauses, _variables: &Variables) {
-        self.insertion_order.push_back(learned_clause);
-        self.activity.insert(learned_clause, 0);
-    }
-
-    fn on_conflict(&mut self, empty_clause: ClauseId, _clauses: &Clauses, _variables: &Variables) {
-        *self.activity.get_mut(&empty_clause)
-            .expect("Empty clause was not registered!") +=1;
-    }
-}
-
-impl ClauseDeletionStrategy for BerkMin {
-    fn delete_clause(&mut self, clauses: &Clauses, variables: &Variables) -> Vec<ClauseId> {
-        let pct = clauses.len() / 16;
-        let unassigned = self.insertion_order.iter()
-            .cloned()
-            .filter(|c| {
-                clauses[*c].watched_literals.iter().all(|i| { variables[clauses[*c].literals[*i].id].assignment.is_none() })
-            });
-
-        let young = unassigned.clone().take(pct);
-        let old = unassigned.skip(pct);
-        
-        let to_be_deleted: SetUsize= young.filter(|id| 42 < clauses[*id].literals.len() && self.activity[id] < 7)
-            .chain(old.filter(|id| 8 < clauses[*id].literals.len() && self.activity[id] < self.threshold)).collect();
-
-        self.activity.retain(|k,_| !to_be_deleted.contains(*k));
-        self.insertion_order.retain(|k| !to_be_deleted.contains(*k));
-
-        self.threshold += 1;
-
-        to_be_deleted.into_iter().collect_vec()
     }
 }
