@@ -1,6 +1,7 @@
 use std::{cell::RefCell, cmp::Reverse, collections::{HashSet, VecDeque, BinaryHeap}, iter::FromIterator, marker::PhantomData, ops::{Not, Index, IndexMut}, rc::Rc};
-use crate::{CNFClause, CNFVar, SATSolution, Solver, CNF, preprocessing};
+use crate::{CNF, CNFClause, CNFVar, NiVER, SATSolution, Solver, preprocessing};
 use itertools::Itertools;
+use preprocessing::Preprocessor;
 use tinyset::SetUsize;
 use stable_vec::StableVec;
 
@@ -277,6 +278,7 @@ where B: 'static+BranchingStrategy,
     branching_strategy: Rc<RefCell<B>>,
     learning_scheme: Rc<RefCell<L>>,
     clause_deletion_strategy: Rc<RefCell<C>>,
+    niver: NiVER,
 
     updates: Vec<Rc<RefCell<dyn Update>>>,
 }
@@ -288,9 +290,9 @@ where B: BranchingStrategy,
 
     fn new(formula: &CNF) -> Option<ExecutionState<B, L, C>> {
         let mut unit_queue = IndexMap::with_capacity_and_hasher(formula.num_variables, BuildHasher::default());
-        let mut ordered_cnf: CNF = order_formula(formula);
-
-        preprocessing(&mut ordered_cnf);
+        let mut niver = NiVER::new();
+        let niver_processed_formula: CNF = niver.preprocess(formula);
+        let mut ordered_cnf: CNF = order_formula(&niver_processed_formula);
 
         if !find_unit_clauses(&mut ordered_cnf, &mut unit_queue) {
             return None;
@@ -315,6 +317,7 @@ where B: BranchingStrategy,
 
         Some(ExecutionState {
             clauses,
+            niver,
             variables,
             branching_depth: 0,
             unit_queue,
@@ -353,12 +356,13 @@ where B: BranchingStrategy,
                 })
             { return SATSolution::Unsatisfiable; }
         }
-
-        SATSolution::Satisfiable(
-            self.variables
-                .into_iter()
-                .map(|var| var.assignment.map(|a| a.sign).unwrap_or(false))
-                .collect_vec(),
+        self.niver.restore(
+            SATSolution::Satisfiable(
+                self.variables
+                    .into_iter()
+                    .map(|var| var.assignment.map(|a| a.sign).unwrap_or(false))
+                    .collect_vec(),
+            )
         )
     }
 
@@ -383,6 +387,10 @@ where B: BranchingStrategy,
     }
 
     fn unit_propagation(&mut self) -> Option<ClauseId> {
+        // todo -> maybe do the check if clauses are empty somewhere different
+        if self.unit_queue.len() == 0 && self.clauses.formula[0].literals.len() == 0 {
+            return Some(0);
+        }
         while let Some((id, (sign, reason))) = self.unit_queue.pop() {
             let empty_clause = self.set_variable(CNFVar::new(id, sign), AssignmentType::Forced(reason));
             if empty_clause.is_some() {
