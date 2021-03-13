@@ -3,7 +3,11 @@ use solver::{
     CNFClause, CNFVar, CadicalSolver, JeroslawWang, NaiveBranching, SATSolution,
     SatisfactionSolver, Solver, CNF, DLCS, DLIS, MOM,
 };
-use solver::cdcl::{CDCLSolver, BerkMin, RelSAT, VSIDS, RestartNever, RestartFixed, RestartGeom, RestartLuby};
+use solver::cdcl::{
+    CDCLSolver, BerkMin, RestartNever, RestartFixed, RestartGeom, RestartLuby,
+    branching_strategies::VSIDS,
+    learning_schemes::RelSAT,
+};
 use std::path::PathBuf;
 
 const MAX_NUM_VARIABLES: usize = 50;

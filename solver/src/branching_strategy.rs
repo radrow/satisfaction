@@ -48,7 +48,7 @@ impl crate::cdcl::update::Initialisation for NaiveBranching {
 
 impl crate::cdcl::update::Update for NaiveBranching {}
 
-impl crate::cdcl::satisfaction::BranchingStrategy for NaiveBranching {
+impl crate::cdcl::branching_strategies::BranchingStrategy for NaiveBranching {
     fn pick_literal(&mut self, _clauses: &crate::cdcl::clause::Clauses, variables: &crate::cdcl::variable::Variables) -> Option<CNFVar> {
         variables
             .iter()
