@@ -8,7 +8,7 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use solver::{
     solvers::{InterruptibleSolver, TimeLimitedSolver, TimedSolver},
     SATSolution, SatisfactionSolver, CNF, NaiveBranching,
-    cdcl::{CDCLSolver, BerkMin, RelSAT, VSIDS, RestartFixed},
+    cdcl::{CDCLSolver, BerkMin, RelSAT, VSIDS, RestartFixed, RestartGeom, RestartNever, RestartLuby},
 };
 use std::{
     collections::HashMap,
@@ -69,12 +69,24 @@ fn make_config<'a>() -> Config {
             Box::new(SatisfactionSolver::new(solver::JeroslawWang)),
         ),
         (
-            "CDCL-Naive-RelSAT-BerkMin".to_string(),
+            "CDCL-Naive-RelSAT-BerkMin-Fixed".to_string(),
             Box::new(CDCLSolver::<NaiveBranching, RelSAT, BerkMin, RestartFixed>::new()),
         ),
         (
-            "CDCL-VSIDS-RelSAT-BerkMin".to_string(),
+            "CDCL-VSIDS-RelSAT-BerkMin-Fixed".to_string(),
             Box::new(CDCLSolver::<VSIDS, RelSAT, BerkMin, RestartFixed>::new()),
+        ),
+        (
+            "CDCL-VSIDS-RelSAT-BerkMin-Geom".to_string(),
+            Box::new(CDCLSolver::<VSIDS, RelSAT, BerkMin, RestartGeom>::new()),
+        ),
+        (
+            "CDCL-VSIDS-RelSAT-BerkMin-Luby".to_string(),
+            Box::new(CDCLSolver::<VSIDS, RelSAT, BerkMin, RestartLuby>::new()),
+        ),
+        (
+            "CDCL-VSIDS-RelSAT-BerkMin-Never".to_string(),
+            Box::new(CDCLSolver::<VSIDS, RelSAT, BerkMin, RestartNever>::new()),
         ),
     ];
 
