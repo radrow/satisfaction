@@ -1,14 +1,20 @@
+use std::path::PathBuf;
+
 use proptest::{bool::weighted, collection::vec, prelude::*};
+
 use solver::{
-    CNFClause, CNFVar, CadicalSolver, JeroslawWang, NaiveBranching, SATSolution,
-    SatisfactionSolver, Solver, CNF, DLCS, DLIS, MOM,
+    CadicalSolver, CNF, CNFClause, CNFVar, DLCS, DLIS,
+    JeroslawWang, MOM, NaiveBranching, SatisfactionSolver, SATSolution, Solver,
 };
 use solver::cdcl::{
-    CDCLSolver, BerkMin, RestartNever, RestartFixed, RestartGeom, RestartLuby,
-    branching_strategies::VSIDS,
-    learning_schemes::RelSAT,
+    BerkMin, branching_strategies::VSIDS, CDCLSolver, learning_schemes::RelSAT,
+    restart_policies::{
+        RestartFixed,
+        RestartGeom,
+        RestartLuby,
+        RestartNever,
+    },
 };
-use std::path::PathBuf;
 
 const MAX_NUM_VARIABLES: usize = 50;
 const MAX_NUM_LITERALS: usize = 10;

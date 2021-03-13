@@ -1,17 +1,20 @@
 use std::{cell::RefCell, collections::VecDeque, marker::PhantomData, rc::Rc};
-use crate::{CNFClause, CNFVar, SATSolution, Solver, CNF};
-use itertools::Itertools;
-use tinyset::SetUsize;
-use crate::solvers::{InterruptibleSolver, FlagWaiter};
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 
+use itertools::Itertools;
+use tinyset::SetUsize;
+
+use crate::{CNF, CNFClause, CNFVar, SATSolution, Solver};
+use crate::cdcl::restart_policies::RestartPolicy;
+use crate::solvers::{FlagWaiter, InterruptibleSolver};
+
 use super::{
-    variable::{VariableId, Variable, Variables, Assignment, AssignmentType},
-    clause::{ClauseId, Clause, Clauses},
-    util::{HashSet, HashMap, IndexMap, BuildHasher},
-    update::{Initialisation, Update},
     branching_strategies::BranchingStrategy,
+    clause::{Clause, ClauseId, Clauses},
     learning_schemes::LearningScheme,
+    update::{Initialisation, Update},
+    util::{BuildHasher, HashMap, HashSet, IndexMap},
+    variable::{Assignment, AssignmentType, Variable, VariableId, Variables},
 };
 
 fn order_formula(cnf: CNF) -> CNF {
@@ -510,129 +513,5 @@ impl ClauseDeletionStrategy for BerkMin {
         self.threshold += 1;
 
         to_be_deleted.into_iter().collect_vec()
-    }
-}
-
-
-pub trait RestartPolicy: Initialisation+Update {
-    fn restart(&mut self) -> bool;
-}
-
-pub struct RestartNever;
-impl Initialisation for RestartNever {
-    fn initialise(_clauses: &Clauses, _variables: &Variables) -> RestartNever {
-        RestartNever
-    }
-}
-
-impl Update for RestartNever {}
-impl RestartPolicy for RestartNever {
-    fn restart(&mut self) -> bool {false}
-}
-
-pub struct RestartFixed { conflicts: u64, rate: u64 }
-impl RestartFixed {
-    pub fn new(rate: u64) -> RestartFixed {
-        RestartFixed{
-            conflicts: 0,
-            rate,
-        }
-    }
-}
-impl Update for RestartFixed {
-    fn on_conflict(&mut self, _empty_clause: ClauseId, _clauses: &Clauses, _variables: &Variables) {
-        self.conflicts += 1;
-    }
-}
-impl Initialisation for RestartFixed {
-    fn initialise(_clauses: &Clauses, _variables: &Variables) -> RestartFixed {
-        RestartFixed::new(550)
-    }
-}impl RestartPolicy for RestartFixed {
-    fn restart(&mut self) -> bool {
-        if self.conflicts > self.rate {
-            self.conflicts = 0;
-            return true
-        }
-        false
-    }
-}
-
-pub struct RestartGeom { conflicts: u64, rate: u64, factor_percent: u64 }
-impl RestartGeom {
-    pub fn new(rate: u64, factor_percent: u64) -> RestartGeom {
-        RestartGeom{
-            conflicts: 0,
-            rate,
-            factor_percent,
-        }
-    }
-}
-impl Update for RestartGeom {
-    fn on_conflict(&mut self, _empty_clause: ClauseId, _clauses: &Clauses, _variables: &Variables) {
-        self.conflicts += 1;
-    }
-}
-impl Initialisation for RestartGeom {
-    fn initialise(_clauses: &Clauses, _variables: &Variables) -> RestartGeom {
-        RestartGeom::new(100, 150)
-    }
-}
-impl RestartPolicy for RestartGeom {
-    fn restart(&mut self) -> bool {
-        if self.conflicts > self.rate {
-            self.rate *= self.factor_percent;
-            self.rate /= 100;
-            self.conflicts = 0;
-            return true
-        }
-        false
-    }
-}
-
-
-pub struct RestartLuby { conflicts: u64, rate: u64, luby_state: (u64, u64, u64) }
-impl RestartLuby {
-    fn next_luby(&mut self) -> u64 {
-        let (u, v, w) = self.luby_state;
-        self.luby_state =
-            if u == w {
-                if u == v {
-                    (u + 1, 1, w * 2)
-                } else {
-                    (u, v + 1, w)
-                }
-            } else {
-                (u + 1, v, w)
-            };
-        v
-    }
-
-    pub fn new() -> RestartLuby {
-        RestartLuby {
-            conflicts: 0,
-            rate: 1,
-            luby_state: (2, 1, 2), // first step already made
-        }
-    }
-}
-impl Update for RestartLuby {
-    fn on_conflict(&mut self, _empty_clause: ClauseId, _clauses: &Clauses, _variables: &Variables) {
-        self.conflicts += 1;
-    }
-}
-impl Initialisation for RestartLuby {
-    fn initialise(_clauses: &Clauses, _variables: &Variables) -> RestartLuby {
-        RestartLuby::new()
-    }
-}
-impl RestartPolicy for RestartLuby {
-    fn restart(&mut self) -> bool {
-        if self.conflicts > self.rate {
-            self.rate = 32 * self.next_luby();
-            self.conflicts = 0;
-            return true
-        }
-        false
     }
 }
