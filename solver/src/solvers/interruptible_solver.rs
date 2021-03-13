@@ -1,8 +1,8 @@
 use crate::{SATSolution, Solver, CNF};
-use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 use std::thread::{JoinHandle, spawn};
 use std::future::Future;
-use std::task::{Poll, Context, Waker};
+use std::task::{Poll, Context};
 use std::pin::Pin;
 use async_std::task::block_on;
 use async_trait::async_trait;

@@ -1,5 +1,6 @@
 pub type BuildHasher = std::hash::BuildHasherDefault<rustc_hash::FxHasher>;
 
+#[allow(dead_code)]
 pub type IndexSet<V> = indexmap::IndexSet<V, BuildHasher>;
 pub type IndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasher>;
 

@@ -1,7 +1,7 @@
 use crate::{cnf, dpll};
 use auto_impl::auto_impl;
-use cnf::{VarId, CNFVar};
-use dpll::{Clauses, Clause, VarValue, Variables};
+use cnf::CNFVar;
+use dpll::{Clauses, VarValue, Variables};
 use std::cmp::Ordering;
 
 /// A trait to choose the next variable to set during DPLL algorithm.
@@ -40,13 +40,13 @@ impl BranchingStrategy for NaiveBranching {
     }
 }
 
-impl crate::cdcl::satisfaction::Initialisation for NaiveBranching {
+impl crate::cdcl::update::Initialisation for NaiveBranching {
     fn initialise(_clauses: &crate::cdcl::clause::Clauses, _variables: &crate::cdcl::variable::Variables) -> Self where Self: Sized {
         NaiveBranching
     }
 }
 
-impl crate::cdcl::satisfaction::Update for NaiveBranching {}
+impl crate::cdcl::update::Update for NaiveBranching {}
 
 impl crate::cdcl::satisfaction::BranchingStrategy for NaiveBranching {
     fn pick_literal(&mut self, _clauses: &crate::cdcl::clause::Clauses, variables: &crate::cdcl::variable::Variables) -> Option<CNFVar> {

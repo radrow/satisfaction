@@ -5,9 +5,12 @@ use tinyset::SetUsize;
 use crate::solvers::{InterruptibleSolver, FlagWaiter};
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 
-use super::variable::{VariableId, Variable, Variables, Assignment, AssignmentType};
-use super::clause::{ClauseId, Clause, Clauses};
-use super::util::{PriorityQueue, HashSet, HashMap, IndexMap, BuildHasher};
+use super::{
+    variable::{VariableId, Variable, Variables, Assignment, AssignmentType},
+    clause::{ClauseId, Clause, Clauses},
+    util::{PriorityQueue, HashSet, HashMap, IndexMap, BuildHasher},
+    update::{Initialisation, Update},
+};
 
 fn order_formula(cnf: CNF) -> CNF {
     let mut order_cnf: CNF = CNF {clauses: Vec::new(), num_variables: cnf.num_variables};
@@ -20,18 +23,6 @@ fn order_formula(cnf: CNF) -> CNF {
     order_cnf
 }
 
-
-pub trait Update {
-    fn on_assign(&mut self, _variable: VariableId, _clauses: &Clauses, _variables: &Variables) {}
-    fn on_unassign(&mut self, _literal: CNFVar, _clauses: &Clauses, _variables: &Variables) {}
-    fn on_learn(&mut self, _learned_clause: ClauseId, _clauses: &Clauses, _variables: &Variables) {}
-    fn on_conflict(&mut self, _empty_clause: ClauseId, _clauses: &Clauses, _variables: &Variables) {}
-    fn on_deletion(&mut self, _deleted_clause: &Clause) {}
-}
-
-pub trait Initialisation {
-    fn initialise(clauses: &Clauses, variables: &Variables) -> Self where Self: Sized;
-}
 
 pub trait BranchingStrategy: Initialisation+Update {
     fn pick_literal(&mut self, clauses: &Clauses, variables: &Variables) -> Option<CNFVar>;
