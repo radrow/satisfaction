@@ -18,7 +18,8 @@ pub mod sat_solver;
 /// A module which offers some additional solver,
 /// for one that can be interrupted or timed.
 pub mod solvers;
-//pub mod learning_schemes;
+
+mod preprocessing;
 
 pub use branching_strategy::{BranchingStrategy, JeroslawWang, NaiveBranching, DLCS, DLIS, MOM};
 pub use bruteforce::Bruteforce;
@@ -27,3 +28,4 @@ pub use cnf::{CNFClause, CNFVar, CNF};
 pub use dpll::SatisfactionSolver;
 pub use sat_solution::{SATSolution, Valuation};
 pub use sat_solver::Solver;
+pub use preprocessing::preprocessing;

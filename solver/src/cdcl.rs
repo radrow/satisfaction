@@ -1,5 +1,5 @@
 use std::{cell::RefCell, cmp::Reverse, collections::{HashSet, VecDeque, BinaryHeap}, iter::FromIterator, marker::PhantomData, ops::{Not, Index, IndexMut}, rc::Rc};
-use crate::{CNFClause, CNFVar, SATSolution, Solver, CNF};
+use crate::{CNFClause, CNFVar, SATSolution, Solver, CNF, preprocessing};
 use itertools::Itertools;
 use tinyset::SetUsize;
 use stable_vec::StableVec;
@@ -233,78 +233,18 @@ pub trait ClauseDeletionStrategy: Initialisation+Update {
 }
 
 
-/// function to remove the case (a v !b) and (!a v b)
-fn equivalent_substitution(cnf: &mut CNF) {
-    // only look at clauses that are relevant and have size of 2
-    let small_clauses: Vec<(usize, &CNFClause)> = cnf.clauses.iter().enumerate().filter(|(i, clause)| clause.len() == 2).collect();
-    let mut remove_indices: HashSet<usize> = HashSet::new();
-    
-    // compare each small clause with the other small clauses if they can be removed
-    for orign_clause in &small_clauses {
-        for comp_clause in &small_clauses {
-            if (orign_clause.1.vars[0].id == comp_clause.1.vars[0].id && orign_clause.1.vars[0].sign != comp_clause.1.vars[0].sign)
-                || (orign_clause.1.vars[0].id == comp_clause.1.vars[1].id && orign_clause.1.vars[0].sign != comp_clause.1.vars[1].sign) {
-
-                if (orign_clause.1.vars[1].id == comp_clause.1.vars[0].id && orign_clause.1.vars[1].sign != comp_clause.1.vars[0].sign)
-                    || (orign_clause.1.vars[1].id == comp_clause.1.vars[1].id && orign_clause.1.vars[1].sign != comp_clause.1.vars[1].sign){
-
-                    // add to the clauses that can be removed
-                    remove_indices.insert(orign_clause.0);
-                    remove_indices.insert(comp_clause.0);
-                }
-            }
-        }
-    }
-    // dont remove clauses if all the clauses would get lost
-    if remove_indices.len() != cnf.clauses.len() {
-
-        // remove the unnessersary clauses
-        cnf.clauses = cnf.clauses.iter().enumerate().filter_map(|(index, clause)| {
-            if remove_indices.contains(&index) {
-                return None;
-            }
-            return Some(clause.clone());
-        }).collect();
-    }
-}
-
-fn sig(clause: CNFClause, num_vars: usize) -> usize {
-    let mut mask = 1;
-    let mut result = 0;
-    for i in 0..num_vars {
-        if clause.vars.contains(&CNFVar {id: i, sign: true}) || clause.vars.contains(&CNFVar {id: i, sign: false}) {
-            result = result | mask;
-        }
-        mask = mask << 1;
-    }
-    result
-}
-
-fn subsumtion_test(clause1: CNFClause, clause2: CNFClause, num_vars: usize) -> bool {
-    let first = sig(clause1, num_vars);
-    let second = !sig(clause2, num_vars);
-    if first & second != 0 {
-        return false;
-    }
-    true
-}
-
-fn preprocessing(cnf: &mut CNF) {
-    //equivalent_substitution(cnf);
-}
-
 fn find_unit_clauses(cnf: &mut CNF, unit_queue: &mut IndexMap<VariableId, (bool, ClauseId)>) -> bool{
     let mut no_error = true;
+    // filter_map -> filter
     cnf.clauses = cnf.clauses.iter().enumerate().filter_map(|(i, clause)| {
         if clause.vars.len() == 1 {
-            let variable: CNFVar = clause.vars[0].clone();
+            let variable: CNFVar = clause.vars[0];
             if unit_queue.contains_key(&(variable.id-1)) {
                 if let Some(var) = unit_queue.get_key_value(&(variable.id-1)) {
                     if var.1.0 != variable.sign {
                         no_error = false;
                     }
                 }
-
             }
             unit_queue.insert(variable.id-1, (variable.sign, i));
         }       
@@ -348,12 +288,13 @@ where B: BranchingStrategy,
 
     fn new(formula: &CNF) -> Option<ExecutionState<B, L, C>> {
         let mut unit_queue = IndexMap::with_capacity_and_hasher(formula.num_variables, BuildHasher::default());
-
         let mut ordered_cnf: CNF = order_formula(formula);
+
+        preprocessing(&mut ordered_cnf);
+
         if !find_unit_clauses(&mut ordered_cnf, &mut unit_queue) {
             return None;
         }
-        preprocessing(&mut ordered_cnf);
 
         let mut variables = (1..=ordered_cnf.num_variables)
                 .map(|index| Variable::new(&ordered_cnf, index))
