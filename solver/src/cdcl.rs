@@ -244,7 +244,7 @@ pub trait ClauseDeletionStrategy: Initialisation+Update {
 }
 
 
-struct ExecutionState<B,L,C> {
+struct ExecutionState<B,L,C,R> {
     clauses: Clauses,
     variables: Variables,
     branching_depth: usize,
@@ -254,19 +254,21 @@ struct ExecutionState<B,L,C> {
     branching_strategy: Rc<RefCell<B>>,
     learning_scheme: Rc<RefCell<L>>,
     clause_deletion_strategy: Rc<RefCell<C>>,
+    restart_policy: Rc<RefCell<R>>,
 
     updates: Vec<Rc<RefCell<dyn Update>>>,
 }
 
-unsafe impl<B,L,C> Sync for ExecutionState<B,L,C> {}
-unsafe impl<B,L,C> Send for ExecutionState<B,L,C> {}
+unsafe impl<B,L,C,R> Sync for ExecutionState<B,L,C,R> {}
+unsafe impl<B,L,C,R> Send for ExecutionState<B,L,C,R> {}
 
-impl<B,L,C> ExecutionState<B,L,C>
+impl<B,L,C,R> ExecutionState<B,L,C,R>
 where B: 'static+BranchingStrategy,
       L: 'static+LearningScheme,
-      C: 'static+ClauseDeletionStrategy {
+      C: 'static+ClauseDeletionStrategy,
+      R: 'static+RestartPolicy {
 
-    fn new(formula: &CNF) -> ExecutionState<B, L, C> {
+    fn new(formula: &CNF) -> ExecutionState<B, L, C, R> {
         // TODO: Avoid cloning
         let ordered_cnf: CNF = order_formula(formula.clone());
         let variables = (1..=ordered_cnf.num_variables)
@@ -284,6 +286,7 @@ where B: 'static+BranchingStrategy,
         let branching_strategy = Rc::new(RefCell::new(B::initialise(&clauses, &variables)));
         let learning_scheme = Rc::new(RefCell::new(L::initialise(&clauses, &variables)));
         let clause_deletion_strategy = Rc::new(RefCell::new(C::initialise(&clauses, &variables)));
+        let restart_policy = Rc::new(RefCell::new(R::initialise(&clauses, &variables)));
 
         ExecutionState {
             clauses,
@@ -296,11 +299,13 @@ where B: 'static+BranchingStrategy,
                 branching_strategy.clone(),
                 learning_scheme.clone(),
                 clause_deletion_strategy.clone(),
+                restart_policy.clone(),
             ],
 
             branching_strategy,
             learning_scheme,
             clause_deletion_strategy,
+            restart_policy,
         }
     }
 
@@ -309,7 +314,7 @@ where B: 'static+BranchingStrategy,
             return SATSolution::Unsatisfiable;
         }
 
-        while let Some(literal) = { 
+        while let Some(literal) = {
             let mut bs = self.branching_strategy.borrow_mut();
             bs.pick_literal(&self.clauses, &self.variables)
         } {
@@ -320,6 +325,13 @@ where B: 'static+BranchingStrategy,
                 // If there was no conflict, eliminate unit clauses
                 .or(self.unit_propagation())
                 // If there was a conflict backtrack; return true if backtracking failed
+                .filter(|_| {
+                    let should_restart = self.restart_policy
+                        .borrow_mut()
+                        .restart();
+                    if should_restart { self.restart() }
+                    !should_restart
+                })
                 .map_or(false, |conflict_clause| {
                     self.backtracking(conflict_clause)
                 })
@@ -350,7 +362,7 @@ where B: 'static+BranchingStrategy,
             return SATSolution::Unsatisfiable;
         }
 
-        while let Some(literal) = { 
+        while let Some(literal) = {
             let mut bs = self.branching_strategy.borrow_mut();
             bs.pick_literal(&self.clauses, &self.variables)
         } {
@@ -361,13 +373,20 @@ where B: 'static+BranchingStrategy,
                 // If there was no conflict, eliminate unit clauses
                 .or(self.unit_propagation())
                 // If there was a conflict backtrack; return true if backtracking failed
+                .filter(|_| {
+                    let should_restart = self.restart_policy
+                        .borrow_mut()
+                        .restart();
+                    if should_restart { self.restart() }
+                    !should_restart
+                })
                 .map_or(false, |conflict_clause| {
                     self.backtracking(conflict_clause)
-                }) { 
-                    flag.store(true, Ordering::Relaxed);
-                    return SATSolution::Unsatisfiable;
+                })
+            { 
+                flag.store(true, Ordering::Relaxed);
+                return SATSolution::Unsatisfiable;
             }
-
             if !flag.load(Ordering::Relaxed) { return SATSolution::Unknown }
 
             let to_delete = self.clause_deletion_strategy.borrow_mut()
@@ -389,6 +408,17 @@ where B: 'static+BranchingStrategy,
                 .map(|var| var.assignment.map(|a| a.sign).unwrap_or(false))
                 .collect_vec(),
         )
+    }
+
+
+    fn restart(&mut self) {
+        self.branching_depth = 0;
+        self.unit_queue.clear();
+        while let Some(id) = self.assignment_stack.pop() {
+            let assignment = self.variables[id].assignment.take().unwrap();
+            let literal = CNFVar::new(id, assignment.sign);
+            self.updates.iter().for_each(|up| up.borrow_mut().on_unassign(literal, &self.clauses, &self.variables));
+        }
     }
 
     fn set_variable(&mut self, literal: CNFVar, assign_type: AssignmentType) -> Option<ClauseId> {
@@ -655,46 +685,52 @@ impl ClauseDeletionStrategy for IdentityDeletionStrategy {
 }
 
 
-pub struct CDCLSolver<B,L,C>
+pub struct CDCLSolver<B,L,C,R>
 where B: BranchingStrategy,
       L: LearningScheme,
-      C: ClauseDeletionStrategy {
+      C: ClauseDeletionStrategy,
+      R: 'static+RestartPolicy {
 
     branching_strategy: PhantomData<B>,
     learning_scheme: PhantomData<L>,
     clause_deletion_strategy: PhantomData<C>,
+    restart_policy: PhantomData<R>,
 }
 
-impl<B,L,C> CDCLSolver<B,L,C>
+impl<B,L,C,R> CDCLSolver<B,L,C,R>
 where B: 'static+BranchingStrategy,
       L: 'static+LearningScheme,
-      C: 'static+ClauseDeletionStrategy {
-    pub fn new() -> CDCLSolver<B,L,C> {
+      C: 'static+ClauseDeletionStrategy,
+      R: 'static+RestartPolicy {
+    pub fn new() -> CDCLSolver<B,L,C,R> {
         CDCLSolver {
             branching_strategy: PhantomData,
             learning_scheme: PhantomData,
             clause_deletion_strategy: PhantomData,
+            restart_policy: PhantomData,
         }
     }
 }
 
-impl<B,L,C> Solver for CDCLSolver<B,L,C>
+impl<B,L,C,R> Solver for CDCLSolver<B,L,C,R>
 where B: 'static+BranchingStrategy,
       L: 'static+LearningScheme,
-      C: 'static+ClauseDeletionStrategy {
+      C: 'static+ClauseDeletionStrategy,
+      R: 'static+RestartPolicy {
           fn solve(&self, formula: &CNF) -> SATSolution {
-              let execution_state = ExecutionState::<B,L,C>::new(formula);
+              let execution_state = ExecutionState::<B,L,C,R>::new(formula);
               execution_state.cdcl()
           }
 }
 
 #[async_trait]
-impl<B,L,C> InterruptibleSolver for CDCLSolver<B,L,C>
+impl<B,L,C,R> InterruptibleSolver for CDCLSolver<B,L,C,R>
 where B: 'static+Send+Sync+BranchingStrategy,
       L: 'static+Send+Sync+LearningScheme,
-      C: 'static+Send+Sync+ClauseDeletionStrategy {
+      C: 'static+Send+Sync+ClauseDeletionStrategy,
+      R: 'static+Send+Sync+RestartPolicy {
           async fn solve_interruptible(&self, formula: &CNF) -> SATSolution {
-              let execution_state = ExecutionState::<B,L,C>::new(formula);
+              let execution_state = ExecutionState::<B,L,C,R>::new(formula);
               FlagWaiter::start(move |flag| {
                   execution_state.interruptible_cdcl(flag)
               }).await
@@ -853,5 +889,129 @@ impl BranchingStrategy for VSIDS {
             }
         }
         None
+    }
+}
+
+
+pub trait RestartPolicy: Initialisation+Update {
+    fn restart(&mut self) -> bool;
+}
+
+pub struct RestartNever;
+impl Initialisation for RestartNever {
+    fn initialise(_clauses: &Clauses, _variables: &Variables) -> RestartNever {
+        RestartNever
+    }
+}
+
+impl Update for RestartNever {}
+impl RestartPolicy for RestartNever {
+    fn restart(&mut self) -> bool {false}
+}
+
+pub struct RestartFixed { conflicts: u64, rate: u64 }
+impl RestartFixed {
+    pub fn new(rate: u64) -> RestartFixed {
+        RestartFixed{
+            conflicts: 0,
+            rate,
+        }
+    }
+}
+impl Update for RestartFixed {
+    fn on_conflict(&mut self, _empty_clause: ClauseId, _clauses: &Clauses, _variables: &Variables) {
+        self.conflicts += 1;
+    }
+}
+impl Initialisation for RestartFixed {
+    fn initialise(_clauses: &Clauses, _variables: &Variables) -> RestartFixed {
+        RestartFixed::new(550)
+    }
+}impl RestartPolicy for RestartFixed {
+    fn restart(&mut self) -> bool {
+        if self.conflicts > self.rate {
+            self.conflicts = 0;
+            return true
+        }
+        false
+    }
+}
+
+pub struct RestartGeom { conflicts: u64, rate: u64, factor_percent: u64 }
+impl RestartGeom {
+    pub fn new(rate: u64, factor_percent: u64) -> RestartGeom {
+        RestartGeom{
+            conflicts: 0,
+            rate,
+            factor_percent,
+        }
+    }
+}
+impl Update for RestartGeom {
+    fn on_conflict(&mut self, _empty_clause: ClauseId, _clauses: &Clauses, _variables: &Variables) {
+        self.conflicts += 1;
+    }
+}
+impl Initialisation for RestartGeom {
+    fn initialise(_clauses: &Clauses, _variables: &Variables) -> RestartGeom {
+        RestartGeom::new(100, 150)
+    }
+}
+impl RestartPolicy for RestartGeom {
+    fn restart(&mut self) -> bool {
+        if self.conflicts > self.rate {
+            self.rate *= self.factor_percent;
+            self.rate /= 100;
+            self.conflicts = 0;
+            return true
+        }
+        false
+    }
+}
+
+
+pub struct RestartLuby { conflicts: u64, rate: u64, luby_state: (u64, u64, u64) }
+impl RestartLuby {
+    fn next_luby(&mut self) -> u64 {
+        let (u, v, w) = self.luby_state;
+        self.luby_state =
+            if u == w {
+                if u == v {
+                    (u + 1, 1, w * 2)
+                } else {
+                    (u, v + 1, w)
+                }
+            } else {
+                (u + 1, v, w)
+            };
+        v
+    }
+
+    pub fn new() -> RestartLuby {
+        RestartLuby {
+            conflicts: 0,
+            rate: 1,
+            luby_state: (2, 1, 2), // first step already made
+        }
+    }
+}
+impl Update for RestartLuby {
+    fn on_conflict(&mut self, _empty_clause: ClauseId, _clauses: &Clauses, _variables: &Variables) {
+        self.conflicts += 1;
+    }
+}
+impl Initialisation for RestartLuby {
+    fn initialise(_clauses: &Clauses, _variables: &Variables) -> RestartLuby {
+        RestartLuby::new()
+    }
+}
+impl RestartPolicy for RestartLuby {
+    fn restart(&mut self) -> bool {
+        if self.conflicts > self.rate {
+            self.rate = 32 * self.next_luby();
+            self.conflicts = 0;
+            return true
+        }
+        false
     }
 }
