@@ -1,40 +1,13 @@
-use std::{cell::RefCell, cmp::Reverse, collections::{HashSet, VecDeque, BinaryHeap, HashMap}, iter::FromIterator, marker::PhantomData, ops::{Not, Index, IndexMut}, rc::Rc};
+use std::{cell::RefCell, collections::VecDeque, marker::PhantomData, ops::Not, rc::Rc};
 use crate::{CNFClause, CNFVar, SATSolution, Solver, CNF};
 use itertools::Itertools;
 use tinyset::SetUsize;
-use stable_vec::StableVec;
 use crate::solvers::{InterruptibleSolver, FlagWaiter};
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
-use priority_queue::PriorityQueue;
 
-type BuildHasher = std::hash::BuildHasherDefault<rustc_hash::FxHasher>;
-
-#[allow(dead_code)]
-type IndexSet<V> = indexmap::IndexSet<V, BuildHasher>;
-type IndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasher>;
-
-pub type VariableId = usize;
-pub type ClauseId = usize;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AssignmentType {
-    Forced(ClauseId),
-    Branching,
-    Known,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Assignment {
-    pub sign: bool,
-    pub branching_level: usize,
-    pub reason: AssignmentType,
-}
-
-#[derive(Debug, Clone)]
-pub struct Variable {
-    pub watched_occ: HashSet<ClauseId>,
-    pub assignment: Option<Assignment>,
-}
+use super::variable::{VariableId, Variable, Variables, Assignment, AssignmentType};
+use super::clause::{ClauseId, Clause, Clauses};
+use super::util::{PriorityQueue, HashSet, HashMap, IndexMap, BuildHasher};
 
 fn order_formula(cnf: CNF) -> CNF {
     let mut order_cnf: CNF = CNF {clauses: Vec::new(), num_variables: cnf.num_variables};
@@ -47,176 +20,6 @@ fn order_formula(cnf: CNF) -> CNF {
     order_cnf
 }
 
-impl Variable {
-    fn new(cnf: &CNF, var_num: usize) -> Variable {
-        // default assignment if the variable is not contained in any clause and is empty
-        let mut assignment: Option<Assignment> = Some(Assignment {
-            sign: false,
-            branching_level: 0,
-            reason: AssignmentType::Known,
-        });
-        // if variable is contained in any clause set it to unassigned first
-        cnf.clauses.iter().for_each(|clause| {
-            for var in &clause.vars {
-                if var_num == var.id {
-                    assignment = None;
-                }
-            }
-        });
-
-        Variable {
-            watched_occ: cnf.clauses
-                .iter()
-                .enumerate()
-                .filter_map(|(index, clause)| {
-                    if clause.vars.first()?.id == var_num {
-                        return Some(index);
-                    }
-                    if clause.vars.last()?.id == var_num {
-                        return Some(index);
-                    }
-                    return None;
-                }).collect(),
-            assignment 
-        }
-    }
-
-    fn add_watched_occ(&mut self, index: ClauseId) {
-        self.watched_occ.insert(index);
-    }
-
-    fn remove_watched_occ(&mut self, index: ClauseId) {
-        self.watched_occ.remove(&index);
-    }
-}
-
-#[derive(Debug)]
-pub struct Clause {
-    literals: Vec<CNFVar>,
-    watched_literals: [usize; 2],
-}
-
-impl Clause {
-    fn new(cnf_clause: &CNFClause) -> Clause {
-        // decrement the variables by 1 to get a 0 offset
-        let mut cnf_variables = cnf_clause.vars.clone();
-        cnf_variables.iter_mut().for_each(|var| var.id -= 1);
-
-        // assign the first and the last literal as watched literals
-        let mut watched_literals: [usize; 2] = [0, 0];
-        if cnf_variables.len() > 0 {
-            watched_literals = [0, cnf_variables.len() - 1];
-        }
-
-        Clause {
-            literals: cnf_variables,
-            watched_literals,
-        }
-    }
-
-    fn get_watched_lits(&self) -> (CNFVar, CNFVar) {
-        (self.literals[self.watched_literals[0]], self.literals[self.watched_literals[1]])
-    }
-
-    fn get_first_watched(&self) -> CNFVar {
-        self.literals[self.watched_literals[0]]
-    }
-
-    #[allow(dead_code)]
-    fn get_second_watched(&self) -> CNFVar {
-        self.literals[self.watched_literals[1]]
-    }
-}
-
-pub struct Clauses {
-    formula: Vec<Clause>,
-    additional_clauses: StableVec<Clause>,
-    used_indices: BinaryHeap<Reverse<usize>>,
-}
-
-impl Clauses {
-    pub fn new(formula: Vec<Clause>) -> Clauses {
-        Clauses {
-            formula,
-            additional_clauses: StableVec::new(),
-            used_indices: BinaryHeap::new(),
-        }
-    }
-
-    /// Expects that the first literal in clause is free.
-    pub fn push(&mut self, clause: CNFClause) -> usize {
-        let mut watched_literals: [usize; 2] = [0, 0];
-        if clause.len() > 0 {
-            watched_literals = [0, clause.len() - 1];
-        }
-
-        let clause = Clause {
-            literals: clause.vars,
-            watched_literals,
-        };
-
-        self.formula.len() + if let Some(Reverse(index)) = self.used_indices.pop() {
-            self.additional_clauses.insert(index, clause);
-            index
-        } else {
-            self.additional_clauses.push(clause)
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.formula.len() + self.additional_clauses.num_elements()
-    }
-
-    pub fn len_formula(&self) -> usize {
-        self.formula.len()
-    }
-
-    pub fn remove(&mut self, index: usize) -> (CNFVar, CNFVar) {
-        let index = index.checked_sub(self.formula.len())
-            .expect("Cannot remove clauses from the original formula!");
-
-        self.used_indices.push(Reverse(index));
-
-        self.additional_clauses.remove(index)
-            .expect("Clause to delete was already deleted!")
-            .get_watched_lits()
-    }
-
-    pub fn iter(&self) -> impl std::iter::Iterator<Item=&Clause> {
-        self.formula.iter().chain(self.additional_clauses.values())
-    }
-}
-
-impl Index<ClauseId> for Clauses {
-    type Output = Clause;
-    fn index(&self, index: ClauseId) -> &Self::Output {
-        if index < self.formula.len() {
-            &self.formula[index]
-        } else {
-            &self.additional_clauses[index-self.formula.len()]
-        }
-    }
-}
-
-impl IndexMut<ClauseId> for Clauses {
-    fn index_mut(&mut self, index: ClauseId) -> &mut Self::Output {
-        if index < self.formula.len() {
-            &mut self.formula[index]
-        } else {
-            let l = self.formula.len();
-            &mut self.additional_clauses[index-l]
-        }
-    }
-}
-
-impl FromIterator<Clause> for Clauses {
-    fn from_iter<T: IntoIterator<Item=Clause>>(iter: T) -> Self {
-        Clauses::new(iter.into_iter().collect())
-    }
-}
-
-
-pub type Variables = Vec<Variable>;
 
 pub trait Update {
     fn on_assign(&mut self, _variable: VariableId, _clauses: &Clauses, _variables: &Variables) {}
@@ -734,7 +537,7 @@ where B: 'static+Send+Sync+BranchingStrategy,
 
 
 pub struct BerkMin {
-    activity: HashMap<ClauseId, usize, BuildHasher>,
+    activity: HashMap<ClauseId, usize>,
     insertion_order: VecDeque<ClauseId>,
     threshold: usize,
 }
@@ -788,7 +591,7 @@ impl ClauseDeletionStrategy for BerkMin {
 pub struct VSIDS {
     resort_period: usize,
     branchings: usize,
-    priority_queue: PriorityQueue<VariableId, *const usize, BuildHasher>,
+    priority_queue: PriorityQueue<*const usize, VariableId>,
     scores: Vec<usize>,
     counters: Vec<usize>
 }
