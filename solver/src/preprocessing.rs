@@ -62,6 +62,7 @@ fn subsumtion_test(clause1: CNFClause, clause2: CNFClause, num_vars: usize) -> b
     true
 }
 
+// C = C' v x and D = D' v x than Resx(C,D) := C' v D'
 fn resolution(clause1: CNFClause, clause2: CNFClause, resolution_variable: usize) -> CNFClause {
     let mut new_clause1: Vec<CNFVar> = clause1.vars.into_iter().filter(|var| {var.id != resolution_variable}).collect();
     let mut new_clause2: Vec<CNFVar> = clause2.vars.into_iter().filter(|var| {var.id != resolution_variable}).collect();
@@ -95,7 +96,6 @@ fn non_incr_var_elim_resolution(cnf: &mut CNF) {
     let mut change: bool = true;
 
     // iterate until no variables can be changed anymore
-    // (a v x) and (b v !x)
     while change {
         change = false;
         for variable_number in 1..=cnf.num_variables {
@@ -103,6 +103,7 @@ fn non_incr_var_elim_resolution(cnf: &mut CNF) {
             pos_occ.clear();
             neg_occ.clear();
             no_occ.clear();
+            // (a v x) and (b v !x) split for x
             for clause in &old_clauses {
                 if clause.vars.contains(&CNFVar{id: variable_number, sign: true}) {
                     pos_occ.push(clause.clone());
@@ -119,19 +120,18 @@ fn non_incr_var_elim_resolution(cnf: &mut CNF) {
             if pos_occ.len() > 0 && neg_occ.len() > 0 {
                 for pos_clause in &pos_occ {
                     for neg_clause in &neg_occ {
-                        new_combined.push(
-                            resolution(pos_clause.clone(), neg_clause.clone(), variable_number)
-                        );
+                        let resolution_clause: CNFClause = resolution(pos_clause.clone(), neg_clause.clone(), variable_number);
+                        if !is_tautology(&resolution_clause) {
+                            new_combined.push(resolution_clause);
+                            remove_dupl_variables(&mut new_combined);
+                        }
                     }
                 }
-            
-                // filter tautologies
-                new_combined = new_combined.into_iter().filter(|clause| {!is_tautology(clause)}).collect();
-                new_combined.append(&mut no_occ);
-                remove_dupl_variables(&mut new_combined);
             }
 
-            if new_combined.len() != 0 && new_combined.len() < old_clauses.len() {
+            // comparing amount of clauses if it increased or decreased in size
+            if new_combined.len() != 0 && new_combined.len() < pos_occ.len() + neg_occ.len() {
+                new_combined.append(&mut no_occ);
                 old_clauses = new_combined;
                 change = true;
             } 
