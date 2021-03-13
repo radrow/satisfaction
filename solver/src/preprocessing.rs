@@ -87,10 +87,6 @@ fn remove_dupl_variables(clauses: &mut Vec<CNFClause>) {
 }
 
 fn non_incr_var_elim_resolution(cnf: &mut CNF) {
-    let mut pos_occ: Vec<CNFClause> = Vec::new();
-    let mut neg_occ: Vec<CNFClause> = Vec::new();
-    let mut no_occ: Vec<CNFClause> = Vec::new();
-    let mut new_combined: Vec<CNFClause> = Vec::new();
     let mut old_clauses: Vec<CNFClause> = cnf.clauses.clone();
 
     let mut change: bool = true;
@@ -99,10 +95,12 @@ fn non_incr_var_elim_resolution(cnf: &mut CNF) {
     while change {
         change = false;
         for variable_number in 1..=cnf.num_variables {
+            let mut new_combined: Vec<CNFClause> = Vec::new();
+            let mut pos_occ: Vec<CNFClause> = Vec::new();
+            let mut neg_occ: Vec<CNFClause> = Vec::new();
+            let mut no_occ: Vec<CNFClause> = Vec::new();
+
             // decomposite the formula in 3 parts
-            pos_occ.clear();
-            neg_occ.clear();
-            no_occ.clear();
             // (a v x) and (b v !x) split for x
             for clause in &old_clauses {
                 if clause.vars.contains(&CNFVar{id: variable_number, sign: true}) {
@@ -113,8 +111,6 @@ fn non_incr_var_elim_resolution(cnf: &mut CNF) {
                     no_occ.push(clause.clone());
                 }
             }
-
-            new_combined = Vec::new();
 
             // all possbile combinations
             if pos_occ.len() > 0 && neg_occ.len() > 0 {
@@ -139,4 +135,8 @@ fn non_incr_var_elim_resolution(cnf: &mut CNF) {
     }
 
     cnf.clauses = old_clauses;
+}
+
+fn niver_postprocessing() {
+
 }
