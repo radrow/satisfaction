@@ -254,8 +254,6 @@ where B: 'static+BranchingStrategy,
     restart_policy: Rc<RefCell<R>>,
 
     updates: Vec<Rc<RefCell<dyn Update>>>,
-
-    original_formula: CNF
 }
 
 impl<B,L,C,R> ExecutionState<B,L,C,R>
@@ -290,7 +288,6 @@ where B: BranchingStrategy,
             branching_depth: 0,
             unit_queue,
             assignment_stack,
-            original_formula: ordered_cnf,
 
             updates: vec![
                 branching_strategy.clone(),
