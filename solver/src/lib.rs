@@ -28,4 +28,4 @@ pub use cnf::{CNFClause, CNFVar, CNF};
 pub use dpll::SatisfactionSolver;
 pub use sat_solution::{SATSolution, Valuation};
 pub use sat_solver::Solver;
-pub use preprocessing::NiVER;
+pub use preprocessing::{NiVER, remove_tautology};

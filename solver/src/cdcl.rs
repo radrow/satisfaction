@@ -1,5 +1,5 @@
 use std::{cell::RefCell, cmp::Reverse, collections::{HashSet, VecDeque, BinaryHeap}, iter::FromIterator, marker::PhantomData, ops::{Not, Index, IndexMut}, rc::Rc};
-use crate::{CNF, CNFClause, CNFVar, NiVER, SATSolution, Solver, preprocessing};
+use crate::{CNF, CNFClause, CNFVar, NiVER, SATSolution, Solver, preprocessing, remove_tautology};
 use itertools::Itertools;
 use preprocessing::Preprocessor;
 use tinyset::SetUsize;
@@ -278,6 +278,7 @@ where B: 'static+BranchingStrategy,
     branching_strategy: Rc<RefCell<B>>,
     learning_scheme: Rc<RefCell<L>>,
     clause_deletion_strategy: Rc<RefCell<C>>,
+    remove_taut: remove_tautology,
     niver: NiVER,
 
     updates: Vec<Rc<RefCell<dyn Update>>>,
@@ -290,8 +291,10 @@ where B: BranchingStrategy,
 
     fn new(formula: &CNF) -> Option<ExecutionState<B, L, C>> {
         let mut unit_queue = IndexMap::with_capacity_and_hasher(formula.num_variables, BuildHasher::default());
+        let mut remove_taut = remove_tautology::new();
+        let no_taut = remove_taut.preprocess(formula);
         let mut niver = NiVER::new();
-        let niver_processed_formula: CNF = niver.preprocess(formula);
+        let niver_processed_formula: CNF = niver.preprocess(&no_taut);
         let mut ordered_cnf: CNF = order_formula(&niver_processed_formula);
 
         if !find_unit_clauses(&mut ordered_cnf, &mut unit_queue) {
@@ -317,6 +320,7 @@ where B: BranchingStrategy,
 
         Some(ExecutionState {
             clauses,
+            remove_taut,
             niver,
             variables,
             branching_depth: 0,
@@ -336,6 +340,10 @@ where B: BranchingStrategy,
     }
 
     fn cdcl(mut self) -> SATSolution {
+        //if self.check_unsat() {
+        //    return SATSolution::Unsatisfiable;
+        //}
+
         if self.unit_propagation().is_some() {
             return SATSolution::Unsatisfiable;
         }
@@ -386,11 +394,17 @@ where B: BranchingStrategy,
         None
     }
 
-    fn unit_propagation(&mut self) -> Option<ClauseId> {
-        // todo -> maybe do the check if clauses are empty somewhere different
-        if self.unit_queue.len() == 0 && self.clauses.formula[0].literals.len() == 0 {
-            return Some(0);
+    fn check_unsat(&mut self) -> bool {
+        for clause in &self.clauses.formula {
+            if clause.literals.len() == 0 {
+                // unsat
+                return true;
+            }
         }
+        false
+    }
+
+    fn unit_propagation(&mut self) -> Option<ClauseId> {
         while let Some((id, (sign, reason))) = self.unit_queue.pop() {
             let empty_clause = self.set_variable(CNFVar::new(id, sign), AssignmentType::Forced(reason));
             if empty_clause.is_some() {

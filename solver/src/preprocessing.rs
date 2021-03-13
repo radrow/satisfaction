@@ -6,6 +6,7 @@ pub trait Preprocessor {
     fn restore(&mut self, assignment: SATSolution) -> SATSolution;
 }
 
+
 pub struct NiVER {
     removed_clauses_stack: Vec<(usize, Vec<CNFClause>)>,
     cnf_result: CNF
@@ -43,7 +44,7 @@ impl Preprocessor for NiVER {
                     for pos_clause in &pos_occ {
                         for neg_clause in &neg_occ {
                             let resolution_clause: CNFClause = self.resolution(pos_clause.clone(), neg_clause.clone(), variable_number);
-                            if !self.is_tautology(&resolution_clause) {
+                            if !is_tautology(&resolution_clause) {
                                 new_combined.push(resolution_clause);
                                 self.remove_dupl_variables(&mut new_combined);
                             }
@@ -77,6 +78,9 @@ impl Preprocessor for NiVER {
                     assign[elim_variable - 1] = true;
                     if !self.is_sat(&assign) {
                         assign[elim_variable - 1] = false;
+                        if !self.is_sat(&assign) {
+                            return SATSolution::Unsatisfiable;
+                        }
                     }
                 }
                 return SATSolution::Satisfiable(assign);
@@ -96,15 +100,17 @@ impl NiVER {
 
     fn is_sat(&self, assignment: &Vec<bool>) -> bool {
         for clause in &self.cnf_result.clauses {
-            let mut clause_sat: bool = false;
-            for var in &clause.vars {
-                if assignment[var.id - 1] == var.sign {
-                    clause_sat = true;
-                    break;
+            if clause.len() > 0 {
+                let mut clause_sat: bool = false;
+                for var in &clause.vars {
+                    if assignment[var.id - 1] == var.sign {
+                        clause_sat = true;
+                        break;
+                    }
                 }
-            }
-            if clause_sat == false {
-                return false;
+                if clause_sat == false {
+                    return false;
+                }
             }
         }
         true
@@ -118,14 +124,7 @@ impl NiVER {
         CNFClause{vars: new_clause1}
     }
 
-    fn is_tautology(&self, clause: &CNFClause) -> bool {
-        for variable in &clause.vars {
-            if clause.vars.contains(&-(*variable)) {
-                return true;
-            } 
-        }
-        false
-    }
+    
 
     fn remove_dupl_variables(&self, clauses: &mut Vec<CNFClause>) {
         for clause in clauses {
@@ -133,6 +132,37 @@ impl NiVER {
             clause.vars.dedup();
         }
     }
+}
+
+
+pub struct remove_tautology;
+
+impl Preprocessor for remove_tautology {
+    fn preprocess(&mut self, cnf: &CNF) -> CNF {
+        CNF {
+            clauses: cnf.clauses.clone().into_iter().filter(|clause| !is_tautology(clause)).collect(),
+            num_variables: cnf.num_variables
+        }
+    }
+
+    fn restore(&mut self, assignment: SATSolution) -> SATSolution {
+        assignment
+    }
+}
+
+impl remove_tautology {
+    pub fn new() -> remove_tautology {
+        remove_tautology
+    }
+}
+
+fn is_tautology(clause: &CNFClause) -> bool {
+    for variable in &clause.vars {
+        if clause.vars.contains(&-(*variable)) {
+            return true;
+        } 
+    }
+    false
 }
 
 /// function to remove the case (a v !b) and (!a v b)
