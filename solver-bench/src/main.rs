@@ -8,7 +8,7 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use solver::{
     solvers::{InterruptibleSolver, TimeLimitedSolver, TimedSolver},
     SATSolution, SatisfactionSolver, CNF, NaiveBranching,
-    cdcl::{CDCLSolver, BerkMin, RelSAT, VSIDS},
+    cdcl::{CDCLSolver, BerkMin, RelSAT, VSIDS, RestartFixed},
 };
 use std::{
     collections::HashMap,
@@ -70,11 +70,11 @@ fn make_config<'a>() -> Config {
         ),
         (
             "CDCL-Naive-RelSAT-BerkMin".to_string(),
-            Box::new(CDCLSolver::<NaiveBranching, RelSAT, BerkMin>::new()),
+            Box::new(CDCLSolver::<NaiveBranching, RelSAT, BerkMin, RestartFixed>::new()),
         ),
         (
             "CDCL-VSIDS-RelSAT-BerkMin".to_string(),
-            Box::new(CDCLSolver::<VSIDS, RelSAT, BerkMin>::new()),
+            Box::new(CDCLSolver::<VSIDS, RelSAT, BerkMin, RestartFixed>::new()),
         ),
     ];
 

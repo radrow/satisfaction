@@ -219,11 +219,11 @@ impl FromIterator<Clause> for Clauses {
 pub type Variables = Vec<Variable>;
 
 pub trait Update {
-    fn on_assign(&mut self, variable: VariableId, clauses: &Clauses, variables: &Variables) {}
-    fn on_unassign(&mut self, literal: CNFVar, clauses: &Clauses, variables: &Variables) {}
-    fn on_learn(&mut self, learned_clause: ClauseId, clauses: &Clauses, variables: &Variables) {}
-    fn on_conflict(&mut self, empty_clause: ClauseId, clauses: &Clauses, variables: &Variables) {}
-    fn on_deletion(&mut self, deleted_clause: &Clause) {}
+    fn on_assign(&mut self, _variable: VariableId, _clauses: &Clauses, _variables: &Variables) {}
+    fn on_unassign(&mut self, _literal: CNFVar, _clauses: &Clauses, _variables: &Variables) {}
+    fn on_learn(&mut self, _learned_clause: ClauseId, _clauses: &Clauses, _variables: &Variables) {}
+    fn on_conflict(&mut self, _empty_clause: ClauseId, _clauses: &Clauses, _variables: &Variables) {}
+    fn on_deletion(&mut self, _deleted_clause: &Clause) {}
 }
 
 pub trait Initialisation {
@@ -387,7 +387,7 @@ where B: 'static+BranchingStrategy,
                 flag.store(true, Ordering::Relaxed);
                 return SATSolution::Unsatisfiable;
             }
-            if !flag.load(Ordering::Relaxed) { return SATSolution::Unknown }
+            if flag.load(Ordering::Relaxed) { return SATSolution::Unknown }
 
             let to_delete = self.clause_deletion_strategy.borrow_mut()
                 .delete_clause(&self.clauses, &self.variables);
@@ -685,12 +685,7 @@ impl ClauseDeletionStrategy for IdentityDeletionStrategy {
 }
 
 
-pub struct CDCLSolver<B,L,C,R>
-where B: BranchingStrategy,
-      L: LearningScheme,
-      C: ClauseDeletionStrategy,
-      R: 'static+RestartPolicy {
-
+pub struct CDCLSolver<B,L,C,R> {
     branching_strategy: PhantomData<B>,
     learning_scheme: PhantomData<L>,
     clause_deletion_strategy: PhantomData<C>,
