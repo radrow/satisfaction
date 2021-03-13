@@ -322,10 +322,14 @@ where B: BranchingStrategy,
                 // If there was no conflict, eliminate unit clauses
                 .or(self.unit_propagation())
                 // If there was a conflict backtrack; return true if backtracking failed
+                .filter(|_| {
+                    let should_restart = self.restart_policy
+                        .borrow_mut()
+                        .restart();
+                    if should_restart { self.restart() }
+                    !should_restart
+                })
                 .map_or(false, |conflict_clause| {
-                    if self.restart_policy.borrow_mut().restart() {
-                        self.restart();
-                    }
                     self.backtracking(conflict_clause)
                 })
             { return SATSolution::Unsatisfiable; }
@@ -344,8 +348,7 @@ where B: BranchingStrategy,
     fn restart(&mut self) {
         self.branching_depth = 0;
         self.unit_queue.clear();
-        self.assignment_stack = Vec::with_capacity(self.original_formula.num_variables);
-        for id in 0..self.variables.len() {
+        while let Some(id) = self.assignment_stack.pop() {
             self.variables[id].assignment = None;
             self.updates.iter().for_each(|up| up.borrow_mut().on_unassign(id, &self.clauses, &self.variables));
         }
@@ -353,6 +356,7 @@ where B: BranchingStrategy,
 
     fn set_variable(&mut self, literal: CNFVar, assign_type: AssignmentType) -> Option<ClauseId> {
         // set the variable and remember the assignment
+        println!("Set {:?}\t{:?}", literal, assign_type);
         let assignment = Assignment {
             sign: literal.sign,
             branching_level: self.branching_depth,
@@ -416,6 +420,7 @@ where B: BranchingStrategy,
         &mut self,
         empty_clause: ClauseId,
     ) -> bool {
+        println!("Backtracking {:?}", empty_clause);
         self.updates.iter()
             .for_each(|up| up.borrow_mut().on_conflict(empty_clause, &self.clauses, &self.variables));
 
