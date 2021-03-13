@@ -3,5 +3,6 @@ pub mod update;
 pub mod clause;
 pub mod variable;
 pub mod satisfaction;
+pub mod branching_strategies;
 
-pub use satisfaction::{VSIDS, CDCLSolver, BerkMin, RestartNever, RestartFixed, RestartGeom, RestartLuby, IdentityDeletionStrategy, RelSAT};
+pub use satisfaction::{CDCLSolver, BerkMin, RestartNever, RestartFixed, RestartGeom, RestartLuby, IdentityDeletionStrategy, RelSAT};
