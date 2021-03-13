@@ -1,15 +1,3 @@
-mod config;
-mod plotting;
-
-use clap::{App, Arg};
-use config::Config;
-use plotting::plot_runtimes;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use solver::{
-    solvers::{InterruptibleSolver, TimeLimitedSolver, TimedSolver},
-    SATSolution, SatisfactionSolver, CNF, NaiveBranching,
-    cdcl::{CDCLSolver, BerkMin, RelSAT, VSIDS, RestartFixed, RestartGeom, RestartNever, RestartLuby},
-};
 use std::{
     collections::HashMap,
     fs::File,
@@ -18,8 +6,31 @@ use std::{
     time::Duration,
 };
 
+use clap::{App, Arg};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+
+use config::Config;
+use plotting::plot_runtimes;
+use solver::{
+    cdcl::{
+        CDCLSolver,
+        branching_strategies::VSIDS,
+        learning_schemes::RelSAT,
+        deletion_strategies::{BerkMin, IdentityDeletionStrategy},
+        restart_policies::{
+            RestartNever,
+            RestartFixed,
+        },
+    },
+    CNF, SatisfactionSolver, SATSolution,
+    solvers::{InterruptibleSolver, TimedSolver, TimeLimitedSolver},
+};
+
+mod config;
+mod plotting;
+
 fn make_config<'a>() -> Config {
-    let matches = App::new("satisfaction benchmarking")
+    let matches = App::new("satisfaction.rs benchmarking")
         .version("1.0")
         .author("Alex&Korbi&Radek inc.")
         .about("Racing pit for SAT solvers")
@@ -56,7 +67,7 @@ fn make_config<'a>() -> Config {
             "DLIS".to_string(),
             Box::new(SatisfactionSolver::new(solver::DLIS)),
         ),
-        (
+        /*(
             "DLCS".to_string(),
             Box::new(SatisfactionSolver::new(solver::DLCS)),
         ),
@@ -67,26 +78,22 @@ fn make_config<'a>() -> Config {
         (
             "Jeroslaw-Wang".to_string(),
             Box::new(SatisfactionSolver::new(solver::JeroslawWang)),
-        ),
-        (
-            "CDCL-Naive-RelSAT-BerkMin-Fixed".to_string(),
-            Box::new(CDCLSolver::<NaiveBranching, RelSAT, BerkMin, RestartFixed>::new()),
-        ),
+        ),*/
         (
             "CDCL-VSIDS-RelSAT-BerkMin-Fixed".to_string(),
             Box::new(CDCLSolver::<VSIDS, RelSAT, BerkMin, RestartFixed>::new()),
         ),
         (
-            "CDCL-VSIDS-RelSAT-BerkMin-Geom".to_string(),
-            Box::new(CDCLSolver::<VSIDS, RelSAT, BerkMin, RestartGeom>::new()),
-        ),
-        (
-            "CDCL-VSIDS-RelSAT-BerkMin-Luby".to_string(),
-            Box::new(CDCLSolver::<VSIDS, RelSAT, BerkMin, RestartLuby>::new()),
-        ),
-        (
             "CDCL-VSIDS-RelSAT-BerkMin-Never".to_string(),
             Box::new(CDCLSolver::<VSIDS, RelSAT, BerkMin, RestartNever>::new()),
+        ),
+        (
+            "CDCL-VSIDS-RelSAT-IdentityDeletionStrategy-Fixed".to_string(),
+            Box::new(CDCLSolver::<VSIDS, RelSAT, IdentityDeletionStrategy, RestartFixed>::new()),
+        ),
+        (
+            "CDCL-VSIDS-RelSAT-IdentityDeletionStrategy-Never".to_string(),
+            Box::new(CDCLSolver::<VSIDS, RelSAT, IdentityDeletionStrategy, RestartNever>::new()),
         ),
     ];
 
