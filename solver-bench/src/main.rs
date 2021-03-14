@@ -1,13 +1,3 @@
-mod config;
-mod plotting;
-
-use clap::{App, Arg};
-use config::Config;
-use plotting::plot_runtimes;
-use solver::{
-    solvers::{InterruptibleSolver, TimeLimitedSolver, TimedSolver},
-    SATSolution, SatisfactionSolver, CNF,
-};
 use std::{
     collections::HashMap,
     fs::File,
@@ -16,8 +6,28 @@ use std::{
     time::Duration,
 };
 
+use clap::{App, Arg};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+
+use config::Config;
+use plotting::plot_runtimes;
+use solver::{
+    cdcl::{
+        CDCLSolver,
+        branching_strategies::VSIDS,
+        learning_schemes::RelSAT,
+        deletion_strategies::NoDeletion,
+        restart_policies::RestartFixed,
+    },
+    CNF, SatisfactionSolver, SATSolution,
+    solvers::{InterruptibleSolver, TimedSolver, TimeLimitedSolver},
+};
+
+mod config;
+mod plotting;
+
 fn make_config<'a>() -> Config {
-    let matches = App::new("satisfaction benchmarking")
+    let matches = App::new("satisfaction.rs benchmarking")
         .version("1.0")
         .author("Alex&Korbi&Radek inc.")
         .about("Racing pit for SAT solvers")
@@ -54,7 +64,7 @@ fn make_config<'a>() -> Config {
             "DLIS".to_string(),
             Box::new(SatisfactionSolver::new(solver::DLIS)),
         ),
-        (
+        /*(
             "DLCS".to_string(),
             Box::new(SatisfactionSolver::new(solver::DLCS)),
         ),
@@ -65,6 +75,10 @@ fn make_config<'a>() -> Config {
         (
             "Jeroslaw-Wang".to_string(),
             Box::new(SatisfactionSolver::new(solver::JeroslawWang)),
+        ),*/
+        (
+            "CDCL".to_string(),
+            Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartFixed(500))),
         ),
     ];
 
@@ -135,7 +149,7 @@ fn run_benchmark(
     max_duration: Duration,
 ) -> HashMap<String, Vec<Duration>> {
     solvers
-        .into_iter()
+        .into_par_iter()
         .map(|(name, solver)| {
             println!("Started {}", &name);
             let result = run_tests(&formulae, solver, max_duration);

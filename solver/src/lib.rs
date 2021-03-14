@@ -19,8 +19,6 @@ pub mod sat_solver;
 /// for one that can be interrupted or timed.
 pub mod solvers;
 
-mod preprocessing;
-
 pub use branching_strategy::{BranchingStrategy, JeroslawWang, NaiveBranching, DLCS, DLIS, MOM};
 pub use bruteforce::Bruteforce;
 pub use cadical_solver::CadicalSolver;
@@ -28,4 +26,3 @@ pub use cnf::{CNFClause, CNFVar, CNF};
 pub use dpll::SatisfactionSolver;
 pub use sat_solution::{SATSolution, Valuation};
 pub use sat_solver::Solver;
-pub use preprocessing::{NiVER, remove_tautology};

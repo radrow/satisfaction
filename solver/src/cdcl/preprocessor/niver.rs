@@ -1,11 +1,5 @@
-use crate::{CNF, CNFClause, CNFVar, SATSolution};
-use std::{collections::{HashSet}};
-
-pub trait Preprocessor {
-    fn preprocess(&mut self, cnf: &CNF) -> CNF;
-    fn restore(&mut self, assignment: SATSolution) -> SATSolution;
-}
-
+use crate::{CNF, CNFVar, CNFClause, SATSolution};
+use super::{preprocessor::Preprocessor};
 
 pub struct NiVER {
     removed_clauses_stack: Vec<(usize, Vec<CNFClause>)>,
@@ -44,7 +38,7 @@ impl Preprocessor for NiVER {
                     for pos_clause in &pos_occ {
                         for neg_clause in &neg_occ {
                             let resolution_clause: CNFClause = self.resolution(pos_clause.clone(), neg_clause.clone(), variable_number);
-                            if !is_tautology(&resolution_clause) {
+                            if !self.is_tautology(&resolution_clause) {
                                 new_combined.push(resolution_clause);
                                 self.remove_dupl_variables(&mut new_combined);
                             }
@@ -124,7 +118,14 @@ impl NiVER {
         CNFClause{vars: new_clause1}
     }
 
-    
+    fn is_tautology(&self, clause: &CNFClause) -> bool {
+        for variable in &clause.vars {
+            if clause.vars.contains(&-(*variable)) {
+                return true;
+            } 
+        }
+        false
+    }
 
     fn remove_dupl_variables(&self, clauses: &mut Vec<CNFClause>) {
         for clause in clauses {
@@ -132,89 +133,4 @@ impl NiVER {
             clause.vars.dedup();
         }
     }
-}
-
-
-pub struct remove_tautology;
-
-impl Preprocessor for remove_tautology {
-    fn preprocess(&mut self, cnf: &CNF) -> CNF {
-        CNF {
-            clauses: cnf.clauses.clone().into_iter().filter(|clause| !is_tautology(clause)).collect(),
-            num_variables: cnf.num_variables
-        }
-    }
-
-    fn restore(&mut self, assignment: SATSolution) -> SATSolution {
-        assignment
-    }
-}
-
-impl remove_tautology {
-    pub fn new() -> remove_tautology {
-        remove_tautology
-    }
-}
-
-fn is_tautology(clause: &CNFClause) -> bool {
-    for variable in &clause.vars {
-        if clause.vars.contains(&-(*variable)) {
-            return true;
-        } 
-    }
-    false
-}
-
-/// function to remove the case (a v !b) and (!a v b)
-pub fn equivalent_substitution(cnf: &mut CNF) {
-    // only look at clauses that are relevant and have size of 2
-    let small_clauses: Vec<(usize, &CNFClause)> = cnf.clauses.iter().enumerate().filter(|(i, clause)| clause.len() == 2).collect();
-    let mut remove_indices: HashSet<usize> = HashSet::new();
-    
-    // compare each small clause with the other small clauses if they can be removed
-    for orign_clause in &small_clauses {
-        for comp_clause in &small_clauses {
-            if (orign_clause.1.vars[0].id == comp_clause.1.vars[0].id && orign_clause.1.vars[0].sign != comp_clause.1.vars[0].sign)
-                || (orign_clause.1.vars[0].id == comp_clause.1.vars[1].id && orign_clause.1.vars[0].sign != comp_clause.1.vars[1].sign) {
-
-                if (orign_clause.1.vars[1].id == comp_clause.1.vars[0].id && orign_clause.1.vars[1].sign != comp_clause.1.vars[0].sign)
-                    || (orign_clause.1.vars[1].id == comp_clause.1.vars[1].id && orign_clause.1.vars[1].sign != comp_clause.1.vars[1].sign){
-
-                    // add to the clauses that can be removed
-                    remove_indices.insert(orign_clause.0);
-                    remove_indices.insert(comp_clause.0);
-                }
-            }
-        }
-    }
-    // dont remove clauses if all the clauses would get lost
-    if remove_indices.len() != cnf.clauses.len() {
-
-        // remove the unnessersary clauses
-        cnf.clauses = cnf.clauses.iter().enumerate().filter_map(|(index, clause)| {
-            if remove_indices.contains(&index) {
-                return None;
-            }
-            return Some(clause.clone());
-        }).collect();
-    }
-}
-
-fn sig(clause: CNFClause, num_vars: usize) -> usize {
-    let mut mask = 1;
-    let mut result = 0;
-    for i in 0..num_vars {
-        if clause.vars.contains(&CNFVar {id: i, sign: true}) || clause.vars.contains(&CNFVar {id: i, sign: false}) {
-            result = result | mask;
-        }
-        mask = mask << 1;
-    }
-    result
-}
-
-fn subsumtion_test(clause1: CNFClause, clause2: CNFClause, num_vars: usize) -> bool {
-    if sig(clause1, num_vars) & !sig(clause2, num_vars) != 0 {
-        return false;
-    }
-    true
 }

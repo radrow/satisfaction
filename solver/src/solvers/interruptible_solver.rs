@@ -1,4 +1,9 @@
 use crate::{SATSolution, Solver, CNF};
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::thread::{JoinHandle, spawn};
+use std::future::Future;
+use std::task::{Poll, Context};
+use std::pin::Pin;
 use async_std::task::block_on;
 use async_trait::async_trait;
 use auto_impl::auto_impl;
@@ -36,5 +41,43 @@ impl<S: InterruptibleSolver> From<S> for InterruptibleSolverWrapper<S> {
 impl<S: InterruptibleSolver> Solver for InterruptibleSolverWrapper<S> {
     fn solve(&self, formula: &CNF) -> SATSolution {
         block_on(self.solver.solve_interruptible(formula))
+    }
+}
+
+pub struct FlagWaiter {
+    flag: Arc<AtomicBool>,
+    handle: Option<JoinHandle<SATSolution>>,
+}
+
+impl FlagWaiter {
+    pub fn start(func: impl FnOnce(Arc<AtomicBool>) -> SATSolution+Send+Sync+'static) -> FlagWaiter {
+        let flag = Arc::new(AtomicBool::new(false));
+        let other = flag.clone();
+        FlagWaiter {
+            handle: Some(spawn(move || func(other))),
+            flag
+        }
+    }
+}
+
+impl Drop for FlagWaiter {
+    fn drop(&mut self) {
+        self.flag.store(true, Ordering::Relaxed);
+    }
+}
+
+impl Future for FlagWaiter {
+    type Output = SATSolution;
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if self.flag.load(Ordering::Relaxed) {
+            Poll::Ready(self.handle
+                .take()
+                .expect("FlagWaiter was polled twice!")
+                .join()
+                .unwrap())
+        } else {
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
     }
 }

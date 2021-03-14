@@ -33,24 +33,23 @@ impl BranchingStrategy for NaiveBranching {
             .iter()
             .enumerate()
             // Only consider unset variables
-            .filter_map(|(i, v)| match v.value {
+            .find_map(|(i, v)| match v.value {
                 VarValue::Free => Some(CNFVar::new(i, true)),
                 _ => None,
             })
-            .next() // Take the first one
     }
 }
 
-impl crate::cdcl::Initialisation for NaiveBranching {
-    fn initialise(_clauses: &crate::cdcl::Clauses, _variables: &crate::cdcl::Variables) -> Self where Self: Sized {
+impl crate::cdcl::update::Initialisation for NaiveBranching {
+    fn initialise(_clauses: &crate::cdcl::clause::Clauses, _variables: &crate::cdcl::variable::Variables) -> Self where Self: Sized {
         NaiveBranching
     }
 }
 
-impl crate::cdcl::Update for NaiveBranching {}
+impl crate::cdcl::update::Update for NaiveBranching {}
 
-impl crate::cdcl::BranchingStrategy for NaiveBranching {
-    fn pick_literal(&mut self, _clauses: &crate::cdcl::Clauses, variables: &crate::cdcl::Variables) -> Option<CNFVar> {
+impl crate::cdcl::branching_strategies::BranchingStrategy for NaiveBranching {
+    fn pick_literal(&mut self, _clauses: &crate::cdcl::clause::Clauses, variables: &crate::cdcl::variable::Variables) -> Option<CNFVar> {
         variables
             .iter()
             .enumerate()

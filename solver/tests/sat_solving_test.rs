@@ -1,10 +1,23 @@
-use proptest::{bool::weighted, collection::vec, prelude::*};
-use solver::{
-    CNFClause, CNFVar, CadicalSolver, JeroslawWang, NaiveBranching, SATSolution,
-    SatisfactionSolver, Solver, CNF, DLCS, DLIS, MOM,
-};
-use solver::cdcl::{CDCLSolver, IdentityDeletionStrategy, RelSAT};
 use std::path::PathBuf;
+
+use proptest::{bool::weighted, collection::vec, prelude::*};
+
+use solver::{
+    CadicalSolver, CNF, CNFClause, CNFVar, DLCS, DLIS,
+    JeroslawWang, MOM, NaiveBranching, SatisfactionSolver, SATSolution, Solver,
+};
+use solver::cdcl::{
+    CDCLSolver,
+    branching_strategies::VSIDS,
+    learning_schemes::RelSAT,
+    restart_policies::{
+        RestartFixed,
+        RestartGeom,
+        RestartLuby,
+        RestartNever,
+    },
+    deletion_strategies::{NoDeletion, BerkMin},
+};
 
 const MAX_NUM_VARIABLES: usize = 50;
 const MAX_NUM_LITERALS: usize = 10;
@@ -12,7 +25,12 @@ const MAX_NUM_CLAUSES: usize = 50;
 
 fn setup_custom_solver() -> Vec<(&'static str, Box<dyn Solver>)> {
     let mut solvers: Vec<(&'static str, Box<dyn Solver>)> = Vec::new();
-    solvers.push(("CDCLSolver", Box::new(CDCLSolver::<NaiveBranching, RelSAT, IdentityDeletionStrategy>::new())));
+    solvers.push(("CDCL-BerkMin-Never", Box::new(CDCLSolver::new(VSIDS, RelSAT, BerkMin::default(), RestartNever))));
+    solvers.push(("CDCL-No-Never", Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartNever))));
+    solvers.push(("CDCL-Fixed", Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartFixed::default()))));
+    solvers.push(("CDCL-Geom", Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartGeom::default()))));
+    solvers.push(("CDCL-Luby", Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartLuby::default())))); 
+
     solvers.push(("NaiveBranching", Box::new(SatisfactionSolver::new(NaiveBranching))));
     solvers.push(("JeroslawWang", Box::new(SatisfactionSolver::new(JeroslawWang))));
     solvers.push(("DLIS", Box::new(SatisfactionSolver::new(DLIS))));
