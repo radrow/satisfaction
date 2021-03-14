@@ -1,14 +1,15 @@
 use crate::{CNF, CNFVar, CNFClause, SATSolution};
-use super::{preprocessor::Preprocessor};
+use super::{Preprocessor, PreprocessorFactory};
 
-pub struct NiVER {
+pub struct NiVERInstance {
     removed_clauses_stack: Vec<(usize, Vec<CNFClause>)>,
     cnf_result: CNF
 }
 
-impl Preprocessor for NiVER {
-    fn preprocess(&mut self, cnf: &CNF) -> CNF {
-        let mut old_clauses: Vec<CNFClause> = cnf.clauses.clone();
+
+impl Preprocessor for NiVERInstance {
+    fn preprocess(&mut self, cnf: CNF) -> CNF {
+        let mut old_clauses: Vec<CNFClause> = cnf.clauses;
 
         let mut change: bool = true;
 
@@ -84,14 +85,7 @@ impl Preprocessor for NiVER {
     }
 }
 
-impl NiVER {
-    pub fn new() -> NiVER {
-        NiVER {
-            removed_clauses_stack: Vec::new(),
-            cnf_result: CNF {clauses: Vec::new(), num_variables: 0}
-        }
-    }
-
+impl NiVERInstance {
     fn is_sat(&self, assignment: &Vec<bool>) -> bool {
         for clause in &self.cnf_result.clauses {
             if clause.len() > 0 {
@@ -132,5 +126,16 @@ impl NiVER {
             clause.vars.sort();
             clause.vars.dedup();
         }
+    }
+}
+
+pub struct NiVER;
+
+impl PreprocessorFactory for NiVER {
+    fn new(&self) -> Box<dyn Preprocessor> {
+        Box::new(NiVERInstance {
+            removed_clauses_stack: Vec::new(),
+            cnf_result: CNF {clauses: Vec::new(), num_variables: 0}
+        })
     }
 }

@@ -1,5 +1,5 @@
 use crate::{CNF, CNFVar, CNFClause, SATSolution};
-use super::{preprocessor::Preprocessor};
+use super::Preprocessor;
 
 
 fn sig(clause: CNFClause, num_vars: usize) -> usize {
@@ -14,7 +14,7 @@ fn sig(clause: CNFClause, num_vars: usize) -> usize {
     result
 }
 
-fn subsumtion_test(clause1: CNFClause, clause2: CNFClause, num_vars: usize) -> bool {
+fn subsumption_test(clause1: CNFClause, clause2: CNFClause, num_vars: usize) -> bool {
     if sig(clause1, num_vars) & !sig(clause2, num_vars) != 0 {
         return false;
     }

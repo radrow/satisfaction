@@ -10,7 +10,7 @@ use crate::solvers::{FlagWaiter, InterruptibleSolver};
 
 use super::{
     branching_strategies::BranchingStrategy,
-    preprocessor::{NiVER, RemoveTautology, Preprocessor},
+    preprocessors::{Preprocessor, PreprocessorFactory},
     clause::{Clause, ClauseId, Clauses},
     learning_schemes::LearningScheme,
     update::Update,
@@ -20,19 +20,21 @@ use super::{
 };
 
 
-pub struct CDCLSolver<B,BF,L,LF,C,CF,R,RF>
+pub struct CDCLSolver<B,BF,L,LF,C,CF,R,RF,PF>
 where BF: AbstractFactory<Product=B>,
       LF: AbstractFactory<Product=L>,
       CF: AbstractFactory<Product=C>,
       RF: AbstractFactory<Product=R>,
+      PF: PreprocessorFactory
 {
     branching_strategy: BF,
     learning_scheme: LF,
     deletion_strategy: CF,
     restart_policy: RF,
+    preprocessor: PF,
 }
 
-impl<B,BF,L,LF,C,CF,R,RF> CDCLSolver<B,BF,L,LF,C,CF,R,RF>
+impl<B,BF,L,LF,C,CF,R,RF,PF> CDCLSolver<B,BF,L,LF,C,CF,R,RF,PF>
 where B: BranchingStrategy,
       L: LearningScheme,
       C: ClauseDeletionStrategy,
@@ -42,18 +44,20 @@ where B: BranchingStrategy,
       LF: AbstractFactory<Product=L>,
       CF: AbstractFactory<Product=C>,
       RF: AbstractFactory<Product=R>,
+      PF: PreprocessorFactory
 {
-    pub fn new(branching_strategy: BF, learning_scheme: LF, deletion_strategy: CF, restart_policy: RF) -> CDCLSolver<B,BF,L,LF,C,CF,R,RF> {
+    pub fn new(branching_strategy: BF, learning_scheme: LF, deletion_strategy: CF, restart_policy: RF, preprocessor: PF) -> CDCLSolver<B,BF,L,LF,C,CF,R,RF,PF> {
         CDCLSolver {
             branching_strategy,
             learning_scheme,
             deletion_strategy,
             restart_policy,
+            preprocessor,
         }
     }
 }
 
-impl<B,BF,L,LF,C,CF,R,RF> Solver for CDCLSolver<B,BF,L,LF,C,CF,R,RF>
+impl<B,BF,L,LF,C,CF,R,RF,PF> Solver for CDCLSolver<B,BF,L,LF,C,CF,R,RF,PF>
 where B: 'static+BranchingStrategy,
       L: 'static+LearningScheme,
       C: 'static+ClauseDeletionStrategy,
@@ -63,8 +67,13 @@ where B: 'static+BranchingStrategy,
       LF: AbstractFactory<Product=L>,
       CF: AbstractFactory<Product=C>,
       RF: AbstractFactory<Product=R>,
+      PF: PreprocessorFactory,
 {
     fn solve(&self, formula: &CNF) -> SATSolution {
+        let mut preprocessor = self.preprocessor.new();
+
+        let formula = preprocessor.preprocess(formula.clone());
+
         let execution_state = ExecutionState::new(
             formula,
             &self.branching_strategy,
@@ -73,14 +82,14 @@ where B: 'static+BranchingStrategy,
             &self.restart_policy
             );
         match execution_state {
-            Some(state) => state.cdcl(),
+            Some(state) => preprocessor.restore(state.cdcl()),
             None => return SATSolution::Unsatisfiable
         }
     }
 }
 
 #[async_trait]
-impl<B,BF,L,LF,C,CF,R,RF> InterruptibleSolver for CDCLSolver<B,BF,L,LF,C,CF,R,RF>
+impl<B,BF,L,LF,C,CF,R,RF,PF> InterruptibleSolver for CDCLSolver<B,BF,L,LF,C,CF,R,RF,PF>
 where B: 'static+Send+Sync+BranchingStrategy,
       L: 'static+Send+Sync+LearningScheme,
       C: 'static+Send+Sync+ClauseDeletionStrategy,
@@ -90,8 +99,15 @@ where B: 'static+Send+Sync+BranchingStrategy,
       LF: Send+Sync+AbstractFactory<Product=L>,
       CF: Send+Sync+AbstractFactory<Product=C>,
       RF: Send+Sync+AbstractFactory<Product=R>,
+
+      PF: Send+Sync+PreprocessorFactory,
 {
     async fn solve_interruptible(&self, formula: &CNF) -> SATSolution {
+        let mut preprocessor = self.preprocessor.new();
+        let formula = preprocessor.preprocess(formula.clone());
+
+        async_std::task::yield_now().await;
+
         let execution_state = ExecutionState::new(
             formula,
             &self.branching_strategy,
@@ -101,7 +117,7 @@ where B: 'static+Send+Sync+BranchingStrategy,
             );
         FlagWaiter::start(move |flag| {
             match execution_state {
-                Some(state) => state.interruptible_cdcl(flag),
+                Some(state) => preprocessor.restore(state.interruptible_cdcl(flag)),
                 None => return SATSolution::Unsatisfiable
             }
         }).await
@@ -158,8 +174,6 @@ struct ExecutionState<B,L,C,R> {
     learning_scheme: Rc<RefCell<L>>,
     clause_deletion_strategy: Rc<RefCell<C>>,
     restart_policy: Rc<RefCell<R>>,
-    remove_taut: RemoveTautology,
-    niver: NiVER,
 
     updates: Vec<Rc<RefCell<dyn Update>>>,
 }
@@ -174,7 +188,7 @@ where B: 'static+BranchingStrategy,
       R: 'static+RestartPolicy {
 
     fn new(
-        formula: &CNF,
+        formula: CNF,
         branching_strategy: &impl AbstractFactory<Product=B>,
         learning_scheme: &impl AbstractFactory<Product=L>,
         deletion_strategy: &impl AbstractFactory<Product=C>,
@@ -183,11 +197,7 @@ where B: 'static+BranchingStrategy,
 
         let mut unit_queue = IndexMap::with_capacity_and_hasher(formula.num_variables, BuildHasher::default());
 
-        let mut remove_taut = RemoveTautology::new();
-        let no_taut = remove_taut.preprocess(formula);
-        let mut niver = NiVER::new();
-        let niver_processed_formula: CNF = niver.preprocess(&no_taut);
-        let mut ordered_cnf: CNF = order_formula(&niver_processed_formula);
+        let mut ordered_cnf: CNF = order_formula(&formula);
 
         if !find_unit_clauses(&mut ordered_cnf, &mut unit_queue) {
             return None;
@@ -217,8 +227,6 @@ where B: 'static+BranchingStrategy,
             branching_depth: 0,
             unit_queue,
             assignment_stack,
-            niver,
-            remove_taut,
 
             updates: vec![
                 branching_strategy.clone(),
@@ -284,13 +292,11 @@ where B: 'static+BranchingStrategy,
             }
         }
 
-        self.niver.restore(
-            SATSolution::Satisfiable(
-                self.variables
-                    .into_iter()
-                    .map(|var| var.assignment.map(|a| a.sign).unwrap_or(false))
-                    .collect_vec(),
-            )
+        SATSolution::Satisfiable(
+            self.variables
+                .into_iter()
+                .map(|var| var.assignment.map(|a| a.sign).unwrap_or(false))
+                .collect_vec(),
         )
     }
 

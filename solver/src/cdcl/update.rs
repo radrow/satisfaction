@@ -11,7 +11,3 @@ pub trait Update {
     fn on_conflict(&mut self, _empty_clause: ClauseId, _clauses: &Clauses, _variables: &Variables) {}
     fn on_deletion(&mut self, _deleted_clause: &Clause) {}
 }
-
-pub trait Initialisation {
-    fn initialise(clauses: &Clauses, variables: &Variables) -> Self where Self: Sized;
-}

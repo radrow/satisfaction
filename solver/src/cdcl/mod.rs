@@ -1,7 +1,7 @@
 pub use satisfaction::CDCLSolver;
 
 mod util;
-pub mod preprocessor;
+pub mod preprocessors;
 pub mod abstract_factory;
 pub mod update;
 pub mod clause;

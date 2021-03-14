@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate async_trait;
+#[macro_use]
+extern crate auto_impl;
 
 /// Branching heuristics one can choose from to customize the [`SatisfactionSolver`].
 mod branching_strategy;
