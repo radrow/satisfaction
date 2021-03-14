@@ -19,7 +19,7 @@ pub struct CNF {
 }
 
 /// Representation of a clause (disjunction of variables)
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Ord)]
 pub struct CNFClause {
     /// Vector of inner variables
     pub vars: Vec<CNFVar>,
