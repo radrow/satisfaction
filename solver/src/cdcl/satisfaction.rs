@@ -149,6 +149,7 @@ fn order_formula(cnf: &CNF) -> CNF {
 struct ExecutionState<B,L,C,R> {
     clauses: Clauses,
     variables: Variables,
+    variables_cache: Option<Variables>,
     branching_depth: usize,
     assignment_stack: Vec<VariableId>,
     unit_queue: IndexMap<VariableId, (bool, ClauseId)>,
@@ -200,7 +201,7 @@ where B: 'static+BranchingStrategy,
         let clauses = ordered_cnf.clauses
                 .iter()
                 .map(|cnf_clause| Clause::new(cnf_clause))
-                .collect(); 
+                .collect();
 
         let assignment_stack= Vec::with_capacity(formula.num_variables);
 
@@ -212,6 +213,7 @@ where B: 'static+BranchingStrategy,
         Some(ExecutionState {
             clauses,
             variables,
+            variables_cache: None,
             branching_depth: 0,
             unit_queue,
             assignment_stack,
@@ -239,7 +241,18 @@ where B: 'static+BranchingStrategy,
 
         while let Some(literal) = {
             let mut bs = self.branching_strategy.borrow_mut();
-            bs.pick_literal(&self.clauses, &self.variables)
+            match bs.pick_literal(&self.clauses, &self.variables) {
+                None => None,
+                Some(literal) =>
+                    match self.variables_cache {
+                        None => Some(literal),
+                        Some(ref caches) =>
+                            match caches[literal.id].assignment {
+                                None => Some(literal),
+                                Some(assg) => Some(CNFVar{sign: assg.sign, ..literal})
+                            }
+                    }
+            }
         } {
             self.branching_depth += 1;
             // Try to set a variable or receive the conflict clause it was not possible
@@ -308,7 +321,7 @@ where B: 'static+BranchingStrategy,
                 .map_or(false, |conflict_clause| {
                     self.backtracking(conflict_clause)
                 })
-            { 
+            {
                 flag.store(true, Ordering::Relaxed);
                 return SATSolution::Unsatisfiable;
             }
@@ -337,6 +350,7 @@ where B: 'static+BranchingStrategy,
 
 
     fn restart(&mut self) {
+        self.variables_cache = Some(self.variables.to_vec());
         self.branching_depth = 0;
         self.unit_queue.clear();
         while let Some(id) = self.assignment_stack.pop() {
@@ -362,7 +376,7 @@ where B: 'static+BranchingStrategy,
             // when a set literal is also watched find a new literal to be watched
             return self.find_new_watched(literal.id);
         }
-        
+
         None
     }
 
