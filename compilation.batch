@@ -1,0 +1,8 @@
+#!/bin/bash
+
+#SBATCH -p All
+#SBATCH -n 4
+#SBATCH -t 00:30:00
+#SBATCH --mail-user=a.lankheit@campus.lmu.de
+
+cargo build --release
