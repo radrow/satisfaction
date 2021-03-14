@@ -14,7 +14,7 @@ use itertools::Itertools;
 pub struct VSIDSInstance {
     resort_period: usize,
     branchings: usize,
-    priority_queue: PriorityQueue<*const usize, VariableId>,
+    priority_queue: PriorityQueue<usize, VariableId>,
     scores: Vec<usize>,
     counters: Vec<usize>
 }
@@ -46,8 +46,7 @@ impl Update for VSIDSInstance {
     }
     fn on_unassign(&mut self, literal: CNFVar, _clauses: &Clauses, _variables: &Variables) {
         let index = VSIDSInstance::literal_to_index(&literal);
-        let p = &self.scores[index];
-        self.priority_queue.push(index, p as *const usize);
+        self.priority_queue.push(index, self.scores[index]);
     }
 }
 
@@ -65,9 +64,10 @@ impl BranchingStrategy for VSIDSInstance {
                     *r = 0;
                 });
 
+            let scores = &self.scores;
             take_mut::take(&mut self.priority_queue, |pq| {
                 pq.into_iter()
-                    .map(std::convert::identity)
+                    .map(|(id, _)| (id, scores[id]))
                     .collect()
             });
         }
@@ -103,7 +103,7 @@ impl AbstractFactory for VSIDS {
         let priority_queue = scores
             .iter()
             .enumerate()
-            .map(|(id, p)| (id, p as *const usize))
+            .map(|(id, p)| (id, *p))
             .collect();
 
         VSIDSInstance {
