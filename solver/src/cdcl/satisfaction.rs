@@ -10,6 +10,7 @@ use crate::solvers::{FlagWaiter, InterruptibleSolver};
 
 use super::{
     branching_strategies::BranchingStrategy,
+    preprocessors::{Preprocessor, PreprocessorFactory},
     clause::{Clause, ClauseId, Clauses},
     learning_schemes::LearningScheme,
     update::Update,
@@ -19,19 +20,21 @@ use super::{
 };
 
 
-pub struct CDCLSolver<B,BF,L,LF,C,CF,R,RF>
+pub struct CDCLSolver<B,BF,L,LF,C,CF,R,RF,PF>
 where BF: AbstractFactory<Product=B>,
       LF: AbstractFactory<Product=L>,
       CF: AbstractFactory<Product=C>,
       RF: AbstractFactory<Product=R>,
+      PF: PreprocessorFactory
 {
     branching_strategy: BF,
     learning_scheme: LF,
     deletion_strategy: CF,
     restart_policy: RF,
+    preprocessor: PF,
 }
 
-impl<B,BF,L,LF,C,CF,R,RF> CDCLSolver<B,BF,L,LF,C,CF,R,RF>
+impl<B,BF,L,LF,C,CF,R,RF,PF> CDCLSolver<B,BF,L,LF,C,CF,R,RF,PF>
 where B: BranchingStrategy,
       L: LearningScheme,
       C: ClauseDeletionStrategy,
@@ -41,18 +44,20 @@ where B: BranchingStrategy,
       LF: AbstractFactory<Product=L>,
       CF: AbstractFactory<Product=C>,
       RF: AbstractFactory<Product=R>,
+      PF: PreprocessorFactory
 {
-    pub fn new(branching_strategy: BF, learning_scheme: LF, deletion_strategy: CF, restart_policy: RF) -> CDCLSolver<B,BF,L,LF,C,CF,R,RF> {
+    pub fn new(branching_strategy: BF, learning_scheme: LF, deletion_strategy: CF, restart_policy: RF, preprocessor: PF) -> CDCLSolver<B,BF,L,LF,C,CF,R,RF,PF> {
         CDCLSolver {
             branching_strategy,
             learning_scheme,
             deletion_strategy,
             restart_policy,
+            preprocessor,
         }
     }
 }
 
-impl<B,BF,L,LF,C,CF,R,RF> Solver for CDCLSolver<B,BF,L,LF,C,CF,R,RF>
+impl<B,BF,L,LF,C,CF,R,RF,PF> Solver for CDCLSolver<B,BF,L,LF,C,CF,R,RF,PF>
 where B: 'static+BranchingStrategy,
       L: 'static+LearningScheme,
       C: 'static+ClauseDeletionStrategy,
@@ -62,8 +67,13 @@ where B: 'static+BranchingStrategy,
       LF: AbstractFactory<Product=L>,
       CF: AbstractFactory<Product=C>,
       RF: AbstractFactory<Product=R>,
+      PF: PreprocessorFactory,
 {
     fn solve(&self, formula: &CNF) -> SATSolution {
+        let mut preprocessor = self.preprocessor.new();
+
+        let formula = preprocessor.preprocess(formula.clone());
+
         let execution_state = ExecutionState::new(
             formula,
             &self.branching_strategy,
@@ -71,12 +81,15 @@ where B: 'static+BranchingStrategy,
             &self.deletion_strategy,
             &self.restart_policy
             );
-        execution_state.cdcl()
+        match execution_state {
+            Some(state) => preprocessor.restore(state.cdcl()),
+            None => return SATSolution::Unsatisfiable
+        }
     }
 }
 
 #[async_trait]
-impl<B,BF,L,LF,C,CF,R,RF> InterruptibleSolver for CDCLSolver<B,BF,L,LF,C,CF,R,RF>
+impl<B,BF,L,LF,C,CF,R,RF,PF> InterruptibleSolver for CDCLSolver<B,BF,L,LF,C,CF,R,RF,PF>
 where B: 'static+Send+Sync+BranchingStrategy,
       L: 'static+Send+Sync+LearningScheme,
       C: 'static+Send+Sync+ClauseDeletionStrategy,
@@ -86,8 +99,15 @@ where B: 'static+Send+Sync+BranchingStrategy,
       LF: Send+Sync+AbstractFactory<Product=L>,
       CF: Send+Sync+AbstractFactory<Product=C>,
       RF: Send+Sync+AbstractFactory<Product=R>,
+
+      PF: Send+Sync+PreprocessorFactory,
 {
     async fn solve_interruptible(&self, formula: &CNF) -> SATSolution {
+        let mut preprocessor = self.preprocessor.new();
+        let formula = preprocessor.preprocess(formula.clone());
+
+        async_std::task::yield_now().await;
+
         let execution_state = ExecutionState::new(
             formula,
             &self.branching_strategy,
@@ -96,15 +116,42 @@ where B: 'static+Send+Sync+BranchingStrategy,
             &self.restart_policy
             );
         FlagWaiter::start(move |flag| {
-            execution_state.interruptible_cdcl(flag)
+            match execution_state {
+                Some(state) => preprocessor.restore(state.interruptible_cdcl(flag)),
+                None => return SATSolution::Unsatisfiable
+            }
         }).await
     }
 }
 
 
-fn order_formula(cnf: CNF) -> CNF {
+fn find_unit_clauses(cnf: &mut CNF, unit_queue: &mut IndexMap<VariableId, (bool, ClauseId)>) -> bool{
+    let mut no_error = true;
+    // filter_map -> filter
+    cnf.clauses = cnf.clauses.iter().enumerate().filter_map(|(i, clause)| {
+        if clause.vars.len() == 1 {
+            let variable: CNFVar = clause.vars[0];
+            if unit_queue.contains_key(&(variable.id-1)) {
+                if let Some(var) = unit_queue.get_key_value(&(variable.id-1)) {
+                    if var.1.0 != variable.sign {
+                        no_error = false;
+                    }
+                }
+            }
+            unit_queue.insert(variable.id-1, (variable.sign, i));
+        }       
+        if clause.vars.len() == 1 {
+            None
+        } else {
+            Some(clause.clone())
+        }
+    }).collect();
+    no_error 
+}
+
+fn order_formula(cnf: &CNF) -> CNF {
     let mut order_cnf: CNF = CNF {clauses: Vec::new(), num_variables: cnf.num_variables};
-    for cnf_clause in cnf.clauses {
+    for cnf_clause in &cnf.clauses {
         let mut cnf_variables = cnf_clause.vars.clone();
         cnf_variables.sort();
         cnf_variables.dedup();
@@ -112,6 +159,7 @@ fn order_formula(cnf: CNF) -> CNF {
     }
     order_cnf
 }
+
 
 
 struct ExecutionState<B,L,C,R> {
@@ -140,14 +188,22 @@ where B: 'static+BranchingStrategy,
       R: 'static+RestartPolicy {
 
     fn new(
-        formula: &CNF,
+        formula: CNF,
         branching_strategy: &impl AbstractFactory<Product=B>,
         learning_scheme: &impl AbstractFactory<Product=L>,
         deletion_strategy: &impl AbstractFactory<Product=C>,
         restart_policy: &impl AbstractFactory<Product=R>,
-        ) -> ExecutionState<B, L, C, R> {
+        ) -> Option<ExecutionState<B, L, C, R>> {
+
+        let mut unit_queue = IndexMap::with_capacity_and_hasher(formula.num_variables, BuildHasher::default());
+
+        let mut ordered_cnf: CNF = order_formula(&formula);
+
+        if !find_unit_clauses(&mut ordered_cnf, &mut unit_queue) {
+            return None;
+        }
+
         // TODO: Avoid cloning
-        let ordered_cnf: CNF = order_formula(formula.clone());
         let variables = (1..=ordered_cnf.num_variables)
                 .map(|index| Variable::new(&ordered_cnf, index))
                 .collect();
@@ -157,7 +213,6 @@ where B: 'static+BranchingStrategy,
                 .map(|cnf_clause| Clause::new(cnf_clause))
                 .collect();
 
-        let unit_queue = IndexMap::with_capacity_and_hasher(formula.num_variables, BuildHasher::default());
         let assignment_stack= Vec::with_capacity(formula.num_variables);
 
         let branching_strategy = Rc::new(RefCell::new(branching_strategy.create(&clauses, &variables)));
@@ -165,7 +220,7 @@ where B: 'static+BranchingStrategy,
         let clause_deletion_strategy = Rc::new(RefCell::new(deletion_strategy.create(&clauses, &variables)));
         let restart_policy = Rc::new(RefCell::new(restart_policy.create(&clauses, &variables)));
 
-        ExecutionState {
+        Some(ExecutionState {
             clauses,
             variables,
             variables_cache: None,
@@ -184,11 +239,11 @@ where B: 'static+BranchingStrategy,
             learning_scheme,
             clause_deletion_strategy,
             restart_policy,
-        }
+        })
     }
 
     fn cdcl(mut self) -> SATSolution {
-        if self.inital_unit_propagation() {
+        if self.unit_propagation().is_some() {
             return SATSolution::Unsatisfiable;
         }
 

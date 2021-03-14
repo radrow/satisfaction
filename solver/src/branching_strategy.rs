@@ -40,24 +40,6 @@ impl BranchingStrategy for NaiveBranching {
     }
 }
 
-impl crate::cdcl::update::Initialisation for NaiveBranching {
-    fn initialise(_clauses: &crate::cdcl::clause::Clauses, _variables: &crate::cdcl::variable::Variables) -> Self where Self: Sized {
-        NaiveBranching
-    }
-}
-
-impl crate::cdcl::update::Update for NaiveBranching {}
-
-impl crate::cdcl::branching_strategies::BranchingStrategy for NaiveBranching {
-    fn pick_literal(&mut self, _clauses: &crate::cdcl::clause::Clauses, variables: &crate::cdcl::variable::Variables) -> Option<CNFVar> {
-        variables
-            .iter()
-            .enumerate()
-            .find_map(|(id, var)| 
-                if var.assignment.is_some() { None }
-                else { Some(CNFVar::new(id, true)) })
-    }
-}
 
 /// A small convenience function counting the number of clauses that are mentioned in occ and not
 /// satisfied at the moment.

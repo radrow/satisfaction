@@ -17,6 +17,7 @@ use solver::cdcl::{
         RestartNever,
     },
     deletion_strategies::{NoDeletion, BerkMin},
+    preprocessors::{NiVER, RemoveTautology, ListPreprocessor, NoPreprocessing},
 };
 
 const MAX_NUM_VARIABLES: usize = 50;
@@ -25,11 +26,11 @@ const MAX_NUM_CLAUSES: usize = 50;
 
 fn setup_custom_solver() -> Vec<(&'static str, Box<dyn Solver>)> {
     let mut solvers: Vec<(&'static str, Box<dyn Solver>)> = Vec::new();
-    solvers.push(("CDCL-BerkMin-Never", Box::new(CDCLSolver::new(VSIDS, RelSAT, BerkMin::default(), RestartNever))));
-    solvers.push(("CDCL-No-Never", Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartNever))));
-    solvers.push(("CDCL-Fixed", Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartFixed::default()))));
-    solvers.push(("CDCL-Geom", Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartGeom::default()))));
-    solvers.push(("CDCL-Luby", Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartLuby::default())))); 
+    solvers.push(("CDCL-BerkMin-Never", Box::new(CDCLSolver::new(VSIDS, RelSAT, BerkMin::default(), RestartNever, NiVER))));
+    solvers.push(("CDCL-No-Never", Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartNever, RemoveTautology))));
+    solvers.push(("CDCL-Fixed", Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartFixed::default(), ListPreprocessor(vec!(Box::new(NiVER), Box::new(RemoveTautology)))))));
+    solvers.push(("CDCL-Geom", Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartGeom::default(), NoPreprocessing))));
+    solvers.push(("CDCL-Luby", Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartLuby::default(), NoPreprocessing)))); 
 
     solvers.push(("NaiveBranching", Box::new(SatisfactionSolver::new(NaiveBranching))));
     solvers.push(("JeroslawWang", Box::new(SatisfactionSolver::new(JeroslawWang))));
