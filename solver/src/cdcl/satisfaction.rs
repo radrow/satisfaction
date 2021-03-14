@@ -88,6 +88,7 @@ where B: 'static+BranchingStrategy,
     }
 }
 
+
 #[async_trait]
 impl<B,BF,L,LF,C,CF,R,RF,PF> InterruptibleSolver for CDCLSolver<B,BF,L,LF,C,CF,R,RF,PF>
 where B: 'static+Send+Sync+BranchingStrategy,
@@ -115,6 +116,7 @@ where B: 'static+Send+Sync+BranchingStrategy,
             &self.deletion_strategy,
             &self.restart_policy
             );
+
         FlagWaiter::start(move |flag| {
             match execution_state {
                 Some(state) => preprocessor.restore(state.interruptible_cdcl(flag)),
@@ -125,28 +127,26 @@ where B: 'static+Send+Sync+BranchingStrategy,
 }
 
 
-fn find_unit_clauses(cnf: &mut CNF, unit_queue: &mut IndexMap<VariableId, (bool, ClauseId)>) -> bool{
-    let mut no_error = true;
-    // filter_map -> filter
-    cnf.clauses = cnf.clauses.iter().enumerate().filter_map(|(i, clause)| {
+fn find_unit_clauses(cnf: CNF, unit_queue: &mut IndexMap<VariableId, (bool, ClauseId)>) -> Option<CNF> {
+    let num_variables = cnf.num_variables;
+    let mut clauses = Vec::with_capacity(cnf.clauses.len());
+
+    for (id, clause) in cnf.clauses.into_iter().enumerate() {
         if clause.vars.len() == 1 {
-            let variable: CNFVar = clause.vars[0];
-            if unit_queue.contains_key(&(variable.id-1)) {
-                if let Some(var) = unit_queue.get_key_value(&(variable.id-1)) {
-                    if var.1.0 != variable.sign {
-                        no_error = false;
-                    }
+            let literal = clause.vars[0];
+            if let Some((sign,_)) = unit_queue.insert(literal.id-1, (literal.sign, id)) {
+                if sign != literal.sign {
+                    return None;
                 }
             }
-            unit_queue.insert(variable.id-1, (variable.sign, i));
-        }       
-        if clause.vars.len() == 1 {
-            None
-        } else {
-            Some(clause.clone())
         }
-    }).collect();
-    no_error 
+        clauses.push(clause);
+    }
+
+    Some(CNF {
+        num_variables,
+        clauses,
+    })
 }
 
 fn order_formula(cnf: &CNF) -> CNF {
@@ -197,11 +197,9 @@ where B: 'static+BranchingStrategy,
 
         let mut unit_queue = IndexMap::with_capacity_and_hasher(formula.num_variables, BuildHasher::default());
 
-        let mut ordered_cnf: CNF = order_formula(&formula);
+        let ordered_cnf: CNF = order_formula(&formula);
 
-        if !find_unit_clauses(&mut ordered_cnf, &mut unit_queue) {
-            return None;
-        }
+        let ordered_cnf = find_unit_clauses(ordered_cnf, &mut unit_queue)?;
 
         // TODO: Avoid cloning
         let variables = (1..=ordered_cnf.num_variables)
@@ -368,6 +366,8 @@ where B: 'static+BranchingStrategy,
 
     fn set_variable(&mut self, literal: CNFVar, assign_type: AssignmentType) -> Option<ClauseId> {
         // set the variable and remember the assignment
+        // println!("{:?} {:?} {}", literal, assign_type, self.branching_depth);
+
         let assignment = Assignment {
             sign: literal.sign,
             branching_level: self.branching_depth,
@@ -413,6 +413,7 @@ where B: 'static+BranchingStrategy,
     fn add_to_unit_queue(&mut self, literal: CNFVar, reason: ClauseId) -> bool {
         self.unit_queue.insert(literal.id, (literal.sign, reason))
             .map_or(false, |(sign, _)| sign != literal.sign)
+        //false
     }
 
     fn add_clause(&mut self, literals: CNFClause) -> usize {
@@ -431,6 +432,7 @@ where B: 'static+BranchingStrategy,
         &mut self,
         empty_clause: ClauseId,
     ) -> bool {
+        if self.branching_depth == 0 { return true; }
         if empty_clause >= self.clauses.len_formula() {
             self.updates.iter()
                 .for_each(|up| up.borrow_mut().on_conflict(empty_clause, &self.clauses, &self.variables));
