@@ -239,6 +239,7 @@ where B: 'static+BranchingStrategy,
         }
 
         while let Some(literal) = {
+            // println!("Branching");
             let mut bs = self.branching_strategy.borrow_mut();
             bs.pick_literal(&self.clauses, &self.variables)
         } {
@@ -290,6 +291,7 @@ where B: 'static+BranchingStrategy,
     fn restart(&mut self) {
         self.branching_depth = 0;
         self.unit_queue.clear();
+
         while let Some(id) = self.assignment_stack.pop() {
             let assignment = self.variables[id].assignment.take().unwrap();
             let literal = CNFVar::new(id, assignment.sign);
@@ -362,6 +364,8 @@ where B: 'static+BranchingStrategy,
         &mut self,
         empty_clause: ClauseId,
     ) -> bool {
+        if self.branching_depth == 0 { return true; }
+        // println!("Backtracking");
         if empty_clause >= self.clauses.len_formula() {
             self.updates.iter()
                 .for_each(|up| up.borrow_mut().on_conflict(empty_clause, &self.clauses, &self.variables));
@@ -388,10 +392,11 @@ where B: 'static+BranchingStrategy,
                         .unwrap();
                     self.updates.iter().for_each(|up| up.borrow_mut().on_unassign(literal, &self.clauses, &self.variables));
                 },
-                _ => {
+                Some(_) => {
                     self.assignment_stack.push(id);
                     break;
                 },
+                _ => unreachable!("All variables in the assignment stack must have an assignment!")
             }
         }
 

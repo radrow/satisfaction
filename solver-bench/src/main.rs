@@ -14,10 +14,10 @@ use plotting::plot_runtimes;
 use solver::{
     cdcl::{
         CDCLSolver,
-        branching_strategies::VSIDS,
+        branching_strategies::{Naive,VSIDS},
         learning_schemes::RelSAT,
         deletion_strategies::NoDeletion,
-        restart_policies::RestartFixed,
+        restart_policies::{RestartFixed, RestartNever},
     },
     CNF, SatisfactionSolver, SATSolution,
     solvers::{InterruptibleSolver, TimedSolver, TimeLimitedSolver},
@@ -60,11 +60,11 @@ fn make_config<'a>() -> Config {
 
     let solvers: Vec<(String, Box<dyn InterruptibleSolver>)> = vec![
         // Brute too expensive
-        (
+        /*(
             "DLIS".to_string(),
             Box::new(SatisfactionSolver::new(solver::DLIS)),
         ),
-        /*(
+        (
             "DLCS".to_string(),
             Box::new(SatisfactionSolver::new(solver::DLCS)),
         ),
@@ -75,10 +75,18 @@ fn make_config<'a>() -> Config {
         (
             "Jeroslaw-Wang".to_string(),
             Box::new(SatisfactionSolver::new(solver::JeroslawWang)),
+        ),
+        (
+            "CDCL-VSIDS".to_string(),
+            Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartFixed(500))),
         ),*/
         (
-            "CDCL".to_string(),
-            Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartFixed(500))),
+            "CDCL-Fixed".to_string(),
+            Box::new(CDCLSolver::new(Naive, RelSAT, NoDeletion, RestartFixed(500))),
+        ),
+        (
+            "CDCL-Never".to_string(),
+            Box::new(CDCLSolver::new(Naive, RelSAT, NoDeletion, RestartNever)),
         ),
     ];
 
