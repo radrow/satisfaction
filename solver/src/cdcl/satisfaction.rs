@@ -186,7 +186,9 @@ where B: 'static+BranchingStrategy,
     }
 
     fn cdcl(mut self) -> SATSolution {
+        //println!("Let's start!");
         if self.inital_unit_propagation() {
+            //println!("Initial unit propagation failed!");
             return SATSolution::Unsatisfiable;
         }
 
@@ -211,7 +213,10 @@ where B: 'static+BranchingStrategy,
                 .map_or(false, |conflict_clause| {
                     self.backtracking(conflict_clause)
                 })
-            { return SATSolution::Unsatisfiable; }
+            { 
+                //println!("Backtracking failed!");
+                return SATSolution::Unsatisfiable;
+            }
 
             let to_delete = self.clause_deletion_strategy.borrow_mut()
                 .delete_clause(&self.clauses, &self.variables);
@@ -223,6 +228,7 @@ where B: 'static+BranchingStrategy,
                 self.variables[w.1.id].remove_watched_occ(clause);
             }
         }
+        //println!("Finished");
 
         SATSolution::Satisfiable(
             self.variables
@@ -239,7 +245,7 @@ where B: 'static+BranchingStrategy,
         }
 
         while let Some(literal) = {
-            // println!("Branching");
+            // //println!("Branching");
             let mut bs = self.branching_strategy.borrow_mut();
             bs.pick_literal(&self.clauses, &self.variables)
         } {
@@ -289,6 +295,7 @@ where B: 'static+BranchingStrategy,
 
 
     fn restart(&mut self) {
+        //println!("Restart!");
         self.branching_depth = 0;
         self.unit_queue.clear();
 
@@ -301,6 +308,8 @@ where B: 'static+BranchingStrategy,
 
     fn set_variable(&mut self, literal: CNFVar, assign_type: AssignmentType) -> Option<ClauseId> {
         // set the variable and remember the assignment
+        //println!("Set {:?} {:?} {:?}", literal, assign_type, self.branching_depth);
+
         let assignment = Assignment {
             sign: literal.sign,
             branching_level: self.branching_depth,
@@ -309,6 +318,8 @@ where B: 'static+BranchingStrategy,
 
         self.variables[literal.id].assignment = Some(assignment);
         self.assignment_stack.push(literal.id);
+
+        // //println!("{}", self.assignment_stack.iter().sorted().dedup().count() - self.assignment_stack.len());
 
 
         if self.variables[literal.id].watched_occ.len() > 0 {
@@ -344,8 +355,9 @@ where B: 'static+BranchingStrategy,
     }
 
     fn add_to_unit_queue(&mut self, literal: CNFVar, reason: ClauseId) -> bool {
-        self.unit_queue.insert(literal.id, (literal.sign, reason))
-            .map_or(false, |(sign, _)| sign != literal.sign)
+        self.unit_queue.insert(literal.id, (literal.sign, reason));
+        false
+            //.map_or(false, |(sign, _)| sign != literal.sign)
     }
 
     fn add_clause(&mut self, literals: CNFClause) -> usize {
@@ -365,7 +377,7 @@ where B: 'static+BranchingStrategy,
         empty_clause: ClauseId,
     ) -> bool {
         if self.branching_depth == 0 { return true; }
-        // println!("Backtracking");
+        //println!("Backtracking {}", empty_clause);
         if empty_clause >= self.clauses.len_formula() {
             self.updates.iter()
                 .for_each(|up| up.borrow_mut().on_conflict(empty_clause, &self.clauses, &self.variables));
@@ -377,12 +389,15 @@ where B: 'static+BranchingStrategy,
             ls.find_conflict_clause(empty_clause, self.branching_depth, &self.clauses, &self.variables)
         } {
             Some(t) => t,
-            None => return true,
+            None => panic!(),
         };
+        //println!("Assertion level: {}", assertion_level);
 
-        let index = self.add_clause(conflict_clause);
+        let index = self.add_clause(conflict_clause.clone());
         self.updates.iter()
             .for_each(|up| up.borrow_mut().on_learn(index, &self.clauses, &self.variables));
+
+        //println!("{:?}: {}", index, conflict_clause);
 
         while let Some(id) = self.assignment_stack.pop() {
             match self.variables[id].assignment {

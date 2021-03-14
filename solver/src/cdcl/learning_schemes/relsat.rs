@@ -23,10 +23,13 @@ impl LearningScheme for RelSATInstance {
             .iter()
             .map(|lit| lit.id)
             .collect();
+
         let mut visited: SetUsize = literal_queue
             .iter()
             .cloned()
             .collect();
+
+        //println!("{:?}", clauses[empty_clause]);
 
 
         let mut clause = CNFClause::with_capacity(literal_queue.len());
@@ -45,17 +48,19 @@ impl LearningScheme for RelSATInstance {
                         }
                     }
                 },
-                Some(Assignment{sign, branching_level, ..}) => {
+                Some(Assignment{sign, branching_level, reason}) => {
+                    //println!("RelSAT {:?} {:?} {:?}", reason, id, sign);
+
                     let literal = CNFVar::new(id, !sign);
                     clause.push(literal);
-                    if branching_level != branching_depth {
+                    if branching_level < branching_depth {
                         assertion_level = std::cmp::max(assertion_level, branching_level);
                     } else {
                         let last_index = clause.len()-1;
                         clause.vars.swap(0, last_index);
                         assertion_literal = Some(literal);
                     }
-                }
+                },
                 _ => {},
             }
         }

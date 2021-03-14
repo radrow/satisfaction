@@ -43,8 +43,8 @@ impl Clause {
 }
 
 pub struct Clauses {
-    formula: Vec<Clause>,
-    additional_clauses: StableVec<Clause>,
+    pub formula: Vec<Clause>,
+    pub additional_clauses: StableVec<Clause>,
     used_indices: BinaryHeap<Reverse<usize>>,
 }
 
