@@ -23,6 +23,7 @@ impl LearningScheme for RelSATInstance {
             .iter()
             .map(|lit| lit.id)
             .collect();
+
         let mut visited: SetUsize = literal_queue
             .iter()
             .cloned()

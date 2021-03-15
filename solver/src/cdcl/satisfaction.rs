@@ -354,6 +354,7 @@ where B: 'static+BranchingStrategy,
 
 
     fn restart(&mut self) {
+        println!("Restart");
         self.variables_cache = Some(self.variables.to_vec());
         self.branching_depth = 0;
         self.unit_queue.clear();
@@ -366,7 +367,7 @@ where B: 'static+BranchingStrategy,
 
     fn set_variable(&mut self, literal: CNFVar, assign_type: AssignmentType) -> Option<ClauseId> {
         // set the variable and remember the assignment
-        // println!("{:?} {:?} {}", literal, assign_type, self.branching_depth);
+        //println!("{:?} {:?} {}", literal, assign_type, self.branching_depth);
 
         let assignment = Assignment {
             sign: literal.sign,
@@ -376,6 +377,7 @@ where B: 'static+BranchingStrategy,
 
         self.variables[literal.id].assignment = Some(assignment);
         self.assignment_stack.push(literal.id);
+        //println!("{}, {}", self.assignment_stack.iter().sorted().dedup().count(), self.assignment_stack.len());
 
 
         if self.variables[literal.id].watched_occ.len() > 0 {
@@ -411,9 +413,19 @@ where B: 'static+BranchingStrategy,
     }
 
     fn add_to_unit_queue(&mut self, literal: CNFVar, reason: ClauseId) -> bool {
-        self.unit_queue.insert(literal.id, (literal.sign, reason))
-            .map_or(false, |(sign, _)| sign != literal.sign)
-        //false
+        if let Some((sign,r)) = self.unit_queue.insert(literal.id, (literal.sign, reason)) {
+            if sign != literal.sign {
+                self.variables[literal.id].assignment = Some(Assignment {
+                    sign,
+                    reason: AssignmentType::Forced(r),
+                    branching_level: self.branching_depth,
+                });
+                self.assignment_stack.push(literal.id);
+                self.unit_queue.clear();
+                return true;
+            }
+        }
+        false
     }
 
     fn add_clause(&mut self, literals: CNFClause) -> usize {
