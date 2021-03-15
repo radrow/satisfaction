@@ -354,7 +354,7 @@ where B: 'static+BranchingStrategy,
 
 
     fn restart(&mut self) {
-        println!("Restart");
+        //println!("Restart");
         self.variables_cache = Some(self.variables.to_vec());
         self.branching_depth = 0;
         self.unit_queue.clear();

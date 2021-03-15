@@ -30,7 +30,7 @@ pub struct RestartFixed(pub u64);
 
 impl Default for RestartFixed {
     fn default() -> Self {
-        RestartFixed(100)
+        RestartFixed(700)
     }
 }
 
