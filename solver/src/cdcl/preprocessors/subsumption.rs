@@ -22,7 +22,7 @@ impl Preprocessor for SelfSubsumptionInstance {
             
             for pos_clause in &pos_occ {
                 let old_neg = neg_occ.clone();
-                for (neg_index, neg_clause) in old_neg.iter().enumerate() {
+                for neg_clause in old_neg {
                     let no_var_neg_clause = CNFClause{ vars: neg_clause.vars
                         .clone()
                         .into_iter()
@@ -45,7 +45,6 @@ impl Preprocessor for SelfSubsumptionInstance {
                                 .into_iter()
                                 .filter(|clause| clause != pos_clause)
                                 .collect();
-                            neg_occ.remove(neg_index);
                             break;
                         } else if subsumption_test(&no_var_neg_clause, &no_var_pos_clause, cnf.num_variables) {
                             // add the clause that lost the literal
@@ -53,9 +52,12 @@ impl Preprocessor for SelfSubsumptionInstance {
                             // remove the clause with the literal
                             old_clauses = old_clauses
                                 .into_iter()
-                                .filter(|clause| clause != neg_clause)
+                                .filter(|clause| *clause != neg_clause)
                                 .collect();
-                            break;
+                            neg_occ = neg_occ
+                                .into_iter()
+                                .filter(|clause| *clause != neg_clause)
+                                .collect();
                         }
                     }
                 }
