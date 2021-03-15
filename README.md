@@ -89,6 +89,7 @@ Supported arguments:
       - `cdcl-preproc` – Preprocessing techniques. Takes mulitple arguments that shall be executed sequentially:
         - `niver` – NiVER
         - `tautologies` – Tautologies elimination
+        - `subsumption` – Self subsumption
    Defaults to `cdcl`.
   
   * `-r` or `--return-code` – if set, instructs the solver to exit with return code `1`

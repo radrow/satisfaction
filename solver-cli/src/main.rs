@@ -16,6 +16,7 @@ use solver::{
             NiVER,
             PreprocessorFactory,
             NoPreprocessing,
+            SelfSubsumption,
             RemoveTautology
         },
         restart_policies::RestartPolicyFactory
@@ -93,7 +94,7 @@ fn make_config<'a>() -> Config {
                 .long("cdcl-preproc")
                 .help("CDCL preprocessing algorithms")
                 .requires_if("algorithm", "cdcl")
-                .possible_values(&["niver", "tautologies", "empty"])
+                .possible_values(&["niver", "tautologies", "subsumption", "empty"])
                 .default_value("empty"),
         )
         .arg(
@@ -151,7 +152,7 @@ fn make_config<'a>() -> Config {
                     Some("relsat") => Box::new(solver::cdcl::learning_schemes::RelSAT),
                     _ => unreachable!(), // already handled by clap
                 };
-            let deletion: Box<dyn ClauseDeletionStrategyFactory> = 
+            let deletion: Box<dyn ClauseDeletionStrategyFactory> =
                 match matches.value_of("cdcl-deletion") {
                     Some("berk-min") => Box::new(solver::cdcl::deletion_strategies::BerkMin::default()),
                     Some("never") => Box::new(solver::cdcl::deletion_strategies::NoDeletion),
@@ -164,6 +165,7 @@ fn make_config<'a>() -> Config {
                     match proc {
                         "niver" => preprocessors.push(Box::new(NiVER)),
                         "tautologies" => preprocessors.push(Box::new(RemoveTautology)),
+                        "subsumption" => preprocessors.push(Box::new(SelfSubsumption)),
                         "empty" => preprocessors.push(Box::new(NoPreprocessing)),
                         _ => unreachable!(),
                     };
