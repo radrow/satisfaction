@@ -18,6 +18,7 @@ use solver::{
         learning_schemes::RelSAT,
         deletion_strategies::NoDeletion,
         restart_policies::RestartFixed,
+        preprocessors::{NoPreprocessing},
     },
     CNF, SatisfactionSolver, SATSolution,
     solvers::{InterruptibleSolver, TimedSolver, TimeLimitedSolver},
@@ -78,7 +79,7 @@ fn make_config<'a>() -> Config {
         ),*/
         (
             "CDCL".to_string(),
-            Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartFixed(500))),
+            Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartFixed::default(), NoPreprocessing, None)),
         ),
     ];
 

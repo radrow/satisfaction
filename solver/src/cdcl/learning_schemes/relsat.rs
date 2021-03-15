@@ -5,9 +5,9 @@ use super::{
         variable::{VariableId, Variables, Assignment, AssignmentType},
         clause::{ClauseId, Clauses},
         update::Update,
-        abstract_factory::AbstractFactory,
     },
-    learning_scheme::LearningScheme,
+    LearningScheme,
+    LearningSchemeFactory,
 };
 use crate::{CNFVar, CNFClause};
 
@@ -66,10 +66,8 @@ impl LearningScheme for RelSATInstance {
 
 pub struct RelSAT;
 
-impl AbstractFactory for RelSAT {
-    type Product = RelSATInstance;
-
-    fn create(&self, _clauses: &Clauses, _variables: &Variables) -> Self::Product {
-        RelSATInstance
+impl LearningSchemeFactory for RelSAT {
+    fn create(&self, _clauses: &Clauses, _variables: &Variables) -> Box<dyn LearningScheme> {
+        Box::new(RelSATInstance)
     }
 }

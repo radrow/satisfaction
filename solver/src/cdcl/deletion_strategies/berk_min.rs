@@ -5,12 +5,12 @@ use tinyset::SetUsize;
 
 use super::{
     ClauseDeletionStrategy,
+    ClauseDeletionStrategyFactory,
     super::{
         clause::{ClauseId, Clauses},
         update::Update,
         util::HashMap,
         variable::Variables,
-        abstract_factory::AbstractFactory,
     },
 };
 
@@ -58,14 +58,13 @@ impl ClauseDeletionStrategy for BerkMinInstance {
 
 pub struct BerkMin(usize);
 
-impl AbstractFactory for BerkMin {
-    type Product = BerkMinInstance;
-    fn create(&self, _clauses: &Clauses, _variables: &Variables) -> Self::Product {
-        BerkMinInstance {
+impl ClauseDeletionStrategyFactory for BerkMin {
+    fn create(&self, clauses: &Clauses, variables: &Variables) -> Box<dyn ClauseDeletionStrategy> {
+        Box::new(BerkMinInstance {
             activity: HashMap::default(),
             insertion_order: VecDeque::new(),
             threshold: self.0,
-        }
+        })
     }
 }
 

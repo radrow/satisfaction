@@ -1,9 +1,8 @@
 use crate::cdcl::{
     clause::{ClauseId, Clauses},
-    deletion_strategies::deletion_strategy::ClauseDeletionStrategy,
+    deletion_strategies::{ClauseDeletionStrategy, ClauseDeletionStrategyFactory},
     update::Update,
     variable::Variables,
-    abstract_factory::AbstractFactory,
 };
 
 
@@ -17,9 +16,8 @@ impl ClauseDeletionStrategy for NoDeletionInstance {
 
 pub struct NoDeletion;
 
-impl AbstractFactory for NoDeletion {
-    type Product = NoDeletionInstance;
-    fn create(&self, _clauses: &Clauses, _variables: &Variables) -> Self::Product {
-        NoDeletionInstance
+impl ClauseDeletionStrategyFactory for NoDeletion {
+    fn create(&self, _clauses: &Clauses, _variables: &Variables) -> Box<dyn ClauseDeletionStrategy> {
+        Box::new(NoDeletionInstance)
     }
 }

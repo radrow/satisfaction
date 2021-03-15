@@ -4,7 +4,7 @@ mod fixed;
 mod geometric;
 mod luby;
 
-pub use restart_policy::RestartPolicy;
+pub use restart_policy::{RestartPolicy, RestartPolicyFactory};
 pub use never::RestartNever;
 pub use fixed::RestartFixed;
 pub use geometric::RestartGeom;
