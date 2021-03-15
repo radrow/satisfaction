@@ -17,8 +17,8 @@ use solver::{
         branching_strategies::VSIDS,
         learning_schemes::RelSAT,
         deletion_strategies::NoDeletion,
-        restart_policies::RestartFixed,
-        preprocessors::{NoPreprocessing},
+        restart_policies::{RestartFixed, RestartNever},
+        preprocessors::{NoPreprocessing, NiVER, RemoveTautology},
     },
     CNF, SatisfactionSolver, SATSolution,
     solvers::{InterruptibleSolver, TimedSolver, TimeLimitedSolver},
@@ -65,21 +65,25 @@ fn make_config<'a>() -> Config {
             "DLIS".to_string(),
             Box::new(SatisfactionSolver::new(solver::DLIS)),
         ),
-        /*(
-            "DLCS".to_string(),
-            Box::new(SatisfactionSolver::new(solver::DLCS)),
+        (
+            "CDCL-NoDeletion-Never".to_string(),
+            Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartNever, NoPreprocessing, None)),
         ),
         (
-            "MOM".to_string(),
-            Box::new(SatisfactionSolver::new(solver::MOM)),
-        ),
-        (
-            "Jeroslaw-Wang".to_string(),
-            Box::new(SatisfactionSolver::new(solver::JeroslawWang)),
-        ),*/
-        (
-            "CDCL".to_string(),
+            "CDCL-NoDeletion-Fixed".to_string(),
             Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartFixed::default(), NoPreprocessing, None)),
+        ),
+        (
+            "CDCL-BerkMin-Fixed".to_string(),
+            Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartFixed::default(), NoPreprocessing, None)),
+        ),
+        (
+            "CDCL-BerkMin-Fixed-NiVER".to_string(),
+            Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartFixed::default(), NiVER, None)),
+        ),
+        (
+            "CDCL-BerkMin-Fixed-Tautology".to_string(),
+            Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartFixed::default(), RemoveTautology, None)),
         ),
     ];
 
