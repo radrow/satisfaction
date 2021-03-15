@@ -10,3 +10,4 @@ pub use no_tautologies::RemoveTautology;
 pub use preprocessor::{Preprocessor, PreprocessorFactory};
 pub use list_preprocessor::ListPreprocessor;
 pub use no_preprocessing::NoPreprocessing;
+pub use subsumption::SelfSubsumption;
