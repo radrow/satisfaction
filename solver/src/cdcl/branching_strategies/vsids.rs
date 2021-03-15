@@ -1,11 +1,11 @@
 use super::{
     BranchingStrategy,
+    BranchingStrategyFactory,
     super::{
         util::PriorityQueue,
         variable::{VariableId, Variables},
         clause::{ClauseId, Clauses},
         update::Update,
-        abstract_factory::AbstractFactory,
     },
 };
 use crate::CNFVar;
@@ -29,7 +29,8 @@ impl VSIDSInstance {
         if literal.sign { index += 1; }
         index
     }
-    
+
+    #[inline]
     fn index_to_literal(index: usize) -> CNFVar {
         CNFVar {
             id: index/2,
@@ -39,11 +40,14 @@ impl VSIDSInstance {
 }
 
 impl Update for VSIDSInstance {
+    #[inline]
     fn on_learn(&mut self, learned_clause: ClauseId, clauses: &Clauses, _variables: &Variables) {
         for lit in clauses[learned_clause].literals.iter() {
             self.counters[VSIDSInstance::literal_to_index(lit)] += 1;
         }
     }
+
+    #[inline]
     fn on_unassign(&mut self, literal: CNFVar, _clauses: &Clauses, _variables: &Variables) {
         let index = VSIDSInstance::literal_to_index(&literal);
         self.priority_queue.push(index, self.scores[index]);
@@ -84,10 +88,8 @@ impl BranchingStrategy for VSIDSInstance {
 
 pub struct VSIDS;
 
-impl AbstractFactory for VSIDS {
-    type Product = VSIDSInstance;
-
-    fn create(&self, clauses: &Clauses, variables: &Variables) -> Self::Product {
+impl BranchingStrategyFactory for VSIDS {
+    fn create(&self, clauses: &Clauses, variables: &Variables) -> Box<dyn BranchingStrategy> {
         let mut scores = std::iter::repeat(0)
             .take(2*variables.len())
             .collect_vec();
@@ -106,12 +108,12 @@ impl AbstractFactory for VSIDS {
             .map(|(id, p)| (id, *p))
             .collect();
 
-        VSIDSInstance {
+        Box::new(VSIDSInstance {
             resort_period: 255,
             priority_queue,
             branchings: 0,
             scores,
             counters,
-        }
+        })
     }
 }

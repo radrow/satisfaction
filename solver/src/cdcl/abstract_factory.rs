@@ -1,10 +1,10 @@
+use auto_impl::auto_impl;
 use super::{
     clause::Clauses,
     variable::Variables,
 };
 
-pub trait AbstractFactory {
-    type Product: Sized;
-
-    fn create(&self, clauses: &Clauses, variables: &Variables) -> Self::Product;
+#[auto_impl(Box)]
+pub trait AbstractFactory<P> {
+    fn create(&self, clauses: &Clauses, variables: &Variables) -> Box<P>;
 }

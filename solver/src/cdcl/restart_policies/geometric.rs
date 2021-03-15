@@ -1,10 +1,10 @@
 use super::{
     RestartPolicy,
+    RestartPolicyFactory,
     super::{
         clause::{ClauseId, Clauses},
         update::Update,
         variable::Variables,
-        abstract_factory::AbstractFactory,
     },
 };
 
@@ -33,14 +33,13 @@ pub struct RestartGeom {
     factor_percent: u64,
 }
 
-impl AbstractFactory for RestartGeom {
-    type Product = RestartGeomInstance;
-    fn create(&self, _clauses: &Clauses, _variables: &Variables) -> Self::Product {
-        RestartGeomInstance {
+impl RestartPolicyFactory for RestartGeom {
+    fn create(&self) -> Box<dyn RestartPolicy> {
+        Box::new(RestartGeomInstance {
             conflicts: 0,
             rate: self.rate,
             factor_percent: self.factor_percent,
-        }
+        })
     }
 }
 

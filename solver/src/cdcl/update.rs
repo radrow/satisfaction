@@ -4,6 +4,7 @@ use super::{
 };
 use crate::CNFVar;
 
+#[auto_impl(Box)]
 pub trait Update {
     fn on_assign(&mut self, _variable: VariableId, _clauses: &Clauses, _variables: &Variables) {}
     fn on_unassign(&mut self, _literal: CNFVar, _clauses: &Clauses, _variables: &Variables) {}

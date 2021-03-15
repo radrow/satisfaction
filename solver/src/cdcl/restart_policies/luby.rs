@@ -1,10 +1,10 @@
 use super::{
     RestartPolicy,
+    RestartPolicyFactory,
     super::{
         clause::{ClauseId, Clauses},
         update::Update,
         variable::Variables,
-        abstract_factory::AbstractFactory,
     },
 };
 
@@ -46,14 +46,13 @@ impl RestartPolicy for RestartLubyInstance {
 
 pub struct RestartLuby(u64);
 
-impl AbstractFactory for RestartLuby {
-    type Product = RestartLubyInstance;
-    fn create(&self, _clauses: &Clauses, _variables: &Variables) -> Self::Product {
-        RestartLubyInstance {
+impl RestartPolicyFactory for RestartLuby {
+    fn create(&self) -> Box<dyn RestartPolicy> {
+        Box::new(RestartLubyInstance {
             conflicts: 0,
             rate: self.0,
             luby_state: (2, 1, 2), // first step already made
-        }
+        })
     }
 }
 

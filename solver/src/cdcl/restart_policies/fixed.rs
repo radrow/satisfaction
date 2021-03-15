@@ -1,10 +1,10 @@
 use super::{
     RestartPolicy,
+    RestartPolicyFactory,
     super::{
         clause::{ClauseId, Clauses},
         update::Update,
         variable::Variables,
-        abstract_factory::AbstractFactory,
     },
 };
 
@@ -34,12 +34,11 @@ impl Default for RestartFixed {
     }
 }
 
-impl AbstractFactory for RestartFixed {
-    type Product = RestartFixedInstance;
-    fn create(&self, _clauses: &Clauses, _variables: &Variables) -> Self::Product {
-        RestartFixedInstance {
+impl RestartPolicyFactory for RestartFixed {
+    fn create(&self) -> Box<dyn RestartPolicy> {
+        Box::new(RestartFixedInstance {
             conflicts: 0,
             rate: self.0,
-        }
+        })
     }
 }

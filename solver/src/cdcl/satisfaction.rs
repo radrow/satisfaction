@@ -5,15 +5,15 @@ use std::path::PathBuf;
 use itertools::Itertools;
 
 use crate::{CNF, CNFClause, CNFVar, SATSolution, Solver};
-use crate::cdcl::deletion_strategies::ClauseDeletionStrategy;
-use crate::cdcl::restart_policies::RestartPolicy;
 use crate::solvers::{FlagWaiter, InterruptibleSolver};
 
 use super::{
-    branching_strategies::BranchingStrategy,
+    branching_strategies::{BranchingStrategy, BranchingStrategyFactory},
     preprocessors::{Preprocessor, PreprocessorFactory},
+    deletion_strategies::{ClauseDeletionStrategy, ClauseDeletionStrategyFactory},
+    restart_policies::{RestartPolicy, RestartPolicyFactory},
     clause::{Clause, ClauseId, Clauses},
-    learning_schemes::LearningScheme,
+    learning_schemes::{LearningScheme, LearningSchemeFactory},
     update::Update,
     util::{BuildHasher, HashSet, IndexMap},
     variable::{Assignment, AssignmentType, Variable, VariableId, Variables},
@@ -21,11 +21,11 @@ use super::{
 };
 
 
-pub struct CDCLSolver<B,BF,L,LF,C,CF,R,RF,PF>
-where BF: AbstractFactory<Product=B>,
-      LF: AbstractFactory<Product=L>,
-      CF: AbstractFactory<Product=C>,
-      RF: AbstractFactory<Product=R>,
+pub struct CDCLSolver<BF,LF,CF,RF,PF>
+where BF: BranchingStrategyFactory,
+      LF: LearningSchemeFactory,
+      CF: ClauseDeletionStrategyFactory,
+      RF: RestartPolicyFactory,
       PF: PreprocessorFactory
 {
     branching_strategy: BF,
@@ -36,19 +36,14 @@ where BF: AbstractFactory<Product=B>,
     drup: Option<PathBuf>,
 }
 
-impl<B,BF,L,LF,C,CF,R,RF,PF> CDCLSolver<B,BF,L,LF,C,CF,R,RF,PF>
-where B: BranchingStrategy,
-      L: LearningScheme,
-      C: ClauseDeletionStrategy,
-      R: RestartPolicy,
-
-      BF: AbstractFactory<Product=B>,
-      LF: AbstractFactory<Product=L>,
-      CF: AbstractFactory<Product=C>,
-      RF: AbstractFactory<Product=R>,
+impl<BF,LF,CF,RF,PF> CDCLSolver<BF,LF,CF,RF,PF>
+where BF: BranchingStrategyFactory,
+      LF: LearningSchemeFactory,
+      CF: ClauseDeletionStrategyFactory,
+      RF: RestartPolicyFactory,
       PF: PreprocessorFactory
 {
-    pub fn new(branching_strategy: BF, learning_scheme: LF, deletion_strategy: CF, restart_policy: RF, preprocessor: PF, drup: Option<PathBuf>)-> CDCLSolver<B,BF,L,LF,C,CF,R,RF,PF> {
+    pub fn new(branching_strategy: BF, learning_scheme: LF, deletion_strategy: CF, restart_policy: RF, preprocessor: PF, drup: Option<PathBuf>)-> CDCLSolver<BF,LF,CF,RF,PF> {
         CDCLSolver {
             branching_strategy,
             learning_scheme,
@@ -60,17 +55,12 @@ where B: BranchingStrategy,
     }
 }
 
-impl<B,BF,L,LF,C,CF,R,RF,PF> Solver for CDCLSolver<B,BF,L,LF,C,CF,R,RF,PF>
-where B: 'static+BranchingStrategy,
-      L: 'static+LearningScheme,
-      C: 'static+ClauseDeletionStrategy,
-      R: 'static+RestartPolicy,
-
-      BF: AbstractFactory<Product=B>,
-      LF: AbstractFactory<Product=L>,
-      CF: AbstractFactory<Product=C>,
-      RF: AbstractFactory<Product=R>,
-      PF: PreprocessorFactory,
+impl<BF,LF,CF,RF,PF> Solver for CDCLSolver<BF,LF,CF,RF,PF>
+where BF: BranchingStrategyFactory,
+      LF: LearningSchemeFactory,
+      CF: ClauseDeletionStrategyFactory,
+      RF: RestartPolicyFactory,
+      PF: PreprocessorFactory
 {
     fn solve(&self, formula: &CNF) -> SATSolution {
         let mut preprocessor = self.preprocessor.new();
@@ -94,18 +84,12 @@ where B: 'static+BranchingStrategy,
 
 
 #[async_trait]
-impl<B,BF,L,LF,C,CF,R,RF,PF> InterruptibleSolver for CDCLSolver<B,BF,L,LF,C,CF,R,RF,PF>
-where B: 'static+Send+Sync+BranchingStrategy,
-      L: 'static+Send+Sync+LearningScheme,
-      C: 'static+Send+Sync+ClauseDeletionStrategy,
-      R: 'static+Send+Sync+RestartPolicy,
-
-      BF: Send+Sync+AbstractFactory<Product=B>,
-      LF: Send+Sync+AbstractFactory<Product=L>,
-      CF: Send+Sync+AbstractFactory<Product=C>,
-      RF: Send+Sync+AbstractFactory<Product=R>,
-
-      PF: Send+Sync+PreprocessorFactory,
+impl<BF,LF,CF,RF,PF> InterruptibleSolver for CDCLSolver<BF,LF,CF,RF,PF>
+where BF: Send+Sync+BranchingStrategyFactory,
+      LF: Send+Sync+LearningSchemeFactory,
+      CF: Send+Sync+ClauseDeletionStrategyFactory,
+      RF: Send+Sync+RestartPolicyFactory,
+      PF: Send+Sync+PreprocessorFactory
 {
     async fn solve_interruptible(&self, formula: &CNF) -> SATSolution {
         let mut preprocessor = self.preprocessor.new();
@@ -186,20 +170,15 @@ struct ExecutionState<B,L,C,R> {
 unsafe impl<B,L,C,R> Sync for ExecutionState<B,L,C,R> {}
 unsafe impl<B,L,C,R> Send for ExecutionState<B,L,C,R> {}
 
-impl<B,L,C,R> ExecutionState<B,L,C,R>
-where B: 'static+BranchingStrategy,
-      L: 'static+LearningScheme,
-      C: 'static+ClauseDeletionStrategy,
-      R: 'static+RestartPolicy {
-
+impl ExecutionState<Box<dyn BranchingStrategy>, Box<dyn LearningScheme>, Box<dyn ClauseDeletionStrategy>, Box<dyn RestartPolicy>> {
     fn new(
         formula: CNF,
-        branching_strategy: &impl AbstractFactory<Product=B>,
-        learning_scheme: &impl AbstractFactory<Product=L>,
-        deletion_strategy: &impl AbstractFactory<Product=C>,
-        restart_policy: &impl AbstractFactory<Product=R>,
+        branching_strategy: &impl BranchingStrategyFactory,
+        learning_scheme: &impl LearningSchemeFactory,
+        deletion_strategy: &impl ClauseDeletionStrategyFactory,
+        restart_policy: &impl RestartPolicyFactory,
         drup: Option<PathBuf>,
-        ) -> Option<ExecutionState<B, L, C, R>> {
+        ) -> Option<Self> {
 
         let mut unit_queue = IndexMap::with_capacity_and_hasher(formula.num_variables, BuildHasher::default());
 
@@ -227,7 +206,7 @@ where B: 'static+BranchingStrategy,
         let branching_strategy = Rc::new(RefCell::new(branching_strategy.create(&clauses, &variables)));
         let learning_scheme = Rc::new(RefCell::new(learning_scheme.create(&clauses, &variables)));
         let clause_deletion_strategy = Rc::new(RefCell::new(deletion_strategy.create(&clauses, &variables)));
-        let restart_policy = Rc::new(RefCell::new(restart_policy.create(&clauses, &variables)));
+        let restart_policy = Rc::new(RefCell::new(restart_policy.create()));
 
         Some(ExecutionState {
             clauses,

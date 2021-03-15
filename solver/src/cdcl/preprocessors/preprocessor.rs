@@ -6,6 +6,7 @@ pub trait Preprocessor: Send+Sync {
     fn restore(&mut self, assignment: SATSolution) -> SATSolution;
 }
 
+#[auto_impl(Box)]
 pub trait PreprocessorFactory {
     fn new(&self) -> Box<dyn Preprocessor>;
 }

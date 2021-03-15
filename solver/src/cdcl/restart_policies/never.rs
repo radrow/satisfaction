@@ -1,10 +1,10 @@
 use super::{
     RestartPolicy,
+    RestartPolicyFactory,
     super::{
         clause::Clauses,
         update::Update,
         variable::Variables,
-        abstract_factory::AbstractFactory,
     },
 };
 
@@ -18,9 +18,8 @@ impl RestartPolicy for RestartNeverInstance {
 
 pub struct RestartNever;
 
-impl AbstractFactory for RestartNever {
-    type Product = RestartNeverInstance;
-    fn create(&self, _clauses: &Clauses, _variables: &Variables) -> Self::Product {
-        RestartNeverInstance
+impl RestartPolicyFactory for RestartNever {
+    fn create(&self) -> Box<dyn RestartPolicy> {
+        Box::new(RestartNeverInstance)
     }
 }
