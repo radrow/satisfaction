@@ -109,10 +109,6 @@ impl Clauses {
         let index = index.checked_sub(self.formula.len())
             .expect("Cannot remove clauses from the original formula!");
 
-        if let Some(drup) = &mut self.drup {
-            drup.delete(&self.additional_clauses[index]);
-        }
-
         self.used_indices.push(Reverse(index));
 
         self.additional_clauses.remove(index)
@@ -174,6 +170,7 @@ impl DrupListener {
             .unwrap();
     }
 
+    #[allow(dead_code)]
     fn delete(&mut self, clause: &Clause) {
         self.0.write_all(format!("d {} 0\n", clause).as_bytes())
             .unwrap();

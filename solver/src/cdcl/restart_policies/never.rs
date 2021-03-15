@@ -1,11 +1,7 @@
 use super::{
     RestartPolicy,
     RestartPolicyFactory,
-    super::{
-        clause::Clauses,
-        update::Update,
-        variable::Variables,
-    },
+    super::update::Update,
 };
 
 pub struct RestartNeverInstance;

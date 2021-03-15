@@ -59,7 +59,7 @@ impl ClauseDeletionStrategy for BerkMinInstance {
 pub struct BerkMin(usize);
 
 impl ClauseDeletionStrategyFactory for BerkMin {
-    fn create(&self, clauses: &Clauses, variables: &Variables) -> Box<dyn ClauseDeletionStrategy> {
+    fn create(&self, _clauses: &Clauses, _variables: &Variables) -> Box<dyn ClauseDeletionStrategy> {
         Box::new(BerkMinInstance {
             activity: HashMap::default(),
             insertion_order: VecDeque::new(),

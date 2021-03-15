@@ -17,7 +17,6 @@ use super::{
     update::Update,
     util::{BuildHasher, HashSet, IndexMap},
     variable::{Assignment, AssignmentType, Variable, VariableId, Variables},
-    abstract_factory::AbstractFactory,
 };
 
 
