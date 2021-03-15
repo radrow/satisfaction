@@ -61,23 +61,41 @@ Supported arguments:
   * `--algorithm=VALUE` – chooses the algorithm. Following options are available:
     - `bruteforce` – plain bruteforce "try, check, backtrack"
     - `cadical` – references to the [cadical implementation](http://fmv.jku.at/cadical/)
-    - `satisfaction` – our prioprietary DPLL implementation. Can be adjusted with
-    `--branch` option to choose heuristics
-    
-   Defaults to `satisfaction`.
-    
-  * `--branch=VALUE` – tweaks the branching heuristics for `satisfaction` solver.
-  Possible options:
-    - `naive`
-    - `DLIS`
-    - `DLCS`
-    - `MOM`
-    - `Jeroslaw-Wang`
-    
-  Defaults to `DLCS`
+    - `dpll` – our prioprietary DPLL implementation. Supports following parameters:
+      - `dpll-branching` – branching strategy. Possible values:
+        - `naive`
+        - `DLIS`
+        - `DLCS`
+        - `MOM`
+        - `Jeroslaw-Wang`
+        Defaults to `DLCS`.
+    - `cdcl` – our prioprietary CDCL implementation. Supports following parameters:
+      - `cdcl-branching` – Branching strategy. Possible values:
+        - `VSIDS`
+        Defaults to `VSIDS`.
+      - `cdcl-restart` – Restart policy. Possible values:
+        - `fixed`
+        - `geom`
+        - `luby`
+        - `never`
+        Defaults to `luby`.
+      - `cdcl-deletion` – Clause deletion strategy. Possible values:
+        - `berk-min`
+        - `never`
+        Defaults to `berk-min`.
+      - `cdcl-learning` – Learning schema. Possible values:
+        - `relsat`
+        Defaults to `relsat`.
+      - `cdcl-preproc` – Preprocessing techniques. Takes mulitple arguments that shall be executed sequentially:
+        - `niver` – NiVER
+        - `tautologies` – Tautologies elimination
+        - `subsumption` – Self subsumption
+   Defaults to `cdcl`.
   
   * `-r` or `--return-code` – if set, instructs the solver to exit with return code `1`
   if the given formula is satisfied, `0` if not or there was an execution error.
+  
+  * `--drup=FILE` – Output file for a DRUP proof. Currently supported only with `cdcl` algorithm.
 
 ### Return value
 

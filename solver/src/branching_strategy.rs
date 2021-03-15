@@ -33,13 +33,13 @@ impl BranchingStrategy for NaiveBranching {
             .iter()
             .enumerate()
             // Only consider unset variables
-            .filter_map(|(i, v)| match v.value {
+            .find_map(|(i, v)| match v.value {
                 VarValue::Free => Some(CNFVar::new(i, true)),
                 _ => None,
             })
-            .next() // Take the first one
     }
 }
+
 
 /// A small convenience function counting the number of clauses that are mentioned in occ and not
 /// satisfied at the moment.

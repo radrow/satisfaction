@@ -25,8 +25,9 @@ pub fn plot_runtimes(
 
     let max_duration = max_duration.as_millis();
     let mut chart = ChartBuilder::on(&drawing_area)
-        .x_label_area_size(40)
-        .y_label_area_size(40)
+        .x_label_area_size(30)
+        .y_label_area_size(80)
+        .margin(20)
         .build_cartesian_2d(0..max_instances, 0..max_duration)?;
 
     chart
@@ -68,9 +69,12 @@ pub fn plot_runtimes(
         chart
             .draw_series(lines)?
             .label(name)
-            .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &line_color));
+            .legend(move |(x, y)| PathElement::new(vec![(x, y), (x - 20, y)], &line_color));
     }
-    chart.configure_series_labels().draw()?;
+    chart.configure_series_labels()
+        .position(SeriesLabelPosition::UpperLeft)
+        .margin(5)
+        .draw()?;
     Ok(())
 }
 

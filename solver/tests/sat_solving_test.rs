@@ -1,42 +1,75 @@
-use proptest::{bool::weighted, collection::vec, prelude::*};
-use solver::{
-    CNFClause, CNFVar, CadicalSolver, JeroslawWang, NaiveBranching, SATSolution,
-    SatisfactionSolver, Solver, CNF, DLCS, DLIS, MOM,
-};
 use std::path::PathBuf;
+
+use proptest::{bool::weighted, collection::vec, prelude::*};
+
+use solver::{
+    CadicalSolver, CNF, CNFClause, CNFVar, DLCS, DLIS,
+    JeroslawWang, MOM, NaiveBranching, SatisfactionSolver, SATSolution, Solver,
+};
+use solver::cdcl::{
+    CDCLSolver,
+    branching_strategies::VSIDS,
+    learning_schemes::RelSAT,
+    restart_policies::{
+        RestartFixed,
+        RestartGeom,
+        RestartLuby,
+        RestartNever,
+    },
+    deletion_strategies::{NoDeletion, BerkMin},
+    preprocessors::{NiVER, RemoveTautology, ListPreprocessor, NoPreprocessing},
+};
 
 const MAX_NUM_VARIABLES: usize = 50;
 const MAX_NUM_LITERALS: usize = 10;
 const MAX_NUM_CLAUSES: usize = 50;
 
-fn setup_custom_solver() -> Vec<Box<dyn Solver>> {
-    let mut solvers: Vec<Box<dyn Solver>> = Vec::new();
-    solvers.push(Box::new(SatisfactionSolver::new(NaiveBranching)));
-    solvers.push(Box::new(SatisfactionSolver::new(JeroslawWang)));
-    solvers.push(Box::new(SatisfactionSolver::new(DLIS)));
-    solvers.push(Box::new(SatisfactionSolver::new(DLCS)));
-    solvers.push(Box::new(SatisfactionSolver::new(MOM)));
+fn setup_custom_solver() -> Vec<(&'static str, Box<dyn Solver>)> {
+    let mut solvers: Vec<(&'static str, Box<dyn Solver>)> = Vec::new();
+    //solvers.push(("CDCL-BerkMin-Never", Box::new(CDCLSolver::new(VSIDS, RelSAT, BerkMin::default(), RestartNever, NiVER))));
+    //solvers.push(("CDCL-No-Never", Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartNever, RemoveTautology))));
+    //solvers.push(("CDCL-Fixed", Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartFixed::default(), NoPreprocessing))));
+    solvers.push(("CDCL-Fixed", Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartNever, NoPreprocessing, None))));
+    //solvers.push(("CDCL-Geom", Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartGeom::default(), NoPreprocessing))));
+    //solvers.push(("CDCL-Luby", Box::new(CDCLSolver::new(VSIDS, RelSAT, NoDeletion, RestartLuby::default(), NoPreprocessing)))); 
+
+    //solvers.push(("NaiveBranching", Box::new(SatisfactionSolver::new(NaiveBranching))));
+    //solvers.push(("JeroslawWang", Box::new(SatisfactionSolver::new(JeroslawWang))));
+    //solvers.push(("DLIS", Box::new(SatisfactionSolver::new(DLIS))));
+    //solvers.push(("DLCS", Box::new(SatisfactionSolver::new(DLCS))));
+    //solvers.push(("MOM", Box::new(SatisfactionSolver::new(MOM))));
     solvers
 }
 
-fn solve_custom_solvers(formula: &CNF, solvers: Vec<Box<dyn Solver>>) -> SATSolution {
-    let mut sat_solution: SATSolution = SATSolution::Unknown;
-    let solutions: Vec<bool> = solvers
-        .iter()
-        .map(|solver| {
-            sat_solution = solver.solve(formula);
-            match sat_solution {
-                SATSolution::Satisfiable(_) => true,
-                SATSolution::Unsatisfiable => false,
-                SATSolution::Unknown => panic!("Could not solve puzzle in time"),
+fn solve_custom_solvers(formula: &CNF, solvers: Vec<(&'static str, Box<dyn Solver>)>) -> SATSolution {
+    let mut solutions: Vec<SATSolution> = solvers.iter()
+        .map(|(name, solver)| {
+            println!("\nTesting {}\n", *name);
+            let solution = solver.solve(formula);
+            match solution.clone() {
+                SATSolution::Satisfiable(assignment) => assert!(is_satisfied(formula.clauses.iter().cloned(), assignment), *name),
+                _ => {},
             }
-        })
-        .collect();
-    let first = solutions[0].clone();
-    if !solutions.iter().all(|solution| *solution == first) {
-        assert!(false);
-    }
-    solvers[0].solve(formula)
+            solution
+        }).collect();
+
+
+    let result = solutions.iter()
+        .zip(solvers.iter().map(|(name, _)| name))
+        .skip(1)
+        .try_fold(
+            solutions[0].is_sat(),
+            |acc, (solution, name)| {
+                if solution.is_sat() == acc { Ok(acc) }
+                else { Err(*name) }
+            });
+
+    match result {
+        Ok(_) => {},
+        Err(name) => panic!(format!("Branching strategy {} differs in satisfiability", name)),
+    };
+
+    solutions.pop().unwrap()
 }
 
 fn execute_solvers(formula: &CNF) -> (SATSolution, SATSolution) {
@@ -99,20 +132,14 @@ fn prescribed_instances() {
 
 #[test]
 fn failed_proptest_instance() {
-    let formula = CNF {
-        clauses: vec![
-            CNFClause {
-                vars: vec![CNFVar::new(37, false), CNFVar::new(39, false)],
-            },
-            CNFClause {
-                vars: vec![CNFVar::new(37, false), CNFVar::new(39, true)],
-            },
-        ],
-        num_variables: 39,
-    };
+    let formula = CNF::from_dimacs(
+r"
+p cnf 3 1
+2 -1 3
+").unwrap();
     let (custom, reference) = execute_solvers(&formula);
 
-    assert_eq!(custom, reference);
+    assert_eq!(custom.is_sat(), reference.is_sat());
 }
 
 proptest! {

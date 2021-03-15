@@ -1,11 +1,14 @@
 #[macro_use]
 extern crate async_trait;
+#[macro_use]
+extern crate auto_impl;
 
 /// Branching heuristics one can choose from to customize the [`SatisfactionSolver`].
 mod branching_strategy;
 pub mod bruteforce;
 /// Module containing the reference solver cadical.
 mod cadical_solver;
+pub mod cdcl;
 /// The CNF representation of a formula
 pub mod cnf;
 /// Module that contains the custom DPLL solver
