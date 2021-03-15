@@ -1,5 +1,6 @@
 use std::{cell::RefCell,rc::Rc};
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::path::PathBuf;
 
 use itertools::Itertools;
 
@@ -32,6 +33,7 @@ where BF: AbstractFactory<Product=B>,
     deletion_strategy: CF,
     restart_policy: RF,
     preprocessor: PF,
+    drup: Option<PathBuf>,
 }
 
 impl<B,BF,L,LF,C,CF,R,RF,PF> CDCLSolver<B,BF,L,LF,C,CF,R,RF,PF>
@@ -46,13 +48,14 @@ where B: BranchingStrategy,
       RF: AbstractFactory<Product=R>,
       PF: PreprocessorFactory
 {
-    pub fn new(branching_strategy: BF, learning_scheme: LF, deletion_strategy: CF, restart_policy: RF, preprocessor: PF) -> CDCLSolver<B,BF,L,LF,C,CF,R,RF,PF> {
+    pub fn new(branching_strategy: BF, learning_scheme: LF, deletion_strategy: CF, restart_policy: RF, preprocessor: PF, drup: Option<PathBuf>)-> CDCLSolver<B,BF,L,LF,C,CF,R,RF,PF> {
         CDCLSolver {
             branching_strategy,
             learning_scheme,
             deletion_strategy,
             restart_policy,
             preprocessor,
+            drup,
         }
     }
 }
@@ -79,7 +82,8 @@ where B: 'static+BranchingStrategy,
             &self.branching_strategy,
             &self.learning_scheme,
             &self.deletion_strategy,
-            &self.restart_policy
+            &self.restart_policy,
+            self.drup.clone(),
             );
         match execution_state {
             Some(state) => preprocessor.restore(state.cdcl()),
@@ -114,7 +118,8 @@ where B: 'static+Send+Sync+BranchingStrategy,
             &self.branching_strategy,
             &self.learning_scheme,
             &self.deletion_strategy,
-            &self.restart_policy
+            &self.restart_policy,
+            self.drup.clone(),
             );
 
         FlagWaiter::start(move |flag| {
@@ -193,6 +198,7 @@ where B: 'static+BranchingStrategy,
         learning_scheme: &impl AbstractFactory<Product=L>,
         deletion_strategy: &impl AbstractFactory<Product=C>,
         restart_policy: &impl AbstractFactory<Product=R>,
+        drup: Option<PathBuf>,
         ) -> Option<ExecutionState<B, L, C, R>> {
 
         let mut unit_queue = IndexMap::with_capacity_and_hasher(formula.num_variables, BuildHasher::default());
@@ -210,6 +216,11 @@ where B: 'static+BranchingStrategy,
                 .iter()
                 .map(|cnf_clause| Clause::new(cnf_clause))
                 .collect();
+
+        let clauses = match drup {
+            Some(path) => Clauses::drup(clauses,path),
+            None => Clauses::new(clauses),
+        };
 
         let assignment_stack= Vec::with_capacity(formula.num_variables);
 

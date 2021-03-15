@@ -1,6 +1,11 @@
 use std::{collections::BinaryHeap, cmp::Reverse, ops::{Index, IndexMut}, iter::FromIterator};
+use itertools::Itertools;
 use stable_vec::StableVec;
 use crate::{CNFVar, CNFClause};
+use std::fs::File;
+use std::io::Write;
+use std::path::Path;
+use std::fmt;
 
 pub type ClauseId = usize;
 
@@ -46,6 +51,7 @@ pub struct Clauses {
     formula: Vec<Clause>,
     additional_clauses: StableVec<Clause>,
     used_indices: BinaryHeap<Reverse<usize>>,
+    drup: Option<DrupListener>,
 }
 
 impl Clauses {
@@ -54,6 +60,16 @@ impl Clauses {
             formula,
             additional_clauses: StableVec::new(),
             used_indices: BinaryHeap::new(),
+            drup: None,
+        }
+    }
+
+    pub fn drup(formula: Vec<Clause>, path: impl AsRef<Path>) -> Clauses {
+        Clauses {
+            formula,
+            additional_clauses: StableVec::new(),
+            used_indices: BinaryHeap::new(),
+            drup: Some(DrupListener::new(path)),
         }
     }
 
@@ -68,6 +84,10 @@ impl Clauses {
             literals: clause.vars,
             watched_literals,
         };
+
+        if let Some(drup) = &mut self.drup {
+            drup.learn(&clause);
+        }
 
         self.formula.len() + if let Some(Reverse(index)) = self.used_indices.pop() {
             self.additional_clauses.insert(index, clause);
@@ -88,6 +108,10 @@ impl Clauses {
     pub fn remove(&mut self, index: usize) -> (CNFVar, CNFVar) {
         let index = index.checked_sub(self.formula.len())
             .expect("Cannot remove clauses from the original formula!");
+
+        if let Some(drup) = &mut self.drup {
+            drup.delete(&self.additional_clauses[index]);
+        }
 
         self.used_indices.push(Reverse(index));
 
@@ -126,5 +150,39 @@ impl IndexMut<ClauseId> for Clauses {
 impl FromIterator<Clause> for Clauses {
     fn from_iter<T: IntoIterator<Item=Clause>>(iter: T) -> Self {
         Clauses::new(iter.into_iter().collect())
+    }
+}
+
+impl fmt::Display for Clause {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.literals.iter().map(|lit| format!("{}{}", if lit.sign { ' ' } else { '-' }, lit.id+1)).join(" "))
+    }
+}
+
+
+struct DrupListener(File);
+
+impl DrupListener {
+    fn new(path: impl AsRef<Path>) -> DrupListener {
+        let file = File::create(path)
+            .unwrap();
+        DrupListener(file)
+    }
+
+    fn learn(&mut self, clause: &Clause) {
+        self.0.write_all(format!("{} 0\n", clause).as_bytes())
+            .unwrap();
+    }
+
+    fn delete(&mut self, clause: &Clause) {
+        self.0.write_all(format!("d {} 0\n", clause).as_bytes())
+            .unwrap();
+    }
+}
+
+impl Drop for DrupListener {
+    fn drop(&mut self) {
+        self.0.write("0".as_bytes())
+            .unwrap();
     }
 }
